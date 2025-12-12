@@ -289,8 +289,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   const handleApproveAll = () => {
     if (confirm(`Are you sure you want to approve all ${pendingApprovals.length} pending requests?`)) {
-      const nextStatus = currentUser?.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED;
       pendingApprovals.forEach(l => {
+        const nextStatus = currentUser?.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED;
         updateLeaveStatus(l.id, nextStatus, "Bulk Approved");
       });
       showToast(`Approved ${pendingApprovals.length} requests`, "success");

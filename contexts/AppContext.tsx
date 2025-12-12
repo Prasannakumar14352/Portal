@@ -82,6 +82,7 @@ interface AppContextType {
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
   deleteHoliday: (id: string) => Promise<void>;
   generatePayslips: (month: string) => Promise<void>;
+  manualAddPayslip: (payslip: Payslip) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -496,6 +497,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast('Holiday deleted', 'info');
   };
 
+  const manualAddPayslip = async (payslip: Payslip) => {
+      await db.addPayslip(payslip);
+      setPayslips(await db.getPayslips());
+  };
+
   const generatePayslips = async (month: string) => {
       const activeEmployees = employees.filter(e => e.status === 'Active');
       // Refetch payslips to ensure we have the latest list to check duplicates
@@ -539,7 +545,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTimeEntry, updateTimeEntry, deleteTimeEntry,
     checkIn, checkOut, getTodayAttendance,
     notify, markNotificationRead, markAllRead,
-    addHoliday, deleteHoliday, generatePayslips
+    addHoliday, deleteHoliday, generatePayslips, manualAddPayslip
   };
 
   return (

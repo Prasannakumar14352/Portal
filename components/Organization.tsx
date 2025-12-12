@@ -189,6 +189,9 @@ const Organization = () => {
   const totalAllocations = users.length;
   const paginatedAllocations = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const totalDepartments = departments.length;
+  const paginatedDepartments = departments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   // Derived lists for modals
   const employeesInCurrentDept = users.filter(u => u.departmentId === deptForm.id);
   const availableEmployeesForDept = users.filter(u => u.departmentId !== deptForm.id);
@@ -331,7 +334,7 @@ const Organization = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {departments.map(dept => {
+               {paginatedDepartments.map(dept => {
                  const employeeCount = users.filter(u => u.departmentId === dept.id).length;
                  const manager = users.find(u => u.id === dept.managerId);
                  
@@ -386,6 +389,8 @@ const Organization = () => {
                  );
                })}
             </div>
+            
+            <PaginationControls total={totalDepartments} />
          </div>
        )}
 

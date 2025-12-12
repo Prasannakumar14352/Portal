@@ -6,6 +6,9 @@ import {
 } from 'recharts';
 import { useAppContext } from '../contexts/AppContext';
 import { Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1'];
 
@@ -122,30 +125,29 @@ const Reports = () => {
   ];
 
   // --- Export Handler ---
-  const handleExport = (format: 'pdf' | 'csv') => {
+  const handleExport = async (format: 'pdf' | 'csv') => {
     setShowExportMenu(false);
+    showToast("Generating report...", "info");
     
-    if (format === 'pdf') {
-        showToast("Opening print dialog. Please choose 'Save as PDF'.", "info");
-        setTimeout(() => window.print(), 500);
-        return;
-    }
-    
-    // CSV Export Logic
+    // 1. Prepare Data based on Active Tab
     let dataToExport: any[] = [];
     let filename = 'report';
+    let title = 'Report';
 
     switch(activeTab) {
         case 'Projects':
+            title = 'Projects Report';
+            filename = 'projects_report';
             dataToExport = projects.map(p => ({ 
                 Name: p.name, 
                 Status: p.status, 
-                Description: p.description,
+                Description: p.description || '',
                 Tasks: p.tasks.join('; ')
             }));
-            filename = 'projects_report';
             break;
         case 'Time Tracking':
+            title = 'Time Tracking Report';
+            filename = 'time_tracking_report';
             dataToExport = timeEntries.map(t => ({ 
                 Date: t.date, 
                 Project: projects.find(p => p.id === t.projectId)?.name || 'N/A', 
@@ -154,21 +156,22 @@ const Reports = () => {
                 Hours: (t.durationMinutes/60).toFixed(2),
                 Billable: t.isBillable ? 'Yes' : 'No'
             }));
-            filename = 'time_tracking_report';
             break;
         case 'Team Performance':
+             title = 'Team Performance Report';
+             filename = 'team_performance_report';
              dataToExport = teamContributionData.map(d => ({
                  Employee: d.name,
                  TotalHours: d.hours
              }));
-             filename = 'team_performance_report';
              break;
         default: // Dashboard Summary
+             title = 'Dashboard Summary Report';
+             filename = 'dashboard_report';
              dataToExport = [
                  ...projectStatusData.map(d => ({ Metric: 'Project Status', Category: d.name, Value: d.value })),
                  ...taskStatusData.map(d => ({ Metric: 'Task Status', Category: d.name, Value: d.value }))
              ];
-             filename = 'dashboard_report';
     }
 
     if (dataToExport.length === 0) {
@@ -176,6 +179,71 @@ const Reports = () => {
         return;
     }
 
+    // 2. Handle PDF Export
+    if (format === 'pdf') {
+        const doc = new jsPDF();
+        let yPos = 20;
+
+        doc.setFontSize(16);
+        doc.text(title, 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+        yPos = 30;
+
+        // Capture Charts
+        const chartElements = document.querySelectorAll('.report-chart');
+        if (chartElements.length > 0) {
+            for (let i = 0; i < chartElements.length; i++) {
+                const el = chartElements[i] as HTMLElement;
+                // Only process visible charts
+                if (el.offsetParent === null) continue;
+
+                try {
+                    const canvas = await html2canvas(el, { scale: 1.5 });
+                    const imgData = canvas.toDataURL('image/png');
+                    
+                    // A4 Width is 210mm. 
+                    // Let's use 180mm max width for image, with 15mm margins.
+                    const imgWidth = 180; 
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // If image doesn't fit on current page, add new page
+                    if (yPos + imgHeight > 280) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+
+                    doc.addImage(imgData, 'PNG', 15, yPos, imgWidth, imgHeight);
+                    yPos += imgHeight + 10;
+                } catch (err) {
+                    console.error("Error capturing chart for PDF", err);
+                }
+            }
+        }
+        
+        const headers = Object.keys(dataToExport[0]);
+        const body = dataToExport.map(row => Object.values(row));
+
+        // Start table on new page if space is tight
+        if (yPos > 240) {
+            doc.addPage();
+            yPos = 20;
+        }
+
+        autoTable(doc, {
+            head: [headers],
+            body: body,
+            startY: yPos,
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [16, 185, 129] }, // Emerald-500
+        });
+        
+        doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`);
+        showToast("PDF report downloaded.", "success");
+        return;
+    }
+    
+    // 3. Handle CSV Export
     const headers = Object.keys(dataToExport[0]);
     const csvContent = [
         headers.join(','),
@@ -279,7 +347,7 @@ const Reports = () => {
         
         {/* Row 1 */}
         {(activeTab === 'Dashboard' || activeTab === 'Projects') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Project Status Overview</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -306,7 +374,7 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Tasks') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Task Completion Status</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -334,7 +402,7 @@ const Reports = () => {
 
         {/* Row 2 - Full Width */}
         {(activeTab === 'Dashboard' || activeTab === 'Projects') && (
-            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Project Progress (%)</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -352,7 +420,7 @@ const Reports = () => {
 
         {/* Row 3 */}
         {(activeTab === 'Dashboard' || activeTab === 'Tasks') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Task Priority Distribution</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -369,7 +437,7 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Time Tracking') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Time Allocation by Project</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -397,7 +465,7 @@ const Reports = () => {
 
         {/* Row 4 - Time Tracking Details */}
         {(activeTab === 'Dashboard' || activeTab === 'Time Tracking') && (
-            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Weekly Hours Logged</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -415,7 +483,7 @@ const Reports = () => {
 
         {/* Row 5 - Team Performance */}
         {(activeTab === 'Dashboard' || activeTab === 'Team Performance') && (
-            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Team Member Contributions (Hours)</h3>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -432,7 +500,7 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Time Tracking') && (
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Billable vs Non-Billable</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">

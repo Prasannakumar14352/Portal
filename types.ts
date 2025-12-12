@@ -164,8 +164,11 @@ export interface Payslip {
   userName: string;
   month: string; // "May 2024"
   amount: number;
+  currency?: string; // e.g. "₹", "$", "€"
   status: 'Paid' | 'Processing';
   generatedDate: string;
+  fileData?: string; // Base64 Data URL for the PDF
+  fileName?: string;
 }
 
 export interface Holiday {

@@ -127,7 +127,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       role: '',
       department: DepartmentType.IT,
       status: EmployeeStatus.ACTIVE,
-      salary: 50000,
+      salary: 0,
     });
     setShowModal(true);
   };
@@ -173,9 +173,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Filters and Search */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-4 justify-between">
-          <div className="flex flex-col md:flex-row gap-2 flex-1">
+        {/* Filters and Search - Aligned in one line */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            
+            {/* Search - Left Aligned */}
             <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -183,37 +185,45 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 placeholder="Search employees..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
               />
             </div>
-            
-            <div className="flex gap-2">
-              <select 
-                value={filterDept}
-                onChange={(e) => setFilterDept(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="All">All Departments</option>
-                {Object.values(DepartmentType).map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
 
-              <select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="All">All Status</option>
-                {Object.values(EmployeeStatus).map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
+            {/* Filters - Right Aligned */}
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <div className="flex items-center gap-2 text-slate-500">
+                    <Filter size={16} />
+                    <span className="text-sm font-medium">Filters:</span>
+                </div>
+                
+                <select 
+                  value={filterDept}
+                  onChange={(e) => setFilterDept(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-400 transition-colors cursor-pointer shadow-sm"
+                >
+                  <option value="All">All Departments</option>
+                  {Object.values(DepartmentType).map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+
+                <select 
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-400 transition-colors cursor-pointer shadow-sm"
+                >
+                  <option value="All">All Status</option>
+                  {Object.values(EmployeeStatus).map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
             </div>
           </div>
           
-          <div className="text-sm text-slate-500 flex items-center">
-            Showing <span className="font-semibold text-slate-700 mx-1">{filteredEmployees.length}</span> employees
+          <div className="flex justify-end mt-2">
+             <div className="text-xs text-slate-500">
+                Showing <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> employees
+             </div>
           </div>
         </div>
 
@@ -435,15 +445,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Salary ($)</label>
-                  <input
-                    type="number"
-                    value={formData.salary}
-                    onChange={(e) => setFormData({...formData, salary: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
                 </div>
                </div>
 
