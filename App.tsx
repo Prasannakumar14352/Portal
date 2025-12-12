@@ -49,6 +49,7 @@ const ToastContainer = () => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Use the Global API Context
   const { 
@@ -91,6 +92,11 @@ const App: React.FC = () => {
     logout();
   };
 
+  const handleViewChange = (view: string) => {
+    setCurrentView(view);
+    setIsSidebarOpen(false); // Close sidebar on mobile when navigating
+  };
+
   // Wrapper for Leave creation to inject current user details automatically
   const handleCreateLeave = async (leaveData: any) => {
     const newLeave: LeaveRequest = {
@@ -115,10 +121,10 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-        <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-slate-500 animate-pulse">Loading EMP Portal...</p>
+                <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading EMP Portal...</p>
             </div>
         </div>
     );
@@ -166,24 +172,39 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden transition-colors duration-200">
       <ToastContainer />
+      
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar 
         currentView={currentView} 
-        onChangeView={setCurrentView} 
+        onChangeView={handleViewChange} 
         userRole={currentUser.role}
-      />
-      <Header 
-        user={currentUser} 
-        onLogout={handleLogout} 
-        onChangeView={setCurrentView}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
       
-      <main className="flex-1 ml-64 mt-16 p-8 overflow-y-auto h-[calc(100vh-4rem)]">
-        <div className="max-w-7xl mx-auto">
-          {renderContent()}
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col h-full md:ml-64 transition-all duration-300">
+        <Header 
+          user={currentUser} 
+          onLogout={handleLogout} 
+          onChangeView={handleViewChange}
+          onMenuClick={() => setIsSidebarOpen(true)}
+        />
+        
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto mt-16 scrollbar-hide">
+          <div className="max-w-7xl mx-auto pb-10">
+            {renderContent()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

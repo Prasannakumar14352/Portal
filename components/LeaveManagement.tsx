@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveRequest, LeaveTypeConfig, User } from '../types';
 import { 
@@ -588,43 +589,48 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
           )}
 
           {/* Toggle Views (Tabs) */}
-          <div className="flex bg-slate-100 p-1 rounded-lg self-start">
+          <div className="flex bg-slate-100 p-1 rounded-lg self-start overflow-x-auto max-w-full">
             <button 
               onClick={() => setViewMode('requests')}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition ${viewMode === 'requests' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'requests' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <List size={16} />
               <span className="hidden sm:inline">Requests</span>
+              <span className="sm:hidden">Req</span>
             </button>
             <button 
               onClick={() => setViewMode('balances')}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition ${viewMode === 'balances' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'balances' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <PieChart size={16} />
               <span className="hidden sm:inline">Balances</span>
+              <span className="sm:hidden">Bal</span>
             </button>
             <button 
               onClick={() => setViewMode('types')}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition ${viewMode === 'types' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'types' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Layers size={16} />
               <span className="hidden sm:inline">Types</span>
+              <span className="sm:hidden">Type</span>
             </button>
             {isManager && (
               <>
                 <button 
                   onClick={() => setViewMode('team')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition ${viewMode === 'team' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'team' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <Users size={16} />
                   <span className="hidden sm:inline">Team</span>
+                  <span className="sm:hidden">Team</span>
                 </button>
                 <button 
                   onClick={() => setViewMode('calendar')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition ${viewMode === 'calendar' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'calendar' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   <CalendarIcon size={16} />
                   <span className="hidden sm:inline">Calendar</span>
+                  <span className="sm:hidden">Cal</span>
                 </button>
               </>
             )}
@@ -657,7 +663,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                      }} />
                      <label htmlFor="leaves-bulk-upload" className="cursor-pointer bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50 flex items-center space-x-2 text-sm whitespace-nowrap shadow-sm">
                        <Upload size={16} />
-                       <span>Bulk Upload</span>
+                       <span className="hidden sm:inline">Bulk Upload</span>
+                       <span className="sm:hidden">Upload</span>
                      </label>
                   </div>
                 )}

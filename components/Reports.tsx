@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -197,15 +198,15 @@ const Reports = () => {
 
   return (
     <div className="space-y-6 pb-10 animate-fade-in print:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Reports & Analytics</h2>
           <p className="text-slate-500 text-sm">Analyze project performance and team productivity.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
             <select 
-                className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
                 value={filterPeriod}
                 onChange={(e) => setFilterPeriod(e.target.value)}
             >
@@ -214,7 +215,7 @@ const Reports = () => {
                 <option>This Year</option>
             </select>
             <select 
-                className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
                 value={filterProject}
                 onChange={(e) => setFilterProject(e.target.value)}
             >
@@ -223,16 +224,16 @@ const Reports = () => {
             </select>
             
             {/* Export Dropdown */}
-            <div className="relative" ref={exportMenuRef}>
+            <div className="relative w-full sm:w-auto" ref={exportMenuRef}>
               <button 
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm transition-colors"
               >
                 <Download size={16} /> Export
               </button>
               
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-full sm:w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
                     <div className="px-4 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase bg-slate-50/50">
                         Export Format
                     </div>
@@ -255,8 +256,8 @@ const Reports = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 print:hidden">
-        <nav className="flex space-x-8 overflow-x-auto">
+      <div className="border-b border-slate-200 print:hidden overflow-x-auto">
+        <nav className="flex space-x-8 min-w-max pb-1">
           {['Dashboard', 'Projects', 'Tasks', 'Time Tracking', 'Team Performance'].map((tab) => (
             <button
               key={tab}
@@ -340,7 +341,7 @@ const Reports = () => {
                         <BarChart data={projectProgressData} layout="vertical" margin={{ left: 20, right: 30 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                             <XAxis type="number" domain={[0, 100]} />
-                            <YAxis dataKey="name" type="category" width={150} tick={{fontSize: 12}} />
+                            <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 11}} />
                             <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Bar dataKey="progress" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
@@ -379,7 +380,7 @@ const Reports = () => {
                                 cy="50%"
                                 outerRadius={80}
                                 dataKey="value"
-                                label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                label={({name, percent}) => `${(percent * 100).toFixed(0)}%`}
                                 labelLine={false}
                             >
                                 {projectTimeAllocation.map((entry, index) => (
@@ -387,6 +388,7 @@ const Reports = () => {
                                 ))}
                             </Pie>
                             <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                            <Legend verticalAlign="bottom" height={36} />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>

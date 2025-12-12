@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { TimeEntry, Project, UserRole } from '../types';
 import { 
   Clock, Plus, Filter, FileText, ChevronDown, ChevronRight, ChevronLeft, Calendar as CalendarIcon, Edit2, Trash2,
-  DollarSign, FileSpreadsheet, File as FileIcon, AlertTriangle, CheckCircle2, Briefcase, Search, MoreHorizontal, X, Download
+  DollarSign, FileSpreadsheet, File as FileIcon, AlertTriangle, CheckCircle2, Briefcase, Search, MoreHorizontal, X, Download, SlidersHorizontal
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -20,6 +21,7 @@ const TimeLogs = () => {
   
   // View State
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const [showFilters, setShowFilters] = useState(false); // Mobile filter toggle
   
   // Filters
   const [filterProject, setFilterProject] = useState('All');
@@ -384,7 +386,7 @@ const TimeLogs = () => {
           'Rejected': 'bg-red-100 text-red-600 border-red-200'
       };
       return (
-          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${styles[status as keyof typeof styles] || 'bg-gray-100'}`}>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold border ${styles[status as keyof typeof styles] || 'bg-gray-100'}`}>
               {status}
           </span>
       );
@@ -394,48 +396,50 @@ const TimeLogs = () => {
     <div className="space-y-6 pb-12 animate-fade-in">
        
        {/* Top Header & Actions */}
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <Clock className="text-emerald-600" /> Time Logs
              </h2>
              <p className="text-sm text-slate-500">View and manage your time entries</p>
           </div>
-          <div className="flex items-center gap-2">
-             <button onClick={() => handleExport('csv')} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition">
-                <FileSpreadsheet size={16} /> Export CSV
-             </button>
-             <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition">
-                <FileText size={16} /> Export PDF
-             </button>
-             <button onClick={() => handleExport('excel')} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition">
-                <Download size={16} /> Export Excel
-             </button>
-             <button 
-                onClick={() => { resetForm(); setShowModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition ml-2"
-             >
-                <Plus size={18} /> Add Time Entry
-             </button>
+          <div className="flex flex-col sm:flex-row w-full xl:w-auto gap-2">
+             <div className="flex gap-2 w-full sm:w-auto">
+                <button 
+                    onClick={() => setShowFilters(!showFilters)} 
+                    className="flex-1 sm:flex-none xl:hidden flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition"
+                >
+                    <SlidersHorizontal size={16} /> {showFilters ? 'Hide Filters' : 'Filters'}
+                </button>
+                <button onClick={() => { resetForm(); setShowModal(true); }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition">
+                    <Plus size={18} /> <span>Log Time</span>
+                </button>
+             </div>
+             
+             {/* Export Menu (Desktop) */}
+             <div className="hidden sm:flex gap-2">
+                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm"><FileSpreadsheet size={16}/></button>
+                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm"><FileText size={16}/></button>
+             </div>
           </div>
        </div>
 
-       {/* Filters Section */}
-       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-5">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4">
+       {/* Filters Section (Collapsible on Mobile) */}
+       <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-5 transition-all duration-300 ${!showFilters ? 'hidden xl:block' : 'block'}`}>
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4">
              {/* Left: Time Period */}
-             <div>
+             <div className="w-full lg:w-auto">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Time Period</label>
                 <div className="flex bg-slate-100 p-1 rounded-lg">
                    <button 
                      onClick={() => setDateRange('Week')}
-                     className={`px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Week' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}
+                     className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Week' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}
                    >
                      Week
                    </button>
                    <button 
                      onClick={() => setDateRange('Month')}
-                     className={`px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Month' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}
+                     className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Month' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}
                    >
                      Month
                    </button>
@@ -443,11 +447,11 @@ const TimeLogs = () => {
              </div>
 
              {/* Center: Date Navigation */}
-             <div className="flex flex-col items-center">
+             <div className="flex flex-col items-center w-full lg:w-auto">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date Range</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full lg:w-auto justify-center">
                    <button onClick={() => handleDateNavigation('prev')} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500"><ChevronLeft size={16} /></button>
-                   <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 min-w-[180px] text-center shadow-sm">
+                   <div className="flex-1 lg:flex-none px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 min-w-[180px] text-center shadow-sm">
                       {dateRange === 'Month' 
                         ? viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })
                         : `${weekDays[0].toLocaleDateString()} - ${weekDays[4].toLocaleDateString()}`
@@ -458,11 +462,11 @@ const TimeLogs = () => {
                 </div>
              </div>
 
-             {/* Right: Status Placeholder/Spacer */}
-             <div className="hidden md:block w-32"></div> 
+             {/* Right: Spacer */}
+             <div className="hidden lg:block w-32"></div> 
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
              <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Filter by Project</label>
                 <div className="relative">
@@ -518,12 +522,12 @@ const TimeLogs = () => {
 
        {/* Timesheet List Grouped by Project */}
        <div>
-          <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 rounded-t-xl font-semibold text-slate-700 text-sm">
+          <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 py-3 rounded-t-xl font-semibold text-slate-700 text-sm">
              Timesheet for {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
           </div>
           <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden shadow-sm">
-             {/* Table Header */}
-             <div className="grid grid-cols-12 bg-slate-50/50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase px-4 py-3">
+             {/* Table Header - Desktop Only */}
+             <div className="hidden lg:grid grid-cols-12 bg-slate-50/50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase px-4 py-3">
                 <div className="col-span-2">Date</div>
                 <div className="col-span-2">Project</div>
                 <div className="col-span-3">Task</div>
@@ -561,31 +565,63 @@ const TimeLogs = () => {
                             const user = users.find(u => u.id === entry.userId);
                             const entryDate = new Date(entry.date);
                             return (
-                               <div key={entry.id} className="grid grid-cols-12 items-center px-4 py-3 border-t border-slate-100 hover:bg-blue-50/30 text-sm transition relative group">
-                                  <div className="col-span-2 flex flex-col">
+                               <div key={entry.id} className="flex flex-col lg:grid lg:grid-cols-12 items-start lg:items-center px-4 py-4 lg:py-3 border-t border-slate-100 hover:bg-blue-50/30 text-sm transition relative group gap-2 lg:gap-0">
+                                  
+                                  {/* Mobile View Structure */}
+                                  <div className="lg:hidden w-full space-y-2">
+                                     <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-bold text-slate-800">{entry.task}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{entryDate.toLocaleDateString()} • {projectName}</p>
+                                        </div>
+                                        <span className="font-mono font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded text-xs">{formatDuration(entry.durationMinutes)}</span>
+                                     </div>
+                                     
+                                     {entry.description && <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">{entry.description}</p>}
+                                     
+                                     <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <StatusBadge status={entry.status} />
+                                            {entry.isBillable && <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><DollarSign size={10}/> Billable</span>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => handleEdit(entry)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={14}/></button>
+                                            <button onClick={() => initiateDelete(entry.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
+                                        </div>
+                                     </div>
+                                  </div>
+
+                                  {/* Desktop Columns */}
+                                  <div className="col-span-2 hidden lg:flex flex-col">
                                      <span className="font-medium text-slate-700">{entryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                                      <span className="text-xs text-slate-400">{entryDate.getFullYear()}</span>
                                   </div>
-                                  <div className="col-span-2 truncate pr-2 text-slate-600 text-xs" title={projectName}>
+                                  
+                                  <div className="col-span-2 hidden lg:block truncate pr-2 text-slate-600 text-xs" title={projectName}>
                                      {projectName}
                                   </div>
-                                  <div className="col-span-3 pr-2">
+                                  
+                                  <div className="col-span-3 pr-2 w-full hidden lg:block">
                                      <p className="text-slate-800 font-medium truncate">{entry.task}</p>
                                      {entry.description && <p className="text-xs text-slate-400 truncate">{entry.description}</p>}
                                   </div>
-                                  <div className="col-span-2 text-slate-600 text-xs">
+                                  
+                                  <div className="col-span-2 text-slate-600 text-xs hidden lg:block">
                                      {user ? `${user.firstName} ${user.lastName}` : 'Unknown'}
                                   </div>
-                                  <div className="col-span-1 font-mono text-slate-700">
+                                  
+                                  <div className="col-span-1 font-mono text-slate-700 hidden lg:block">
                                      {formatDuration(entry.durationMinutes)}
                                   </div>
-                                  <div className="col-span-1 flex flex-col gap-1 items-start">
+
+                                  <div className="col-span-1 hidden lg:flex flex-col gap-1 items-start">
                                      <StatusBadge status={entry.status} />
                                      {entry.isBillable && (
                                         <span className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-green-200">Billable</span>
                                      )}
                                   </div>
-                                  <div className="col-span-1 text-right relative">
+                                  
+                                  <div className="col-span-1 text-right relative hidden lg:block">
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === entry.id ? null : entry.id); }}
                                         className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
@@ -619,11 +655,12 @@ const TimeLogs = () => {
              <h3 className="font-bold text-slate-800">Weekly Timesheet Report</h3>
              <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1 rounded-lg text-xs font-medium text-slate-600 shadow-sm">
                 <CalendarIcon size={14} className="text-slate-400" />
-                {weekDays[0].toLocaleDateString()} - {weekDays[4].toLocaleDateString()}
+                <span className="hidden sm:inline">{weekDays[0].toLocaleDateString()} - {weekDays[4].toLocaleDateString()}</span>
+                <span className="sm:hidden text-[10px]">Current Week</span>
              </div>
           </div>
           <div className="overflow-x-auto">
-             <table className="w-full text-left border-collapse text-sm">
+             <table className="w-full text-left border-collapse text-sm min-w-[600px]">
                 <thead>
                    <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase">
                       <th className="px-6 py-3 border-b border-slate-200">Client & Project</th>

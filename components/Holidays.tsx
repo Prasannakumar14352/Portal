@@ -68,7 +68,7 @@ const Holidays = () => {
 
       return (
         <div className={`bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition group ${compact ? 'p-4' : 'p-5'}`}>
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
                 {/* Date Box */}
                 <div className={`flex flex-col items-center justify-center text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl flex-shrink-0 ${compact ? 'w-14 h-14' : 'w-16 h-16'}`}>
                     <span className="text-xs font-bold tracking-wider">{month}</span>
@@ -76,18 +76,18 @@ const Holidays = () => {
                 </div>
                 
                 {/* Details */}
-                <div>
+                <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                        <h4 className={`${compact ? 'text-base' : 'text-lg'} font-bold text-slate-800`}>{holiday.name}</h4>
+                        <h4 className={`${compact ? 'text-base' : 'text-lg'} font-bold text-slate-800 truncate`}>{holiday.name}</h4>
                         {upcoming && (
-                            <span className="bg-slate-700 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold">Upcoming</span>
+                            <span className="bg-slate-700 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold whitespace-nowrap flex-shrink-0">Upcoming</span>
                         )}
                     </div>
-                    <p className="text-slate-500 text-sm font-medium">
+                    <p className="text-slate-500 text-sm font-medium truncate">
                         {dayName} • <span className="text-slate-400 font-normal">{holiday.type} Holiday</span>
                     </p>
                     {!compact && (
-                        <p className="text-xs text-slate-400 mt-1">
+                        <p className="text-xs text-slate-400 mt-1 truncate">
                             {holiday.type === 'Public' ? 'National observance' : 'Company observance'}
                         </p>
                     )}
@@ -96,7 +96,7 @@ const Holidays = () => {
 
             {/* Actions (Only in full view and if HR) */}
             {!compact && isHR && (
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-1 ml-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                     <button className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition" title="Edit">
                         <Edit2 size={18} />
                     </button>
@@ -120,7 +120,7 @@ const Holidays = () => {
           {isHR && (
             <button 
                 onClick={() => setShowModal(true)}
-                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm font-medium text-sm"
+                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm font-medium text-sm w-full md:w-auto justify-center"
             >
                 <Plus size={16} /> Add Holiday
             </button>
@@ -155,15 +155,14 @@ const Holidays = () => {
                    
                    {nextHoliday ? (
                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                           {/* Reusing the HolidayCard component but in compact mode, reusing the logic to match the "show like this" request which pointed to a card style */}
                            <div className="flex flex-col gap-4">
                                 <div className="flex items-start gap-4">
                                     <div className="w-14 h-14 bg-emerald-50 rounded-xl flex flex-col items-center justify-center text-emerald-700 border border-emerald-100 flex-shrink-0">
                                         <span className="text-xs font-bold tracking-wider">{getDateParts(nextHoliday.date).month}</span>
                                         <span className="text-xl font-bold leading-none">{getDateParts(nextHoliday.date).day}</span>
                                     </div>
-                                    <div>
-                                        <h4 className="text-base font-bold text-slate-800">{nextHoliday.name}</h4>
+                                    <div className="min-w-0">
+                                        <h4 className="text-base font-bold text-slate-800 truncate">{nextHoliday.name}</h4>
                                         <p className="text-slate-500 text-sm">{getDateParts(nextHoliday.date).full}</p>
                                         <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
                                             {nextHoliday.type}

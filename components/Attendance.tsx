@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord } from '../types';
 import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -160,8 +161,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     <div className="space-y-6">
       
       {/* Interactive Attendance Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-6">
-         <div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row justify-between items-center gap-6">
+         <div className="text-center lg:text-left">
             <h2 className="text-2xl font-bold text-slate-800">Attendance Tracker</h2>
             <p className="text-slate-500">Manage your daily work hours.</p>
             <div className="mt-2 text-3xl font-mono text-slate-700 font-semibold tracking-wider">
@@ -174,14 +175,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
              {!todayRecord ? (
                 <button 
                   onClick={() => checkIn()}
-                  className="flex flex-col items-center justify-center w-40 h-40 bg-emerald-50 rounded-full border-4 border-emerald-100 hover:bg-emerald-100 hover:scale-105 transition-all group cursor-pointer shadow-sm"
+                  className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-emerald-50 rounded-full border-4 border-emerald-100 hover:bg-emerald-100 hover:scale-105 transition-all group cursor-pointer shadow-sm"
                 >
                    <PlayCircle size={48} className="text-emerald-600 mb-2 group-hover:text-emerald-700" />
                    <span className="font-bold text-emerald-700">Check In</span>
                    <span className="text-xs text-emerald-500">Start your day</span>
                 </button>
              ) : todayRecord.checkOut ? (
-                <div className="flex flex-col items-center justify-center w-40 h-40 bg-gray-50 rounded-full border-4 border-gray-100">
+                <div className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-gray-50 rounded-full border-4 border-gray-100">
                    <CheckCircle2 size={48} className="text-gray-400 mb-2" />
                    <span className="font-bold text-gray-500">Completed</span>
                    <span className="text-xs text-gray-400">Good job today!</span>
@@ -189,7 +190,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
              ) : (
                 <button 
                   onClick={handleCheckOutClick}
-                  className={`flex flex-col items-center justify-center w-40 h-40 rounded-full border-4 hover:scale-105 transition-all group cursor-pointer shadow-sm ${
+                  className={`flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 rounded-full border-4 hover:scale-105 transition-all group cursor-pointer shadow-sm ${
                     isEarlyLogout ? 'bg-amber-50 border-amber-100 hover:bg-amber-100' : 'bg-red-50 border-red-100 hover:bg-red-100'
                   }`}
                 >
@@ -204,7 +205,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
              )}
          </div>
 
-         <div className="w-full md:w-auto bg-slate-50 p-4 rounded-lg border border-slate-100 min-w-[200px]">
+         <div className="w-full lg:w-auto bg-slate-50 p-4 rounded-lg border border-slate-100 min-w-[200px]">
             <h4 className="text-sm font-bold text-slate-700 mb-2 uppercase">Today's Session</h4>
             <div className="space-y-2 text-sm">
                <div className="flex justify-between">
@@ -373,8 +374,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       )}
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        <div className="md:col-span-2">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div className="sm:col-span-2">
            <label className="block text-xs font-medium text-slate-500 mb-1">Search Employee</label>
            <div className="relative">
              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
@@ -409,7 +410,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px] md:min-w-0">
             <thead>
               <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider font-semibold">
                 <th className="px-6 py-4">Employee</th>
@@ -476,7 +477,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         </div>
 
         {/* Pagination Controls */}
-        <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50/50">
+        <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t border-slate-200 bg-slate-50/50 gap-4 sm:gap-0">
            <div className="flex items-center gap-2 text-xs text-slate-500">
              <span>Show</span>
              <select 
@@ -490,8 +491,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 <option value={50}>50</option>
              </select>
              <span>per page</span>
-             <span className="mx-2 text-slate-300">|</span>
-             <span>
+             <span className="hidden sm:inline mx-2 text-slate-300">|</span>
+             <span className="hidden sm:inline">
                Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredRecords.length)}</span> of <span className="font-medium text-slate-700">{filteredRecords.length}</span> results
              </span>
            </div>

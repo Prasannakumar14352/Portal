@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, User, Department, Project, Employee } from '../types';
@@ -200,7 +201,7 @@ const Organization = () => {
     if (total === 0) return null;
 
     return (
-      <div className="flex justify-between items-center p-4 pt-6 border-t border-gray-200">
+      <div className="flex flex-col sm:flex-row justify-between items-center p-4 pt-6 border-t border-gray-200 gap-4 sm:gap-0">
          <div className="flex items-center gap-2 text-xs text-gray-500">
              <span>Show</span>
              <select 
@@ -215,8 +216,8 @@ const Organization = () => {
                 <option value={20}>20</option>
              </select>
              <span>items</span>
-             <span className="mx-2 text-gray-300">|</span>
-             <span>
+             <span className="hidden sm:inline mx-2 text-gray-300">|</span>
+             <span className="hidden sm:inline">
                 Showing <span className="font-medium text-gray-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-gray-700">{Math.min(currentPage * itemsPerPage, total)}</span> of <span className="font-medium text-gray-700">{total}</span> results
              </span>
          </div>
@@ -266,35 +267,35 @@ const Organization = () => {
         </div>
        )}
 
-       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Organization Settings</h2>
             <p className="text-sm text-gray-500">Manage company departments, projects, and people allocations.</p>
           </div>
           
-          <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
+          <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto w-full xl:w-auto max-w-full no-scrollbar">
              <button 
                onClick={() => setActiveTab('departments')}
-               className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Departments
              </button>
              <button 
                onClick={() => setActiveTab('projects')}
-               className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'projects' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'projects' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Projects
              </button>
              <button 
                onClick={() => setActiveTab('allocations')}
-               className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'allocations' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'allocations' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Allocations
              </button>
              {showEmployeesTab && (
                <button 
                  onClick={() => setActiveTab('employees')}
-                 className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'employees' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+                 className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'employees' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
                >
                  Employees
                </button>
@@ -324,7 +325,7 @@ const Organization = () => {
                </h3>
                {isHR && (
                  <button onClick={() => { setDeptForm({ name: '', description: '', managerId: '' }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 shadow-sm flex items-center gap-2">
-                   <FolderPlus size={16} /> Add Department
+                   <FolderPlus size={16} /> Add Dept
                  </button>
                )}
             </div>
@@ -344,7 +345,7 @@ const Organization = () => {
                          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
                            <Building2 size={20} />
                          </div>
-                         <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <div className="flex space-x-2 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
                            {isHR ? (
                              <>
                                 <button onClick={(e) => { e.stopPropagation(); openDeptView(dept); }} className="text-gray-400 hover:text-emerald-600">
@@ -399,10 +400,10 @@ const Organization = () => {
                
                <div className="flex items-center gap-3 w-full sm:w-auto">
                  {/* Filter */}
-                 <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                 <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 flex-1 sm:flex-none">
                     <Filter size={14} className="text-gray-400" />
                     <select 
-                      className="text-sm bg-transparent outline-none text-gray-700"
+                      className="text-sm bg-transparent outline-none text-gray-700 w-full"
                       value={projFilter}
                       onChange={(e) => setProjFilter(e.target.value as any)}
                     >
@@ -446,7 +447,7 @@ const Organization = () => {
                            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${proj.status === 'Active' ? 'bg-green-100 text-green-700' : proj.status === 'On Hold' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
                              {proj.status}
                            </span>
-                           <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <div className="flex space-x-1 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
                               {isHR ? (
                                 <>
                                   <button onClick={(e) => { e.stopPropagation(); openProjView(proj); }} className="text-gray-400 hover:text-emerald-600">
@@ -503,7 +504,7 @@ const Organization = () => {
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left min-w-[600px] md:min-w-0">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-100">
                   <tr>
                     <th className="px-6 py-4">Employee</th>

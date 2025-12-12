@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, XCircle } from 'lucide-react';
 import { getHRChatResponse, resetChatSession } from '../services/geminiService';
@@ -64,7 +65,7 @@ const HRAssistant: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="h-[calc(100dvh-8rem)] flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex items-center justify-between text-white">
         <div className="flex items-center space-x-3">
@@ -93,13 +94,13 @@ const HRAssistant: React.FC = () => {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50">
         {messages.map((msg) => (
           <div 
             key={msg.id} 
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`flex max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3`}>
+            <div className={`flex max-w-[95%] md:max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 
                 ${msg.role === 'user' ? 'bg-blue-600' : msg.isError ? 'bg-red-500' : 'bg-indigo-600'}`}>
                 {msg.role === 'user' ? <User size={16} className="text-white" /> : <Bot size={16} className="text-white" />}
@@ -151,20 +152,20 @@ const HRAssistant: React.FC = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about leave policies, draft an email, or generate a job description..."
-            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+            placeholder="Ask about HR policies..."
+            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm"
           />
           <button 
             type="submit" 
             disabled={!input.trim() || isLoading}
-            className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center justify-center"
+            className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center justify-center shrink-0"
           >
             <Send size={20} />
           </button>
         </form>
-        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400 justify-center">
-          <AlertCircle size={12} />
-          <span>AI can make mistakes. Please verify important HR information.</span>
+        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400 justify-center text-center">
+          <AlertCircle size={12} className="shrink-0" />
+          <span>AI can make mistakes. Verify important info.</span>
         </div>
       </div>
     </div>

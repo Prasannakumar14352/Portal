@@ -20,6 +20,10 @@ interface AppContextType {
   toasts: ToastMessage[];
   isLoading: boolean;
   currentUser: User | null;
+  
+  // Theme State
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 
   // Actions (The API)
   refreshData: () => Promise<void>;
@@ -96,6 +100,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   // Initial Load
   const refreshData = async () => {
@@ -131,10 +136,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const init = async () => {
       setIsLoading(true);
       await refreshData();
+      
+      // Load theme
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+      if (savedTheme) {
+          setTheme(savedTheme);
+          if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+      } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          setTheme('dark');
+          document.documentElement.classList.add('dark');
+      }
+      
       setIsLoading(false);
     };
     init();
   }, []);
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+        const newTheme = prev === 'light' ? 'dark' : 'light';
+        localStorage.setItem('theme', newTheme);
+        if (newTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        return newTheme;
+    });
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     const currentEmployees = await db.getEmployees();
@@ -500,8 +529,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const value = {
     employees, users: employees, departments, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
-    holidays, payslips, toasts, isLoading, currentUser,
-    login, logout, forgotPassword, refreshData, showToast, removeToast,
+    holidays, payslips, toasts, isLoading, currentUser, theme,
+    login, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     addEmployee, updateEmployee, updateUser, deleteEmployee,
     addDepartment, updateDepartment, deleteDepartment,
     addProject, updateProject, deleteProject,
