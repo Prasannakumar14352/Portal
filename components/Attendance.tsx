@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord } from '../types';
-import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
 interface AttendanceProps {
@@ -12,6 +12,10 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchName, setSearchName] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Attendance Logic State
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -136,6 +140,18 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
     return nameMatch && dateMatch;
   });
+
+  // Reset pagination when filters or items per page change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchName, startDate, endDate, itemsPerPage]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Filter projects assigned to user
   const userProjects = projects.filter(p => currentUser?.projectIds?.includes(p.id));
@@ -405,7 +421,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredRecords.map((record) => (
+              {paginatedRecords.map((record) => (
                 <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">
                     {record.employeeName}
@@ -448,7 +464,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </td>
                 </tr>
               ))}
-              {filteredRecords.length === 0 && (
+              {paginatedRecords.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                     No attendance records found matching your filters.
@@ -457,6 +473,47 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50/50">
+           <div className="flex items-center gap-2 text-xs text-slate-500">
+             <span>Show</span>
+             <select 
+               value={itemsPerPage}
+               onChange={(e) => setItemsPerPage(Number(e.target.value))}
+               className="border border-slate-300 rounded p-1 outline-none bg-white focus:ring-2 focus:ring-blue-500"
+             >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+             </select>
+             <span>per page</span>
+             <span className="mx-2 text-slate-300">|</span>
+             <span>
+               Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredRecords.length)}</span> of <span className="font-medium text-slate-700">{filteredRecords.length}</span> results
+             </span>
+           </div>
+           <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-slate-600 shadow-sm"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-medium text-slate-600 px-2">
+                 Page {currentPage} of {totalPages || 1}
+              </span>
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="p-1.5 rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-slate-600 shadow-sm"
+              >
+                <ChevronRight size={16} />
+              </button>
+           </div>
         </div>
       </div>
     </div>

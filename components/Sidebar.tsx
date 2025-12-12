@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { LayoutDashboard, Users, Calendar, Clock, MessageSquareText, Building2, Timer, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, MessageSquareText, Building2, Timer, BarChart3, FileText, Coffee } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface SidebarProps {
@@ -12,6 +13,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole }
   const getMenuItems = () => {
     const commonItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'holidays', label: 'Holidays', icon: Coffee }, // New
       { id: 'ai-assistant', label: 'HR Assistant', icon: MessageSquareText },
     ];
 
@@ -22,20 +24,23 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole }
         { id: 'time-logs', label: 'Time Logs', icon: Timer },
         { id: 'attendance', label: 'My Attendance', icon: Clock },
         { id: 'leaves', label: 'Leaves', icon: Calendar },
-        commonItems[1]
+        { id: 'payslips', label: 'Payslips', icon: FileText }, // New
+        commonItems[1], // Holidays
+        commonItems[2]  // AI
       ];
     }
 
     // HR and Manager
     return [
       commonItems[0],
-      { id: 'employees', label: 'Employees', icon: Users },
       { id: 'organization', label: 'Organization', icon: Building2 },
       { id: 'time-logs', label: 'Time Logs', icon: Timer },
       { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'attendance', label: 'Attendance', icon: Clock },
       { id: 'leaves', label: 'Leave Management', icon: Calendar },
-      commonItems[1]
+      { id: 'payslips', label: 'Payslips', icon: FileText }, // New
+      commonItems[1], // Holidays
+      commonItems[2]  // AI
     ];
   };
 

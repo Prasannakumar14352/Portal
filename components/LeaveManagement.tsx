@@ -121,6 +121,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [reviewComment, setReviewComment] = useState('');
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  
   // Team View State
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
@@ -188,14 +192,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     if (currentUser?.role === UserRole.HR) {
       filtered = leaves;
     } else if (currentUser?.role === UserRole.MANAGER) {
-      // Logic: Show leaves where I am the approver OR leaves of my direct reports
-      // Also show my own leaves
       const directReports = users.filter(u => u.managerId === currentUser.id).map(u => u.id);
       
       const relevantLeaves = leaves.filter(l => 
-        l.userId === currentUser.id || // My leaves
-        l.approverId === currentUser.id || // Explicitly assigned to me
-        (directReports.includes(l.userId) && (!l.approverId || l.approverId === currentUser.id)) // Direct report leaves (if not assigned to someone else)
+        l.userId === currentUser.id || 
+        l.approverId === currentUser.id || 
+        (directReports.includes(l.userId) && (!l.approverId || l.approverId === currentUser.id)) 
       );
       
       filtered = relevantLeaves;
@@ -213,6 +215,18 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       l.status.toLowerCase().includes(lowerQ)
     );
   }, [visibleLeaves, searchQuery]);
+
+  // Reset pagination on search or itemsPerPage change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, itemsPerPage]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(searchedLeaves.length / itemsPerPage);
+  const paginatedLeaves = searchedLeaves.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Pending Actions Logic
   const pendingApprovals = searchedLeaves.filter(l => 
@@ -249,7 +263,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   };
 
   const handleOpenEdit = (leave: LeaveRequest) => {
-    // Only allow editing if pending
     if (leave.status !== LeaveStatus.PENDING_MANAGER) {
         showToast("You can only edit pending requests.", "error");
         return;
@@ -342,7 +355,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     for (let i = 0; i < firstDayOfWeek; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(new Date(calMonth.getFullYear(), calMonth.getMonth(), i));
 
-    // Get relevant team leaves
     const teamLeaves = visibleLeaves.filter(l => l.userId !== currentUser?.id); 
 
     const getLeavesForDate = (date: Date) => {
@@ -398,7 +410,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 })}
             </div>
 
-            {/* Date Details Modal */}
             {selectedCalDate && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedCalDate(null)}>
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
@@ -427,13 +438,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   };
 
   const TeamView = () => {
-    // Show direct reports
     const myTeam = users.filter(u => u.managerId === currentUser?.id);
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
         {myTeam.map(member => {
-           // Calculate balances for this user
            const memberLeaves = leaves.filter(l => l.userId === member.id);
            
            return (
@@ -756,7 +765,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                          className="flex-1 text-xs border border-orange-200 rounded px-2 py-1 focus:ring-1 focus:ring-orange-500 outline-none"
                          onChange={(e) => setReviewComment(e.target.value)}
                        />
-                       {/* Manager approves to PENDING_HR, HR approves to APPROVED */}
                        <button onClick={() => updateLeaveStatus(leave.id, currentUser.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED, reviewComment)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200"><CheckCircle size={18}/></button>
                        <button onClick={() => {
                            const reason = prompt("Reason for rejection:");
@@ -782,7 +790,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {searchedLeaves.map(leave => (
+                  {paginatedLeaves.map(leave => (
                     <tr key={leave.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
@@ -813,7 +821,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                             <Edit2 size={12} className="mr-1"/> Edit
                           </button>
                         ) : (
-                          // Logic for List View Actions
                           ((currentUser?.role === UserRole.HR && leave.status === LeaveStatus.PENDING_HR) || 
                            (currentUser?.role === UserRole.MANAGER && leave.status === LeaveStatus.PENDING_MANAGER)) ? (
                             <div className="flex gap-2">
@@ -842,11 +849,52 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                       </td>
                     </tr>
                   ))}
-                  {searchedLeaves.length === 0 && (
+                  {paginatedLeaves.length === 0 && (
                      <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400 text-sm">No records found.</td></tr>
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50/50">
+               <div className="flex items-center gap-2 text-xs text-slate-500">
+                 <span>Show</span>
+                 <select 
+                   value={itemsPerPage}
+                   onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                   className="border border-slate-300 rounded p-1 outline-none bg-white focus:ring-2 focus:ring-emerald-500"
+                 >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                 </select>
+                 <span>per page</span>
+                 <span className="mx-2 text-slate-300">|</span>
+                 <span>
+                   Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, searchedLeaves.length)}</span> of <span className="font-medium text-slate-700">{searchedLeaves.length}</span> results
+                 </span>
+               </div>
+               <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-slate-600 shadow-sm"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-xs font-medium text-slate-600 px-2">
+                     Page {currentPage} of {totalPages || 1}
+                  </span>
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="p-1.5 rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-slate-600 shadow-sm"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+               </div>
             </div>
           </div>
         </>

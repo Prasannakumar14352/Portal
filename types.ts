@@ -1,3 +1,4 @@
+
 export enum DepartmentType {
   IT = 'IT',
   HR = 'HR',
@@ -40,16 +41,16 @@ export interface Employee {
   firstName: string;
   lastName: string;
   email: string;
+  password?: string; // Added password field
   role: string;
-  department: string; // Changed from Enum to string to support dynamic departments
-  departmentId?: string; // Link to Department entity
-  projectIds?: string[]; // Link to Project entities
+  department: string; 
+  departmentId?: string; 
+  projectIds?: string[]; 
   joinDate: string;
   status: EmployeeStatus;
   salary: number;
   avatar: string;
   managerId?: string; 
-  // Added optional fields for Profile/Map features
   location?: { latitude: number; longitude: number; address: string };
   phone?: string;
   jobTitle?: string;
@@ -98,12 +99,12 @@ export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
   date: string;
-  checkIn: string; // Display string e.g., "09:00 AM"
-  checkOut: string; // Display string e.g., "06:00 PM"
-  checkInTime?: string; // ISO string for calculation
-  checkOutTime?: string; // ISO string for calculation
+  checkIn: string; 
+  checkOut: string; 
+  checkInTime?: string; 
+  checkOutTime?: string; 
   status: 'Present' | 'Absent' | 'Late';
-  notes?: string; // For early logout reasons
+  notes?: string; 
 }
 
 export interface TimeEntry {
@@ -139,13 +140,12 @@ export interface User {
   avatar: string;
   managerId?: string;
   jobTitle?: string;
-  departmentId?: string; // Added for Organization component
-  projectIds?: string[]; // Added for Organization component
-  // Optional for UI compatibility
+  departmentId?: string; 
+  projectIds?: string[]; 
   phone?: string;
   location?: { latitude: number; longitude: number; address: string };
   hireDate?: string;
-  email?: string; // Added for Profile compatibility
+  email?: string; 
 }
 
 export interface Notification {
@@ -161,9 +161,16 @@ export interface Notification {
 export interface Payslip {
   id: string;
   userId: string;
-  month: string;
-  year: number;
+  userName: string;
+  month: string; // "May 2024"
   amount: number;
-  pdfUrl: string; // Blob URL
-  uploadedAt: string;
+  status: 'Paid' | 'Processing';
+  generatedDate: string;
+}
+
+export interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  type: 'Public' | 'Company';
 }

@@ -5,6 +5,8 @@ import {
   Clock, Plus, Filter, FileText, ChevronDown, ChevronRight, ChevronLeft, Calendar as CalendarIcon, Edit2, Trash2,
   DollarSign, FileSpreadsheet, File as FileIcon, AlertTriangle, CheckCircle2, Briefcase, Search, MoreHorizontal, X, Download
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const TimeLogs = () => {
   const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, users, showToast } = useAppContext();
@@ -15,7 +17,6 @@ const TimeLogs = () => {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // View State
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
@@ -150,7 +151,6 @@ const TimeLogs = () => {
         const startOfWeek = weekDays[0];
         const endOfWeek = new Date(weekDays[4]); // Friday
         endOfWeek.setHours(23, 59, 59);
-        // Usually weeks include weekends, but assuming work week for this view based on screenshot
         const realEndOfWeek = new Date(startOfWeek);
         realEndOfWeek.setDate(startOfWeek.getDate() + 6);
         realEndOfWeek.setHours(23, 59, 59);
@@ -180,7 +180,7 @@ const TimeLogs = () => {
       const allIds = Object.keys(groupedEntries);
       const initialState: Record<string, boolean> = {};
       allIds.forEach(id => initialState[id] = true);
-      setExpandedProjects(prev => ({...initialState, ...prev})); // Keep existing toggles if any
+      setExpandedProjects(prev => ({...initialState, ...prev})); 
   }, [groupedEntries]);
 
   const toggleProjectGroup = (pid: string) => {
@@ -199,7 +199,6 @@ const TimeLogs = () => {
         return d >= startOfWeek && d <= endOfWeek;
      });
 
-     // Apply same user/project filters
      if (!isHR) relevantEntries = relevantEntries.filter(e => e.userId === currentUser?.id);
      if (filterProject !== 'All') relevantEntries = relevantEntries.filter(e => (e.projectId || NO_PROJECT_ID) === filterProject);
 
@@ -307,7 +306,7 @@ const TimeLogs = () => {
           return [
             e.date,
             getProjectName(e.projectId),
-            e.task.replace(/,/g, ' '), // Remove commas for CSV
+            e.task.replace(/,/g, ' '),
             userName,
             e.durationMinutes,
             e.status,
@@ -316,7 +315,21 @@ const TimeLogs = () => {
       });
 
       if (type === 'pdf') {
-          window.print();
+          const doc = new jsPDF();
+          doc.text("Timesheet Report", 14, 15);
+          doc.setFontSize(10);
+          doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 20);
+          
+          autoTable(doc, {
+            head: [headers],
+            body: rows,
+            startY: 25,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [16, 185, 129] }, // Emerald-500
+          });
+          
+          doc.save(`timesheet_${new Date().toISOString().split('T')[0]}.pdf`);
+          showToast("PDF report downloaded.", "success");
           return;
       }
 

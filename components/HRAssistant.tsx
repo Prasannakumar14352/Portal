@@ -49,7 +49,7 @@ const HRAssistant: React.FC = () => {
     const responseText = await getHRChatResponse(userMessage.text);
     
     // Check if the response suggests an error based on the service's default error string
-    const isError = responseText.includes("Sorry, I encountered an error") || responseText.includes("apologize");
+    const isError = responseText.includes("Sorry, I encountered an issue") || responseText.includes("apologize");
 
     const botMessage: ChatMessage = {
       id: (Date.now() + 1).toString(),

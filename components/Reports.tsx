@@ -9,7 +9,7 @@ import { Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
 const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1'];
 
 const Reports = () => {
-  const { timeEntries, projects, users } = useAppContext();
+  const { timeEntries, projects, users, showToast } = useAppContext();
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [filterPeriod, setFilterPeriod] = useState('This Month');
   const [filterProject, setFilterProject] = useState('All');
@@ -125,7 +125,8 @@ const Reports = () => {
     setShowExportMenu(false);
     
     if (format === 'pdf') {
-        window.print();
+        showToast("Opening print dialog. Please choose 'Save as PDF'.", "info");
+        setTimeout(() => window.print(), 500);
         return;
     }
     
@@ -170,7 +171,7 @@ const Reports = () => {
     }
 
     if (dataToExport.length === 0) {
-        alert("No data available to export.");
+        showToast("No data available to export.", "warning");
         return;
     }
 
@@ -191,6 +192,7 @@ const Reports = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    showToast("CSV report downloaded.", "success");
   };
 
   return (

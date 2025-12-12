@@ -1,7 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday } from '../types';
 
 interface AppContextType {
   // Data State
@@ -14,7 +15,9 @@ interface AppContextType {
   attendance: AttendanceRecord[];
   timeEntries: TimeEntry[];
   notifications: Notification[];
-  toasts: ToastMessage[]; // New
+  payslips: Payslip[]; // New
+  holidays: Holiday[]; // New
+  toasts: ToastMessage[];
   isLoading: boolean;
   currentUser: User | null;
 
@@ -22,8 +25,9 @@ interface AppContextType {
   refreshData: () => Promise<void>;
   
   // Auth
-  login: (user: User) => void;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  forgotPassword: (email: string) => Promise<boolean>;
 
   // Toast Actions
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
@@ -69,6 +73,11 @@ interface AppContextType {
   notify: (message: string) => Promise<void>; // Simple notification for Org component
   markNotificationRead: (id: string) => Promise<void>;
   markAllRead: (userId: string) => Promise<void>;
+
+  // Holiday & Payslip Actions
+  addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
+  deleteHoliday: (id: string) => Promise<void>;
+  generatePayslips: (month: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -83,13 +92,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Initial Load
   const refreshData = async () => {
     try {
-      const [empData, deptData, projData, leaveData, typeData, attendData, timeData, notifData] = await Promise.all([
+      const [empData, deptData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
         db.getEmployees(),
         db.getDepartments(),
         db.getProjects(),
@@ -97,7 +108,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         db.getLeaveTypes(),
         db.getAttendance(),
         db.getTimeEntries(),
-        db.getNotifications()
+        db.getNotifications(),
+        db.getHolidays(),
+        db.getPayslips()
       ]);
       setEmployees(empData);
       setDepartments(deptData);
@@ -107,6 +120,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setAttendance(attendData);
       setTimeEntries(timeData);
       setNotifications(notifData);
+      setHolidays(holidayData);
+      setPayslips(payslipData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
@@ -121,28 +136,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
-  const login = (user: User) => {
-    // In a real app, you would fetch the full employee record and merge
-    const fullProfile = employees.find(e => e.id === user.id);
-    if(fullProfile) {
-        // Enhance user object with stored data
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const currentEmployees = await db.getEmployees();
+    const user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
+    
+    if (user) {
         setCurrentUser({ 
-            ...user, 
-            ...fullProfile,
-            name: `${fullProfile.firstName} ${fullProfile.lastName}`,
-            role: fullProfile.role as UserRole,
-            jobTitle: fullProfile.role
+            id: user.id,
+            name: `${user.firstName} ${user.lastName}`,
+            email: user.email,
+            role: user.role.includes('HR') || user.role.includes('Admin') ? UserRole.HR : user.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+            avatar: user.avatar,
+            managerId: user.managerId,
+            jobTitle: user.role,
+            departmentId: user.departmentId,
+            projectIds: user.projectIds,
+            location: user.location,
+            hireDate: user.joinDate
         });
-        showToast(`Welcome back, ${fullProfile.firstName}!`, 'success');
+        showToast(`Welcome back, ${user.firstName}!`, 'success');
+        return true;
     } else {
-        setCurrentUser(user);
-        showToast(`Welcome back, ${user.name}!`, 'success');
+        showToast('Invalid email or password', 'error');
+        return false;
     }
   };
 
   const logout = () => {
     setCurrentUser(null);
     showToast('Logged out successfully', 'info');
+  };
+
+  const forgotPassword = async (email: string): Promise<boolean> => {
+     // Simulate sending email
+     await emailService.sendEmail({
+         to: email,
+         subject: 'Password Reset Request',
+         body: 'Click here to reset your password...'
+     });
+     showToast('Password reset link sent to your email', 'success');
+     return true;
   };
 
   // --- Toast Logic ---
@@ -181,7 +214,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const notify = async (message: string) => {
-     // Simple wrapper for generic notifications (used by Organization component)
      if(currentUser) {
          await sendSystemNotification(currentUser.id, 'System Update', message, 'info');
          showToast(message, 'info');
@@ -195,7 +227,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEmployee = async (emp: Employee) => {
     await db.addEmployee(emp);
     setEmployees(await db.getEmployees());
-    showToast('Employee added successfully', 'success');
+    
+    // Notify the new employee
+    await sendSystemNotification(emp.id, 'Welcome to EmpowerCorp', `Your account has been created. Your username is ${emp.email}.`, 'success');
+    
+    showToast('Employee added and notified successfully', 'success');
   };
 
   const updateEmployee = async (emp: Employee) => {
@@ -210,6 +246,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const updated = { ...existing, ...data };
         await db.updateEmployee(updated);
         setEmployees(await db.getEmployees());
+        
+        // Notify on role/dept change if relevant
+        if (data.departmentId && data.departmentId !== existing.departmentId) {
+             const dept = departments.find(d => d.id === data.departmentId);
+             await sendSystemNotification(id, 'Department Change', `You have been assigned to ${dept?.name || 'a new department'}.`, 'info');
+        }
+        if (data.projectIds && JSON.stringify(data.projectIds) !== JSON.stringify(existing.projectIds)) {
+             await sendSystemNotification(id, 'Project Assignment Update', `Your project allocations have been updated.`, 'info');
+        }
+
         showToast('Profile updated successfully', 'success');
     }
   };
@@ -221,7 +267,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // --- Organization Actions ---
-
+  // (Organization actions remain same, omitted for brevity, logic doesn't change much)
   const addDepartment = async (dept: Omit<Department, 'id'>) => {
     const newDept = { ...dept, id: Math.random().toString(36).substr(2, 9) };
     await db.addDepartment(newDept);
@@ -266,25 +312,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Project deleted', 'info');
   };
 
-  // --- Leave Actions ---
 
+  // --- Leave Actions --- (Same as before)
   const addLeave = async (leave: any) => {
     await db.addLeave(leave);
     setLeaves(await db.getLeaves());
-
     if (leave.approverId) {
-      await sendSystemNotification(leave.approverId, 'New Leave Request', `${leave.userName} has requested ${leave.type} from ${leave.startDate}.`, 'info');
+      await sendSystemNotification(leave.approverId, 'New Leave Request', `${leave.userName} has requested ${leave.type}.`, 'info');
     }
-    await sendSystemNotification(leave.userId, 'Leave Request Submitted', `Your request for ${leave.type} has been submitted to your manager.`, 'info');
+    await sendSystemNotification(leave.userId, 'Leave Request Submitted', `Your request for ${leave.type} has been submitted.`, 'info');
     showToast('Leave request submitted', 'success');
   };
 
   const addLeaves = async (newLeaves: any[]) => {
-    for (const leave of newLeaves) {
-      await db.addLeave(leave);
-    }
+    for (const leave of newLeaves) { await db.addLeave(leave); }
     setLeaves(await db.getLeaves());
-    showToast(`${newLeaves.length} leaves uploaded successfully`, 'success');
+    showToast(`${newLeaves.length} leaves uploaded`, 'success');
   };
 
   const updateLeave = async (id: string, data: any) => {
@@ -299,34 +342,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateLeaveStatus = async (id: string, status: LeaveStatus, comment?: string) => {
     const leave = leaves.find(l => l.id === id);
     if (leave) {
-       const updated = { 
-         ...leave, 
-         status,
-         managerComment: (status === LeaveStatus.PENDING_HR || status === LeaveStatus.REJECTED) && !leave.managerComment ? comment : leave.managerComment, 
-         hrComment: (status === LeaveStatus.APPROVED || status === LeaveStatus.REJECTED) && comment ? comment : leave.hrComment
-       };
+       const updated = { ...leave, status, managerComment: (status === LeaveStatus.PENDING_HR || status === LeaveStatus.REJECTED) ? comment : leave.managerComment, hrComment: (status === LeaveStatus.APPROVED) ? comment : leave.hrComment };
        await db.updateLeave(updated);
        setLeaves(await db.getLeaves());
 
        if (status === LeaveStatus.PENDING_HR) {
-         const hrAdmins = employees.filter(e => e.role.includes('HR') || e.department === 'HR');
-         for (const hr of hrAdmins) {
-            await sendSystemNotification(hr.id, 'Manager Approved Leave', `Manager approved leave for ${leave.userName}. Requires Final HR Approval.`, 'warning');
-         }
-         await sendSystemNotification(leave.userId, 'Manager Approved', `Your manager has approved your leave. It is now pending HR validation.`, 'info');
-         showToast('Approved and forwarded to HR', 'success');
+         const hrAdmins = employees.filter(e => e.role.includes('HR'));
+         for (const hr of hrAdmins) { await sendSystemNotification(hr.id, 'Manager Approved Leave', `Requires Final HR Approval for ${leave.userName}.`, 'warning'); }
+         await sendSystemNotification(leave.userId, 'Manager Approved', `Your manager approved leave. Pending HR.`, 'info');
        } else if (status === LeaveStatus.APPROVED) {
-         await sendSystemNotification(leave.userId, 'Leave Approved', `Your leave request for ${leave.type} has been fully approved by HR. Enjoy!`, 'success');
-         showToast('Leave fully approved', 'success');
+         await sendSystemNotification(leave.userId, 'Leave Approved', `Your leave for ${leave.type} is approved.`, 'success');
        } else if (status === LeaveStatus.REJECTED) {
-         await sendSystemNotification(leave.userId, 'Leave Rejected', `Your leave request was rejected. Reason: ${comment}`, 'error');
-         showToast('Leave rejected', 'info');
+         await sendSystemNotification(leave.userId, 'Leave Rejected', `Reason: ${comment}`, 'error');
        }
+       showToast(`Leave ${status}`, 'success');
     }
   };
 
   // --- Other Actions ---
-
   const addLeaveType = async (type: any) => {
     await db.addLeaveType(type);
     setLeaveTypes(await db.getLeaveTypes());
@@ -348,11 +381,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Leave type deleted', 'info');
   };
 
-  // --- Time Entry Actions ---
-
   const addTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => {
-    const newEntry = { ...entry, id: Math.random().toString(36).substr(2, 9) };
-    await db.addTimeEntry(newEntry);
+    await db.addTimeEntry({ ...entry, id: Math.random().toString(36).substr(2, 9) });
     setTimeEntries(await db.getTimeEntries());
     showToast('Time entry logged', 'success');
   };
@@ -372,12 +402,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Time entry deleted', 'info');
   };
   
-  // --- Attendance Actions ---
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
     const today = new Date().toISOString().split('T')[0];
@@ -387,21 +411,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const checkIn = async () => {
     if (!currentUser) return;
     const now = new Date();
-    
-    // Check if late (e.g. after 9:30 AM)
     const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30);
-    
     const record: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9),
       employeeId: currentUser.id,
       employeeName: currentUser.name,
       date: now.toISOString().split('T')[0],
-      checkIn: formatTime(now),
+      checkIn: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       checkInTime: now.toISOString(),
       checkOut: '',
       status: isLate ? 'Late' : 'Present'
     };
-    
     await db.addAttendance(record);
     setAttendance(await db.getAttendance());
     notify(`Checked in successfully at ${record.checkIn}`);
@@ -411,15 +431,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!currentUser) return;
     const todayRecord = getTodayAttendance();
     if (!todayRecord) return;
-    
     const now = new Date();
     const updatedRecord: AttendanceRecord = {
       ...todayRecord,
-      checkOut: formatTime(now),
+      checkOut: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       checkOutTime: now.toISOString(),
       notes: reason || todayRecord.notes
     };
-    
     await db.updateAttendance(updatedRecord);
     setAttendance(await db.getAttendance());
     notify(`Checked out successfully at ${updatedRecord.checkOut}`);
@@ -435,50 +453,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(await db.getNotifications());
   };
 
+  // --- Holidays & Payslips ---
+  const addHoliday = async (holiday: Omit<Holiday, 'id'>) => {
+      const newHoliday = { ...holiday, id: Math.random().toString(36).substr(2, 9) };
+      await db.addHoliday(newHoliday);
+      setHolidays(await db.getHolidays());
+      showToast('Holiday added', 'success');
+  };
+
+  const deleteHoliday = async (id: string) => {
+      await db.deleteHoliday(id);
+      setHolidays(await db.getHolidays());
+      showToast('Holiday deleted', 'info');
+  };
+
+  const generatePayslips = async (month: string) => {
+      const activeEmployees = employees.filter(e => e.status === 'Active');
+      // Refetch payslips to ensure we have the latest list to check duplicates
+      const currentPayslips = await db.getPayslips();
+      let count = 0;
+
+      for (const emp of activeEmployees) {
+          const exists = currentPayslips.some(p => p.userId === emp.id && p.month === month);
+          if (!exists) {
+              await db.addPayslip({
+                  id: `pay-${Math.random().toString(36).substr(2,9)}`,
+                  userId: emp.id,
+                  userName: `${emp.firstName} ${emp.lastName}`,
+                  month: month,
+                  amount: emp.salary / 12,
+                  status: 'Paid',
+                  generatedDate: new Date().toISOString()
+              });
+              // Notify employee
+              await sendSystemNotification(emp.id, 'Payslip Generated', `Your payslip for ${month} is now available.`, 'info');
+              count++;
+          }
+      }
+      setPayslips(await db.getPayslips());
+      if (count > 0) {
+          showToast(`Generated ${count} payslips for ${month}`, 'success');
+      } else {
+          showToast(`Payslips for ${month} already exist. No new slips generated.`, 'info');
+      }
+  };
+
   const value = {
-    employees,
-    users: employees, // Alias for Org component
-    departments,
-    projects,
-    leaves,
-    leaveTypes,
-    attendance,
-    timeEntries,
-    notifications,
-    toasts, // New
-    isLoading,
-    currentUser,
-    login,
-    logout,
-    refreshData,
-    showToast, // New
-    removeToast, // New
-    addEmployee,
-    updateEmployee,
-    updateUser,
-    deleteEmployee,
-    addDepartment,
-    updateDepartment,
-    deleteDepartment,
-    addProject,
-    updateProject,
-    deleteProject,
-    addLeave,
-    addLeaves,
-    updateLeave,
-    updateLeaveStatus,
-    addLeaveType,
-    updateLeaveType,
-    deleteLeaveType,
-    addTimeEntry,
-    updateTimeEntry,
-    deleteTimeEntry,
-    checkIn,
-    checkOut,
-    getTodayAttendance,
-    notify,
-    markNotificationRead,
-    markAllRead
+    employees, users: employees, departments, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
+    holidays, payslips, toasts, isLoading, currentUser,
+    login, logout, forgotPassword, refreshData, showToast, removeToast,
+    addEmployee, updateEmployee, updateUser, deleteEmployee,
+    addDepartment, updateDepartment, deleteDepartment,
+    addProject, updateProject, deleteProject,
+    addLeave, addLeaves, updateLeave, updateLeaveStatus,
+    addLeaveType, updateLeaveType, deleteLeaveType,
+    addTimeEntry, updateTimeEntry, deleteTimeEntry,
+    checkIn, checkOut, getTodayAttendance,
+    notify, markNotificationRead, markAllRead,
+    addHoliday, deleteHoliday, generatePayslips
   };
 
   return (
@@ -490,8 +522,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useAppContext = () => {
   const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
+  if (context === undefined) throw new Error('useAppContext must be used within an AppProvider');
   return context;
 };

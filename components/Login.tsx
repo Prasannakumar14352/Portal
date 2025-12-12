@@ -1,73 +1,159 @@
-import React from 'react';
-import { UserRole, User } from '../types';
-import { Shield, Users, User as UserIcon } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { User } from '../types';
+import { Lock, Mail, ChevronRight, Loader2, ArrowLeft } from 'lucide-react';
+import { useAppContext } from '../contexts/AppContext';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const handleRoleSelect = (role: UserRole) => {
-    // Mock login logic
-    let user: User;
-    switch (role) {
-      case UserRole.HR:
-        user = { id: 'hr1', name: 'Admin User', role: UserRole.HR, avatar: 'https://picsum.photos/seed/admin/40' };
-        break;
-      case UserRole.MANAGER:
-        user = { id: 'm1', name: 'Sarah Manager', role: UserRole.MANAGER, avatar: 'https://picsum.photos/seed/sarah/40' };
-        break;
-      case UserRole.EMPLOYEE:
-        // Fixed ID to '1' to match seed data in db.ts
-        user = { id: '1', name: 'Alice Johnson', role: UserRole.EMPLOYEE, avatar: 'https://picsum.photos/seed/alice/40' };
-        break;
-      default:
-        return;
+  const { login, forgotPassword } = useAppContext();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [view, setView] = useState<'login' | 'forgot'>('login');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    // Add a small delay to simulate network request
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    const success = await login(email, password);
+    if (success) {
+       // Success handled by context
     }
-    onLogin(user);
+    setIsLoading(false);
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsLoading(true);
+      await forgotPassword(email);
+      setIsLoading(false);
+      setView('login');
+  };
+
+  // Fill credentials for demo purposes
+  const fillDemoCreds = (role: 'admin' | 'employee') => {
+      if (role === 'admin') {
+          setEmail('superadmin@empower.com');
+          setPassword('password123');
+      } else {
+          setEmail('alice.j@empower.com');
+          setPassword('password123');
+      }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-white mb-2">Welcome to EMP Portal</h1>
-          <p className="text-slate-400">Select your role to sign in</p>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-blue-600 p-8 text-center relative">
+           {view === 'forgot' && (
+               <button onClick={() => setView('login')} className="absolute left-4 top-4 text-white/80 hover:text-white">
+                   <ArrowLeft size={24} />
+               </button>
+           )}
+           <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <Lock className="text-white" size={32} />
+           </div>
+           <h1 className="text-2xl font-bold text-white">EMP Portal</h1>
+           <p className="text-blue-100 text-sm mt-1">{view === 'login' ? 'Secure Employee Access' : 'Reset Your Password'}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <button 
-            onClick={() => handleRoleSelect(UserRole.HR)}
-            className="bg-white p-8 rounded-2xl hover:scale-105 transition-transform duration-200 group"
-          >
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-blue-600 transition-colors">
-              <Shield size={32} className="text-blue-600 group-hover:text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">HR Manager</h3>
-            <p className="text-slate-500 text-sm">Full access to employee data, leaves, and settings.</p>
-          </button>
+        {/* Form */}
+        <div className="p-8">
+           {view === 'login' ? (
+               <form onSubmit={handleSubmit} className="space-y-6">
+                  <div>
+                     <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                     <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                          type="email" 
+                          required
+                          className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          placeholder="name@company.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                     </div>
+                  </div>
 
-          <button 
-            onClick={() => handleRoleSelect(UserRole.MANAGER)}
-            className="bg-white p-8 rounded-2xl hover:scale-105 transition-transform duration-200 group"
-          >
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-purple-600 transition-colors">
-              <Users size={32} className="text-purple-600 group-hover:text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Team Manager</h3>
-            <p className="text-slate-500 text-sm">Manage team attendance and approve leave requests.</p>
-          </button>
+                  <div>
+                     <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-slate-700">Password</label>
+                        <button type="button" onClick={() => setView('forgot')} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Forgot Password?</button>
+                     </div>
+                     <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                          type="password" 
+                          required
+                          className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                     </div>
+                  </div>
 
-          <button 
-            onClick={() => handleRoleSelect(UserRole.EMPLOYEE)}
-            className="bg-white p-8 rounded-2xl hover:scale-105 transition-transform duration-200 group"
-          >
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-emerald-600 transition-colors">
-              <UserIcon size={32} className="text-emerald-600 group-hover:text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Employee</h3>
-            <p className="text-slate-500 text-sm">View your profile, check attendance, and apply for leave.</p>
-          </button>
+                  <button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-blue-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? (
+                        <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                        <>
+                            Sign In <ChevronRight size={18} className="ml-2" />
+                        </>
+                    )}
+                  </button>
+               </form>
+           ) : (
+               <form onSubmit={handleForgotSubmit} className="space-y-6">
+                  <p className="text-sm text-slate-500">Enter your email address and we'll send you a link to reset your password.</p>
+                  <div>
+                     <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                     <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                          type="email" 
+                          required
+                          className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          placeholder="name@company.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                     </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-blue-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : "Send Reset Link"}
+                  </button>
+               </form>
+           )}
+
+           <div className="mt-8 pt-6 border-t border-slate-100">
+              <p className="text-xs text-center text-slate-400 mb-3 uppercase font-bold tracking-wider">Demo Credentials</p>
+              <div className="flex gap-3 justify-center">
+                 <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded transition">
+                    Fill Admin
+                 </button>
+                 <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded transition">
+                    Fill Employee
+                 </button>
+              </div>
+           </div>
         </div>
       </div>
     </div>

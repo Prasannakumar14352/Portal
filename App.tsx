@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -11,6 +12,8 @@ import Organization from './components/Organization';
 import TimeLogs from './components/TimeLogs';
 import Reports from './components/Reports';
 import Profile from './components/Profile';
+import Holidays from './components/Holidays'; // New
+import Payslips from './components/Payslips'; // New
 import { User, UserRole, LeaveRequest, LeaveStatus } from './types';
 import { useAppContext } from './contexts/AppContext';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
@@ -80,7 +83,7 @@ const App: React.FC = () => {
   }));
 
   const handleLogin = (user: User) => {
-    login(user);
+    // Auth logic is handled within the Login component via Context
     setCurrentView('dashboard');
   };
 
@@ -125,15 +128,6 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return <Dashboard employees={employees} />;
-      case 'employees':
-        return currentUser.role !== UserRole.EMPLOYEE ? (
-          <EmployeeList 
-            employees={employees} 
-            onAddEmployee={addEmployee}
-            onUpdateEmployee={updateEmployee}
-            onDeleteEmployee={deleteEmployee}
-          />
-        ) : <Dashboard employees={employees} />;
       case 'organization':
         return <Organization />;
       case 'time-logs':
@@ -144,6 +138,10 @@ const App: React.FC = () => {
         return <Profile />;
       case 'attendance':
         return <Attendance records={attendance} />;
+      case 'holidays':
+        return <Holidays />;
+      case 'payslips':
+        return <Payslips />;
       case 'leaves':
         return (
           <LeaveManagement 

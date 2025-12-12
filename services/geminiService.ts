@@ -29,8 +29,8 @@ export const getHRChatResponse = async (message: string): Promise<string> => {
     const result: GenerateContentResponse = await chatSession.sendMessage({ message });
     return result.text || "I apologize, I couldn't generate a response at this time.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Sorry, I encountered an error while processing your request. Please check your API key.";
+    // User-friendly error message without console logging
+    return "Sorry, I encountered an issue. Please try again later.";
   }
 };
 

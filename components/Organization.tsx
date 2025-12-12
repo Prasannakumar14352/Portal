@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, User, Department, Project, Employee } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, X, ListTodo, GripVertical, Eye } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import EmployeeList from './EmployeeList';
 
 const Organization = () => {
-  const { currentUser, departments, addDepartment, updateDepartment, deleteDepartment, projects, addProject, updateProject, deleteProject, users, updateUser, notify } = useAppContext();
+  const { 
+    currentUser, 
+    departments, addDepartment, updateDepartment, deleteDepartment, 
+    projects, addProject, updateProject, deleteProject, 
+    users, updateUser, notify,
+    employees, addEmployee, updateEmployee, deleteEmployee 
+  } = useAppContext();
   
-  const [activeTab, setActiveTab] = useState<'departments' | 'projects' | 'allocations'>('departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations'>('departments');
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
@@ -14,6 +21,10 @@ const Organization = () => {
 
   // Filters
   const [projFilter, setProjFilter] = useState<'All' | 'Active' | 'Completed' | 'On Hold'>('All');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(6); // Default 6 for grid layout (multiple of 3)
 
   // Form States
   const [deptForm, setDeptForm] = useState<{ id?: string, name: string, description: string, managerId: string }>({ name: '', description: '', managerId: '' });
@@ -28,8 +39,14 @@ const Organization = () => {
   const [allocForm, setAllocForm] = useState<{ departmentId: string, projectIds: string[] }>({ departmentId: '', projectIds: [] });
 
   const isHR = currentUser?.role === UserRole.HR;
+  const showEmployeesTab = currentUser?.role !== UserRole.EMPLOYEE;
 
   // -- Handlers --
+
+  // Reset pagination on tab, filter or itemsPerPage change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, projFilter, itemsPerPage]);
 
   const handleDeptSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,9 +180,13 @@ const Organization = () => {
      if(u) updateUser(userId, { projectIds: (u.projectIds || []).filter(pid => pid !== projForm.id) });
   };
 
-
-  // Filtered Lists
+  // Filtered Lists & Pagination Logic
   const filteredProjects = projects.filter(p => projFilter === 'All' || p.status === projFilter);
+  const totalProjects = filteredProjects.length;
+  const paginatedProjects = filteredProjects.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const totalAllocations = users.length;
+  const paginatedAllocations = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Derived lists for modals
   const employeesInCurrentDept = users.filter(u => u.departmentId === deptForm.id);
@@ -173,6 +194,54 @@ const Organization = () => {
   
   const employeesInCurrentProj = users.filter(u => u.projectIds?.includes(projForm.id!));
   const availableEmployeesForProj = users.filter(u => !u.projectIds?.includes(projForm.id!));
+
+  const PaginationControls = ({ total }: { total: number }) => {
+    const totalPages = Math.ceil(total / itemsPerPage);
+    if (total === 0) return null;
+
+    return (
+      <div className="flex justify-between items-center p-4 pt-6 border-t border-gray-200">
+         <div className="flex items-center gap-2 text-xs text-gray-500">
+             <span>Show</span>
+             <select 
+               value={itemsPerPage}
+               onChange={(e) => setItemsPerPage(Number(e.target.value))}
+               className="border border-gray-300 rounded p-1 outline-none bg-white focus:ring-2 focus:ring-emerald-500"
+             >
+                <option value={5}>5</option>
+                <option value={6}>6</option>
+                <option value={9}>9</option>
+                <option value={12}>12</option>
+                <option value={20}>20</option>
+             </select>
+             <span>items</span>
+             <span className="mx-2 text-gray-300">|</span>
+             <span>
+                Showing <span className="font-medium text-gray-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-gray-700">{Math.min(currentPage * itemsPerPage, total)}</span> of <span className="font-medium text-gray-700">{total}</span> results
+             </span>
+         </div>
+         <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-gray-600 shadow-sm"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-medium text-gray-600 px-2">
+               Page {currentPage} of {totalPages || 1}
+            </span>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="p-1.5 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-gray-600 shadow-sm"
+            >
+              <ChevronRight size={16} />
+            </button>
+         </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -203,31 +272,51 @@ const Organization = () => {
             <p className="text-sm text-gray-500">Manage company departments, projects, and people allocations.</p>
           </div>
           
-          <div className="flex bg-gray-100 p-1 rounded-lg">
+          <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
              <button 
                onClick={() => setActiveTab('departments')}
-               className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Departments
              </button>
              <button 
                onClick={() => setActiveTab('projects')}
-               className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'projects' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'projects' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Projects
              </button>
              <button 
                onClick={() => setActiveTab('allocations')}
-               className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'allocations' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'allocations' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Allocations
              </button>
+             {showEmployeesTab && (
+               <button 
+                 onClick={() => setActiveTab('employees')}
+                 className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'employees' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               >
+                 Employees
+               </button>
+             )}
           </div>
        </div>
 
+       {/* --- EMPLOYEES TAB --- */}
+       {activeTab === 'employees' && (
+         <div className="animate-fade-in">
+            <EmployeeList 
+              employees={employees} 
+              onAddEmployee={addEmployee}
+              onUpdateEmployee={updateEmployee}
+              onDeleteEmployee={deleteEmployee}
+            />
+         </div>
+       )}
+
        {/* --- DEPARTMENTS TAB --- */}
        {activeTab === 'departments' && (
-         <div className="space-y-4">
+         <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
                <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
                  <Building2 size={20} className="text-emerald-600"/>
@@ -301,7 +390,7 @@ const Organization = () => {
 
        {/* --- PROJECTS TAB --- */}
        {activeTab === 'projects' && (
-         <div className="space-y-4">
+         <div className="space-y-4 animate-fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
                  <Briefcase size={20} className="text-emerald-600"/>
@@ -333,7 +422,7 @@ const Organization = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {filteredProjects.map(proj => {
+               {paginatedProjects.map(proj => {
                  const membersCount = users.filter(u => u.projectIds?.includes(proj.id)).length;
                  const isAssignedToMe = currentUser?.projectIds?.includes(proj.id);
                  
@@ -391,18 +480,20 @@ const Organization = () => {
                    </div>
                  );
                })}
-               {filteredProjects.length === 0 && (
+               {paginatedProjects.length === 0 && (
                   <div className="col-span-full text-center py-10 text-gray-500">
                      No projects found matching the filter.
                   </div>
                )}
             </div>
+            
+            <PaginationControls total={totalProjects} />
          </div>
        )}
 
        {/* --- ALLOCATIONS TAB --- */}
        {activeTab === 'allocations' && (
-         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                <h3 className="font-bold text-gray-700 flex items-center gap-2">
                   <Layers size={20} className="text-emerald-600"/>
@@ -422,7 +513,7 @@ const Organization = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                   {users.map(user => {
+                   {paginatedAllocations.map(user => {
                      const userDept = departments.find(d => d.id === user.departmentId);
                      const userProjects = projects.filter(p => user.projectIds?.includes(p.id));
                      const displayName = `${user.firstName} ${user.lastName}`;
@@ -470,6 +561,8 @@ const Organization = () => {
                 </tbody>
               </table>
             </div>
+            
+            <PaginationControls total={totalAllocations} />
          </div>
        )}
 

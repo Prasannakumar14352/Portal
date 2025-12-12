@@ -1,4 +1,5 @@
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, EmployeeStatus, DepartmentType, LeaveStatus, Notification, Department, Project, TimeEntry } from '../types';
+
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, EmployeeStatus, DepartmentType, LeaveStatus, Notification, Department, Project, TimeEntry, Payslip, Holiday } from '../types';
 
 // --- SEED DATA ---
 
@@ -16,13 +17,17 @@ const INITIAL_PROJECTS: Project[] = [
 ];
 
 const INITIAL_EMPLOYEES: Employee[] = [
-  { id: '1', firstName: 'Alice', lastName: 'Johnson', email: 'alice.j@empower.com', role: 'Software Engineer', department: 'IT', departmentId: 'd1', projectIds: ['p1', 'p3'], joinDate: '2023-01-15', status: EmployeeStatus.ACTIVE, salary: 85000, avatar: 'https://picsum.photos/seed/alice/100', managerId: 'm1' },
-  { id: '2', firstName: 'Bob', lastName: 'Smith', email: 'bob.s@empower.com', role: 'Sales Manager', department: 'Sales', departmentId: 'd3', projectIds: ['p2'], joinDate: '2022-05-10', status: EmployeeStatus.ACTIVE, salary: 92000, avatar: 'https://picsum.photos/seed/bob/100', managerId: 'm1' },
-  { id: '3', firstName: 'Charlie', lastName: 'Davis', email: 'charlie.d@empower.com', role: 'HR Specialist', department: 'HR', departmentId: 'd2', projectIds: ['p2'], joinDate: '2023-08-20', status: EmployeeStatus.ON_LEAVE, salary: 65000, avatar: 'https://picsum.photos/seed/charlie/100', managerId: 'hr1' },
-  { id: '4', firstName: 'Diana', lastName: 'Prince', email: 'diana.p@empower.com', role: 'Marketing Lead', department: 'Marketing', departmentId: 'd4', projectIds: ['p1'], joinDate: '2021-11-01', status: EmployeeStatus.ACTIVE, salary: 88000, avatar: 'https://picsum.photos/seed/diana/100', managerId: 'm1' },
-  { id: '5', firstName: 'Evan', lastName: 'Wright', email: 'evan.w@empower.com', role: 'DevOps Engineer', department: 'IT', departmentId: 'd1', projectIds: ['p3'], joinDate: '2024-02-01', status: EmployeeStatus.INACTIVE, salary: 95000, avatar: 'https://picsum.photos/seed/evan/100', managerId: 'm1' },
-  { id: 'm1', firstName: 'Sarah', lastName: 'Manager', email: 'sarah.m@empower.com', role: 'Team Manager', department: 'IT', departmentId: 'd1', projectIds: ['p1', 'p2', 'p3'], joinDate: '2020-01-01', status: EmployeeStatus.ACTIVE, salary: 120000, avatar: 'https://picsum.photos/seed/sarah/100', managerId: 'hr1' },
-  { id: 'hr1', firstName: 'Admin', lastName: 'User', email: 'admin@empower.com', role: 'HR Manager', department: 'HR', departmentId: 'd2', projectIds: [], joinDate: '2019-01-01', status: EmployeeStatus.ACTIVE, salary: 110000, avatar: 'https://picsum.photos/seed/admin/100' },
+  // Super Admin Account
+  { id: 'super1', firstName: 'Super', lastName: 'Admin', email: 'superadmin@empower.com', password: 'password123', role: 'HR Manager', department: 'HR', departmentId: 'd2', projectIds: [], joinDate: '2019-01-01', status: EmployeeStatus.ACTIVE, salary: 150000, avatar: 'https://picsum.photos/seed/super/100', managerId: '' },
+  
+  // Standard Employees
+  { id: '1', firstName: 'Alice', lastName: 'Johnson', email: 'alice.j@empower.com', password: 'password123', role: 'Software Engineer', department: 'IT', departmentId: 'd1', projectIds: ['p1', 'p3'], joinDate: '2023-01-15', status: EmployeeStatus.ACTIVE, salary: 85000, avatar: 'https://picsum.photos/seed/alice/100', managerId: 'm1' },
+  { id: '2', firstName: 'Bob', lastName: 'Smith', email: 'bob.s@empower.com', password: 'password123', role: 'Sales Manager', department: 'Sales', departmentId: 'd3', projectIds: ['p2'], joinDate: '2022-05-10', status: EmployeeStatus.ACTIVE, salary: 92000, avatar: 'https://picsum.photos/seed/bob/100', managerId: 'm1' },
+  { id: '3', firstName: 'Charlie', lastName: 'Davis', email: 'charlie.d@empower.com', password: 'password123', role: 'HR Specialist', department: 'HR', departmentId: 'd2', projectIds: ['p2'], joinDate: '2023-08-20', status: EmployeeStatus.ON_LEAVE, salary: 65000, avatar: 'https://picsum.photos/seed/charlie/100', managerId: 'hr1' },
+  { id: '4', firstName: 'Diana', lastName: 'Prince', email: 'diana.p@empower.com', password: 'password123', role: 'Marketing Lead', department: 'Marketing', departmentId: 'd4', projectIds: ['p1'], joinDate: '2021-11-01', status: EmployeeStatus.ACTIVE, salary: 88000, avatar: 'https://picsum.photos/seed/diana/100', managerId: 'm1' },
+  { id: '5', firstName: 'Evan', lastName: 'Wright', email: 'evan.w@empower.com', password: 'password123', role: 'DevOps Engineer', department: 'IT', departmentId: 'd1', projectIds: ['p3'], joinDate: '2024-02-01', status: EmployeeStatus.INACTIVE, salary: 95000, avatar: 'https://picsum.photos/seed/evan/100', managerId: 'm1' },
+  { id: 'm1', firstName: 'Sarah', lastName: 'Manager', email: 'sarah.m@empower.com', password: 'password123', role: 'Team Manager', department: 'IT', departmentId: 'd1', projectIds: ['p1', 'p2', 'p3'], joinDate: '2020-01-01', status: EmployeeStatus.ACTIVE, salary: 120000, avatar: 'https://picsum.photos/seed/sarah/100', managerId: 'hr1' },
+  { id: 'hr1', firstName: 'Admin', lastName: 'User', email: 'admin@empower.com', password: 'password123', role: 'HR Manager', department: 'HR', departmentId: 'd2', projectIds: [], joinDate: '2019-01-01', status: EmployeeStatus.ACTIVE, salary: 110000, avatar: 'https://picsum.photos/seed/admin/100' },
 ];
 
 const INITIAL_LEAVE_TYPES: LeaveTypeConfig[] = [
@@ -53,6 +58,14 @@ const INITIAL_NOTIFICATIONS: Notification[] = [
   { id: 'n1', userId: '1', title: 'Welcome', message: 'Welcome to the new portal!', time: 'Now', read: false, type: 'info' }
 ];
 
+const INITIAL_HOLIDAYS: Holiday[] = [
+    { id: 'h1', name: 'New Year Day', date: '202-01-01', type: 'Public' },
+    { id: 'h2', name: 'Independence Day', date: '2025-07-04', type: 'Public' },
+    { id: 'h3', name: 'Company Anniversary', date: '2025-09-15', type: 'Company' },
+    { id: 'h4', name: 'Thanksgiving', date: '2025-11-28', type: 'Public' },
+    { id: 'h5', name: 'Christmas', date: '2025-12-25', type: 'Public' },
+];
+
 const KEYS = {
   EMPLOYEES: 'emp_portal_employees',
   LEAVES: 'emp_portal_leaves',
@@ -62,6 +75,8 @@ const KEYS = {
   DEPARTMENTS: 'emp_portal_departments',
   PROJECTS: 'emp_portal_projects',
   TIME_ENTRIES: 'emp_portal_time_entries',
+  HOLIDAYS: 'emp_portal_holidays',
+  PAYSLIPS: 'emp_portal_payslips',
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -308,5 +323,39 @@ export const db = {
     const data = JSON.parse(localStorage.getItem(KEYS.NOTIFICATIONS) || '[]');
     const newData = data.map((n: Notification) => n.userId === userId ? { ...n, read: true } : n);
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(newData));
+  },
+
+  // HOLIDAYS
+  getHolidays: async (): Promise<Holiday[]> => {
+    const data = localStorage.getItem(KEYS.HOLIDAYS);
+    if (!data) {
+        localStorage.setItem(KEYS.HOLIDAYS, JSON.stringify(INITIAL_HOLIDAYS));
+        return INITIAL_HOLIDAYS;
+    }
+    return JSON.parse(data);
+  },
+
+  addHoliday: async (holiday: Holiday) => {
+    const data = JSON.parse(localStorage.getItem(KEYS.HOLIDAYS) || '[]');
+    const newData = [...data, holiday];
+    localStorage.setItem(KEYS.HOLIDAYS, JSON.stringify(newData));
+  },
+
+  deleteHoliday: async (id: string) => {
+    const data = JSON.parse(localStorage.getItem(KEYS.HOLIDAYS) || '[]');
+    const newData = data.filter((h: Holiday) => h.id !== id);
+    localStorage.setItem(KEYS.HOLIDAYS, JSON.stringify(newData));
+  },
+
+  // PAYSLIPS
+  getPayslips: async (): Promise<Payslip[]> => {
+    const data = localStorage.getItem(KEYS.PAYSLIPS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addPayslip: async (payslip: Payslip) => {
+    const data = JSON.parse(localStorage.getItem(KEYS.PAYSLIPS) || '[]');
+    const newData = [payslip, ...data];
+    localStorage.setItem(KEYS.PAYSLIPS, JSON.stringify(newData));
   }
 };
