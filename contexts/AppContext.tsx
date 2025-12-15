@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus } from '../types';
 
 interface AppContextType {
   // Data State
@@ -15,8 +15,8 @@ interface AppContextType {
   attendance: AttendanceRecord[];
   timeEntries: TimeEntry[];
   notifications: Notification[];
-  payslips: Payslip[]; // New
-  holidays: Holiday[]; // New
+  payslips: Payslip[]; 
+  holidays: Holiday[]; 
   toasts: ToastMessage[];
   isLoading: boolean;
   currentUser: User | null;
@@ -30,6 +30,7 @@ interface AppContextType {
   
   // Auth
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithMicrosoft: () => Promise<boolean>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<boolean>;
 
@@ -102,6 +103,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  // MSAL Instance
+  const [msalInstance, setMsalInstance] = useState<any>(null);
 
   // Initial Load
   const refreshData = async () => {
@@ -136,9 +140,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
+      
+      // Initialize Data
       await refreshData();
       
-      // Load theme
+      // Initialize Theme
       const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
       if (savedTheme) {
           setTheme(savedTheme);
@@ -146,6 +152,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
           setTheme('dark');
           document.documentElement.classList.add('dark');
+      }
+
+      // Initialize MSAL
+      try {
+        const { PublicClientApplication } = await import("@azure/msal-browser");
+        const { msalConfig } = await import("../services/authConfig");
+        const pca = new PublicClientApplication(msalConfig);
+        await pca.initialize();
+        setMsalInstance(pca);
+      } catch (err) {
+        console.warn("MSAL initialization failed:", err);
       }
       
       setIsLoading(false);
@@ -192,7 +209,106 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const loginWithMicrosoft = async (): Promise<boolean> => {
+    if (!msalInstance) {
+        showToast("Microsoft login service is initializing...", "info");
+        return false;
+    }
+
+    try {
+        const { loginRequest } = await import("../services/authConfig");
+        const response = await msalInstance.loginPopup(loginRequest);
+        
+        if (response && response.account) {
+            const email = response.account.username;
+            const name = response.account.name || email.split('@')[0];
+            
+            // Re-fetch employees to ensure we have latest list
+            const currentEmployees = await db.getEmployees();
+            const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
+            
+            if (existingUser) {
+                setCurrentUser({ 
+                    id: existingUser.id,
+                    name: `${existingUser.firstName} ${existingUser.lastName}`,
+                    email: existingUser.email,
+                    role: existingUser.role.includes('HR') || existingUser.role.includes('Admin') ? UserRole.HR : existingUser.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+                    avatar: existingUser.avatar,
+                    managerId: existingUser.managerId,
+                    jobTitle: existingUser.role,
+                    departmentId: existingUser.departmentId,
+                    projectIds: existingUser.projectIds,
+                    location: existingUser.location,
+                    hireDate: existingUser.joinDate
+                });
+                showToast(`Welcome back, ${existingUser.firstName}!`, 'success');
+            } else {
+                // Auto-Register new user
+                const [firstName, ...lastNameParts] = name.split(' ');
+                const lastName = lastNameParts.join(' ') || '';
+                
+                const newUser: Employee = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    firstName: firstName || 'User',
+                    lastName: lastName,
+                    email: email,
+                    password: 'ms-auth-user', // Placeholder
+                    role: 'Employee', // Default role
+                    department: 'General',
+                    departmentId: '',
+                    joinDate: new Date().toISOString().split('T')[0],
+                    status: EmployeeStatus.ACTIVE,
+                    salary: 0,
+                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`,
+                    projectIds: []
+                };
+                
+                await db.addEmployee(newUser);
+                setEmployees(prev => [...prev, newUser]);
+                
+                setCurrentUser({
+                    id: newUser.id,
+                    name: `${newUser.firstName} ${newUser.lastName}`,
+                    email: newUser.email,
+                    role: UserRole.EMPLOYEE,
+                    avatar: newUser.avatar,
+                    jobTitle: newUser.role,
+                    hireDate: newUser.joinDate
+                });
+                
+                // Notify the new employee (and HR via system log implicitly)
+                await sendSystemNotification(newUser.id, 'Welcome to EmpowerCorp', `Your account has been created via Microsoft Login.`, 'success');
+                showToast(`Account created for ${newUser.firstName}!`, 'success');
+            }
+            return true;
+        }
+    } catch (error: any) {
+        console.error("Microsoft Login Error:", error);
+        
+        // Handle User Cancellation gracefully
+        if (error.errorCode === 'user_cancelled') {
+            showToast("Login cancelled.", "info");
+            return false;
+        }
+        
+        // Handle Popup Blocked
+        if (error.errorCode === 'popup_window_error') {
+            showToast("Login popup was blocked. Please allow popups for this site.", "warning");
+            return false;
+        }
+
+        // Generic error fallback
+        const errorMsg = error.message ? error.message.split(':')[0] : 'Unknown error';
+        showToast(`Login failed: ${errorMsg}`, "error");
+        return false;
+    }
+    return false;
+  };
+
   const logout = () => {
+    if (msalInstance) {
+        // Optional: msalInstance.logoutPopup(); // If we want to logout from MS too
+    }
     setCurrentUser(null);
     showToast('Logged out successfully', 'info');
   };
@@ -297,7 +413,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // --- Organization Actions ---
-  // (Organization actions remain same, omitted for brevity, logic doesn't change much)
   const addDepartment = async (dept: Omit<Department, 'id'>) => {
     const newDept = { ...dept, id: Math.random().toString(36).substr(2, 9) };
     await db.addDepartment(newDept);
@@ -343,7 +458,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
 
-  // --- Leave Actions --- (Same as before)
+  // --- Leave Actions ---
   const addLeave = async (leave: any) => {
     await db.addLeave(leave);
     setLeaves(await db.getLeaves());
@@ -504,7 +619,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const generatePayslips = async (month: string) => {
       const activeEmployees = employees.filter(e => e.status === 'Active');
-      // Refetch payslips to ensure we have the latest list to check duplicates
       const currentPayslips = await db.getPayslips();
       let count = 0;
 
@@ -520,7 +634,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   status: 'Paid',
                   generatedDate: new Date().toISOString()
               });
-              // Notify employee
               await sendSystemNotification(emp.id, 'Payslip Generated', `Your payslip for ${month} is now available.`, 'info');
               count++;
           }
@@ -536,7 +649,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const value = {
     employees, users: employees, departments, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
-    login, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
+    login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     addEmployee, updateEmployee, updateUser, deleteEmployee,
     addDepartment, updateDepartment, deleteDepartment,
     addProject, updateProject, deleteProject,
