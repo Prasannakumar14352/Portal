@@ -1,14 +1,32 @@
+
 import React from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { Users, UserCheck, CalendarOff, TrendingUp } from 'lucide-react';
-import { Employee, EmployeeStatus, Department } from '../types';
+import { Employee, EmployeeStatus } from '../types';
 
 interface DashboardProps {
   employees: Employee[];
 }
+
+const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
+
+const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string | number, icon: any, color: string, subtext?: string }) => (
+  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+        <h3 className="text-3xl font-bold text-slate-800">{value}</h3>
+        {subtext && <p className="text-xs text-slate-400 mt-2">{subtext}</p>}
+      </div>
+      <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>
+        <Icon size={24} className={color.replace('bg-', 'text-')} />
+      </div>
+    </div>
+  </div>
+);
 
 const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
   const totalEmployees = employees.length;
@@ -32,23 +50,6 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
     { name: 'On Leave', value: onLeaveEmployees },
     { name: 'Inactive', value: totalEmployees - activeEmployees - onLeaveEmployees }
   ];
-
-  const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
-
-  const StatCard = ({ title, value, icon: Icon, color, subtext }: any) => (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-          <h3 className="text-3xl font-bold text-slate-800">{value}</h3>
-          {subtext && <p className="text-xs text-slate-400 mt-2">{subtext}</p>}
-        </div>
-        <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>
-          <Icon size={24} className={color.replace('bg-', 'text-')} />
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">

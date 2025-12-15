@@ -4,6 +4,73 @@ import { useAppContext } from '../contexts/AppContext';
 import { Calendar, Trash2, Plus, Edit2 } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
 
+const getDateParts = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    
+    return {
+        day: date.getDate(),
+        month: date.toLocaleString('default', { month: 'short' }).toUpperCase(),
+        full: date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+        dayName: date.toLocaleDateString('en-US', { weekday: 'long' })
+    };
+};
+
+const isUpcoming = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const hDate = new Date(year, month - 1, day);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return hDate >= today;
+};
+
+const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean, isHR: boolean, onDelete: (id: string) => void }> = ({ holiday, compact = false, isHR, onDelete }) => {
+    const { day, month, dayName } = getDateParts(holiday.date);
+    const upcoming = isUpcoming(holiday.date);
+
+    return (
+      <div className={`bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition group ${compact ? 'p-4' : 'p-5'}`}>
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+              {/* Date Box */}
+              <div className={`flex flex-col items-center justify-center text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl flex-shrink-0 ${compact ? 'w-14 h-14' : 'w-16 h-16'}`}>
+                  <span className="text-xs font-bold tracking-wider">{month}</span>
+                  <span className={`${compact ? 'text-xl' : 'text-2xl'} font-bold leading-none`}>{day}</span>
+              </div>
+              
+              {/* Details */}
+              <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                      <h4 className={`${compact ? 'text-base' : 'text-lg'} font-bold text-slate-800 truncate`}>{holiday.name}</h4>
+                      {upcoming && (
+                          <span className="bg-slate-700 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold whitespace-nowrap flex-shrink-0">Upcoming</span>
+                      )}
+                  </div>
+                  <p className="text-slate-500 text-sm font-medium truncate">
+                      {dayName} • <span className="text-slate-400 font-normal">{holiday.type} Holiday</span>
+                  </p>
+                  {!compact && (
+                      <p className="text-xs text-slate-400 mt-1 truncate">
+                          {holiday.type === 'Public' ? 'National observance' : 'Company observance'}
+                      </p>
+                  )}
+              </div>
+          </div>
+
+          {/* Actions (Only in full view and if HR) */}
+          {!compact && isHR && (
+              <div className="flex gap-1 ml-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                  <button className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition" title="Edit">
+                      <Edit2 size={18} />
+                  </button>
+                  <button onClick={() => onDelete(holiday.id)} className="p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 transition" title="Delete">
+                      <Trash2 size={18} />
+                  </button>
+              </div>
+          )}
+      </div>
+    );
+};
+
 const Holidays = () => {
   const { holidays, addHoliday, deleteHoliday, currentUser } = useAppContext();
   const [showModal, setShowModal] = useState(false);
@@ -44,71 +111,6 @@ const Holidays = () => {
       }).length
   };
 
-  const getDateParts = (dateStr: string) => {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const date = new Date(year, month - 1, day);
-      
-      return {
-          day: date.getDate(),
-          month: date.toLocaleString('default', { month: 'short' }).toUpperCase(),
-          full: date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-          dayName: date.toLocaleDateString('en-US', { weekday: 'long' })
-      };
-  };
-
-  const isUpcoming = (dateStr: string) => {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const hDate = new Date(year, month - 1, day);
-      return hDate >= today;
-  };
-
-  const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean }> = ({ holiday, compact = false }) => {
-      const { day, month, dayName } = getDateParts(holiday.date);
-      const upcoming = isUpcoming(holiday.date);
-
-      return (
-        <div className={`bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition group ${compact ? 'p-4' : 'p-5'}`}>
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-                {/* Date Box */}
-                <div className={`flex flex-col items-center justify-center text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl flex-shrink-0 ${compact ? 'w-14 h-14' : 'w-16 h-16'}`}>
-                    <span className="text-xs font-bold tracking-wider">{month}</span>
-                    <span className={`${compact ? 'text-xl' : 'text-2xl'} font-bold leading-none`}>{day}</span>
-                </div>
-                
-                {/* Details */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                        <h4 className={`${compact ? 'text-base' : 'text-lg'} font-bold text-slate-800 truncate`}>{holiday.name}</h4>
-                        {upcoming && (
-                            <span className="bg-slate-700 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold whitespace-nowrap flex-shrink-0">Upcoming</span>
-                        )}
-                    </div>
-                    <p className="text-slate-500 text-sm font-medium truncate">
-                        {dayName} • <span className="text-slate-400 font-normal">{holiday.type} Holiday</span>
-                    </p>
-                    {!compact && (
-                        <p className="text-xs text-slate-400 mt-1 truncate">
-                            {holiday.type === 'Public' ? 'National observance' : 'Company observance'}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Actions (Only in full view and if HR) */}
-            {!compact && isHR && (
-                <div className="flex gap-1 ml-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition" title="Edit">
-                        <Edit2 size={18} />
-                    </button>
-                    <button onClick={() => deleteHoliday(holiday.id)} className="p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 transition" title="Delete">
-                        <Trash2 size={18} />
-                    </button>
-                </div>
-            )}
-        </div>
-      );
-  };
-
   return (
     <div className="space-y-6 animate-fade-in">
        {/* Page Header */}
@@ -135,7 +137,7 @@ const Holidays = () => {
                
                <div className="space-y-4">
                    {sortedHolidays.map(holiday => (
-                       <HolidayCard key={holiday.id} holiday={holiday} />
+                       <HolidayCard key={holiday.id} holiday={holiday} isHR={isHR} onDelete={deleteHoliday} />
                    ))}
                    
                    {sortedHolidays.length === 0 && (

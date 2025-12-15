@@ -1,18 +1,18 @@
 
+require('dotenv').config();
 const express = require('express');
 const sql = require('mssql');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
 const app = express();
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
 // Database Configuration
-// defaults set based on your provided configuration
 const dbConfig = {
     user: process.env.DB_USER || 'DHLE',
     password: process.env.DB_PASSWORD || 'DHLE',
@@ -23,7 +23,7 @@ const dbConfig = {
         encrypt: false, // Set to false for local/internal network servers
         trustServerCertificate: true, // Trust self-signed certificates
         enableArithAbort: true,
-        instancename: undefined // If using a named instance (e.g. isthydpc107\SQLEXPRESS), set this.
+        instancename: undefined 
     }
 };
 
@@ -245,7 +245,6 @@ app.post('/api/employees', async (req, res) => {
     const e = req.body;
     try {
         const reqSql = pool.request();
-        // Bind inputs
         reqSql.input('id', sql.NVarChar, e.id);
         reqSql.input('firstName', sql.NVarChar, e.firstName);
         reqSql.input('lastName', sql.NVarChar, e.lastName);
@@ -410,7 +409,6 @@ app.get('/api/leaves', async (req, res) => {
         res.json(result.recordset.map(r => ({ 
             ...r, 
             notifyUserIds: parseJSON(r.notifyUserIds) || [],
-            // Convert DB BIT (true/false) to JS boolean
             managerConsent: !!r.managerConsent,
             isUrgent: !!r.isUrgent
         })));

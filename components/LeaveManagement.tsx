@@ -105,6 +105,62 @@ const MultiSelectUser = ({
   );
 };
 
+const LeaveTypeCard: React.FC<{ 
+  config: LeaveTypeConfig, 
+  isHR: boolean, 
+  onUpdate: (id: string, data: any) => void, 
+  onDelete: (id: string) => void,
+  onEdit: (id: string, data: any) => void
+}> = ({ config, isHR, onUpdate, onDelete, onEdit }) => (
+  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative">
+    <div className="flex justify-between items-start mb-2">
+      <div className="flex items-center space-x-2">
+        <Calendar className={`w-5 h-5 ${config.color || 'text-slate-600'}`} />
+        <h3 className="font-bold text-slate-800 text-lg">{config.name}</h3>
+      </div>
+      <span className={`text-xs px-2 py-1 rounded-full ${config.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+        {config.isActive ? 'Active' : 'Inactive'}
+      </span>
+    </div>
+    
+    <div className="mb-4">
+      <h4 className={`text-2xl font-bold ${config.color || 'text-slate-800'}`}>{config.days} Days</h4>
+      <p className="text-xs text-slate-500">Default allocation per year</p>
+    </div>
+    
+    <p className="text-sm text-slate-600 mb-6 h-12 line-clamp-2">{config.description}</p>
+    
+    {isHR && (
+      <div className="flex justify-between items-center border-t border-slate-100 pt-4">
+          <div className="flex items-center space-x-2">
+          <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${config.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`} 
+              onClick={() => onUpdate(config.id, { isActive: !config.isActive })}>
+              <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${config.isActive ? 'translate-x-5' : ''}`} />
+          </div>
+          <span className="text-xs text-slate-500">{config.isActive ? 'Active' : 'Hidden'}</span>
+          </div>
+          
+          <div className="flex space-x-2">
+          <button 
+              onClick={() => onEdit(config.id, config)}
+              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+          >
+              <Edit2 size={16} />
+          </button>
+          <button 
+              onClick={() => {
+              if (window.confirm('Delete this leave type?')) onDelete(config.id);
+              }}
+              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
+          >
+              <Trash2 size={16} />
+          </button>
+          </div>
+      </div>
+    )}
+  </div>
+);
+
 const LeaveManagement: React.FC<LeaveManagementProps> = ({ 
   currentUser, users, leaves, leaveTypes, 
   addLeave, editLeave, addLeaves, updateLeaveStatus,
@@ -509,60 +565,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     );
   };
 
-  const LeaveTypeCard: React.FC<{ config: LeaveTypeConfig }> = ({ config }) => (
-    <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center space-x-2">
-          <Calendar className={`w-5 h-5 ${config.color || 'text-slate-600'}`} />
-          <h3 className="font-bold text-slate-800 text-lg">{config.name}</h3>
-        </div>
-        <span className={`text-xs px-2 py-1 rounded-full ${config.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-          {config.isActive ? 'Active' : 'Inactive'}
-        </span>
-      </div>
-      
-      <div className="mb-4">
-        <h4 className={`text-2xl font-bold ${config.color || 'text-slate-800'}`}>{config.days} Days</h4>
-        <p className="text-xs text-slate-500">Default allocation per year</p>
-      </div>
-      
-      <p className="text-sm text-slate-600 mb-6 h-12 line-clamp-2">{config.description}</p>
-      
-      {isHR && (
-        <div className="flex justify-between items-center border-t border-slate-100 pt-4">
-            <div className="flex items-center space-x-2">
-            <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${config.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`} 
-                onClick={() => updateLeaveType(config.id, { isActive: !config.isActive })}>
-                <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${config.isActive ? 'translate-x-5' : ''}`} />
-            </div>
-            <span className="text-xs text-slate-500">{config.isActive ? 'Active' : 'Hidden'}</span>
-            </div>
-            
-            <div className="flex space-x-2">
-            <button 
-                onClick={() => {
-                setEditingType(config.id);
-                setTypeData({ name: config.name, days: config.days, description: config.description, isActive: config.isActive });
-                setShowTypeModal(true);
-                }}
-                className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded"
-            >
-                <Edit2 size={16} />
-            </button>
-            <button 
-                onClick={() => {
-                if (window.confirm('Delete this leave type?')) deleteLeaveType(config.id);
-                }}
-                className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
-            >
-                <Trash2 size={16} />
-            </button>
-            </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -687,7 +689,18 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       {viewMode === 'types' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
           {leaveTypes.filter(t => isHR || t.isActive).map(type => (
-            <LeaveTypeCard key={type.id} config={type} />
+            <LeaveTypeCard 
+              key={type.id} 
+              config={type} 
+              isHR={isHR} 
+              onUpdate={updateLeaveType} 
+              onDelete={deleteLeaveType} 
+              onEdit={(id, data) => {
+                setEditingType(id);
+                setTypeData(data);
+                setShowTypeModal(true);
+              }}
+            />
           ))}
           {leaveTypes.filter(t => isHR || t.isActive).length === 0 && <p className="text-slate-500">No leave types available.</p>}
         </div>

@@ -1,5 +1,7 @@
 {
   "name": "EMP HR Portal Enhanced",
   "description": "A modern Employee HR Portal with Dashboard, Employee Management, Leave Tracking, and Gemini AI HR Assistant.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }
