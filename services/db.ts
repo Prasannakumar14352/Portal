@@ -6,7 +6,7 @@ import {
 } from './mockData';
 
 // --- CONFIGURATION ---
-// We default to FALSE to try the API, but the system will fallback to Mock if the API is unreachable.
+// Set to FALSE to try the API, but the system will fallback to Mock if the API is unreachable.
 const USE_MOCK_DATA = false; 
 const API_BASE = 'http://localhost:8000/api';
 
