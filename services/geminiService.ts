@@ -1,21 +1,27 @@
 
+import { GoogleGenAI } from "@google/genai";
+
+// Initialize the Google GenAI client
+// The API key is assumed to be available in the environment variables.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 export const getHRChatResponse = async (message: string): Promise<string> => {
   try {
-    const response = await fetch('http://localhost:8000/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: message,
+      config: {
+        systemInstruction: "You are a helpful and professional HR Assistant for EmpowerCorp. You help employees with questions about leave policies, holidays, benefits, and general HR queries. Keep answers concise and friendly.",
+      }
     });
     
-    if (!response.ok) throw new Error("Backend error");
-    
-    const data = await response.json();
-    return data.response;
+    return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
   } catch (error) {
-    return "Sorry, I am unable to connect to the HR server at the moment. Please ensure the backend is running.";
+    console.error("AI Service Error:", error);
+    return "Sorry, I am unable to process your request at the moment. Please ensure your API key is configured correctly.";
   }
 };
 
 export const resetChatSession = () => {
-  // No session state needed for simple REST API
+  // Client-side session management if needed, currently stateless
 };
