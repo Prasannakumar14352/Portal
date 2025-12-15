@@ -6,9 +6,12 @@ import {
 } from './mockData';
 
 // --- CONFIGURATION ---
-// Set to FALSE to try the API, but the system will fallback to Mock if the API is unreachable.
-const USE_MOCK_DATA = true; 
-const API_BASE = 'http://localhost:8000/api';
+// Controlled via .env file (VITE_USE_MOCK_DATA=true/false)
+// Defaults to TRUE if the variable is missing to ensure the app works out of the box.
+const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'false' ? false : true;
+const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
+console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'REAL API'}`);
 
 // --- REAL API IMPLEMENTATION ---
 const api = {

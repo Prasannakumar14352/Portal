@@ -2,13 +2,9 @@
 import { Configuration, PopupRequest } from "@azure/msal-browser";
 
 // --- AZURE APP CONFIGURATION ---
-// 1. Create a new App Registration in Azure Portal.
-// 2. Select "Single-page application" (SPA) for the platform. Do NOT use "Web".
-// 3. Add "http://localhost:5173" as the Redirect URI.
-// 4. Paste your new IDs below:
-
-const CLIENT_ID = "af84ee21-88c6-4cb7-9586-957230a8f583"; // Replace with your new Application (client) ID
-const TENANT_ID = "e917b365-0776-4fcc-b8f6-5c12396474e0"; // Replace with your new Directory (tenant) ID
+// Config is now loaded from .env variables
+const CLIENT_ID = process.env.VITE_AZURE_CLIENT_ID || "af84ee21-88c6-4cb7-9586-957230a8f583"; // Fallback to provided ID
+const TENANT_ID = process.env.VITE_AZURE_TENANT_ID || "e917b365-0776-4fcc-b8f6-5c12396474e0"; // Fallback to provided ID
 
 // -------------------------------
 
