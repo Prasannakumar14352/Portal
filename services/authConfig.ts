@@ -16,5 +16,6 @@ export const msalConfig: Configuration = {
 };
 
 export const loginRequest: PopupRequest = {
-    scopes: ["User.Read"]
+    scopes: ["User.Read"],
+    prompt: "select_account" // Forces account selection to avoid stale session loops
 };
