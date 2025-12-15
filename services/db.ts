@@ -7,7 +7,7 @@ import {
 
 // --- CONFIGURATION ---
 // Set to FALSE to try the API, but the system will fallback to Mock if the API is unreachable.
-const USE_MOCK_DATA = false; 
+const USE_MOCK_DATA = true; 
 const API_BASE = 'http://localhost:8000/api';
 
 // --- REAL API IMPLEMENTATION ---
