@@ -72,7 +72,7 @@ const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean, isHR: boolean
 };
 
 const Holidays = () => {
-  const { Holidays, addHoliday, deleteHoliday, currentUser } = useAppContext();
+  const { holidays, addHoliday, deleteHoliday, currentUser } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '', type: 'Public' as 'Public' | 'Company' });
 
@@ -86,8 +86,8 @@ const Holidays = () => {
       setNewHoliday({ name: '', date: '', type: 'Public' });
   };
 
-  // Sort Holidays by date
-  const sortedHolidays = [...Holidays].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Sort holidays by date
+  const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   
   // Stats Logic
   const today = new Date();
@@ -103,9 +103,9 @@ const Holidays = () => {
   const nextHoliday = upcomingHolidays.length > 0 ? upcomingHolidays[0] : null;
   
   const stats = {
-      total: Holidays.length,
+      total: holidays.length,
       upcoming: upcomingHolidays.length,
-      thisMonth: Holidays.filter(h => {
+      thisMonth: holidays.filter(h => {
           const [year, month] = h.date.split('-').map(Number);
           return month - 1 === today.getMonth() && year === today.getFullYear();
       }).length
@@ -117,7 +117,7 @@ const Holidays = () => {
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Holidays</h2>
-            <p className="text-slate-500 text-sm">View company Holidays and plan your time off</p>
+            <p className="text-slate-500 text-sm">View company holidays and plan your time off</p>
           </div>
           {isHR && (
             <button 
@@ -142,7 +142,7 @@ const Holidays = () => {
                    
                    {sortedHolidays.length === 0 && (
                        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300 text-slate-500">
-                           No Holidays found for this year.
+                           No holidays found for this year.
                        </div>
                    )}
                </div>
@@ -174,7 +174,7 @@ const Holidays = () => {
                            </div>
                        </div>
                    ) : (
-                       <p className="text-slate-500 text-sm italic">No upcoming Holidays this year.</p>
+                       <p className="text-slate-500 text-sm italic">No upcoming holidays this year.</p>
                    )}
                </div>
 

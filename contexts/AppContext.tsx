@@ -2,21 +2,21 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Leavestatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, Employeestatus } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus } from '../types';
 
 interface AppContextType {
   // Data State
-  Employees: Employee[];
+  employees: Employee[];
   users: Employee[]; // Alias for Organization component compatibility
-  Departments: Department[];
-  Projects: Project[];
-  Leaves: LeaveRequest[];
+  departments: Department[];
+  projects: Project[];
+  leaves: LeaveRequest[];
   leaveTypes: LeaveTypeConfig[];
-  Attendance: AttendanceRecord[];
+  attendance: AttendanceRecord[];
   timeEntries: TimeEntry[];
-  Notifications: Notification[];
-  Payslips: Payslip[]; 
-  Holidays: Holiday[]; 
+  notifications: Notification[];
+  payslips: Payslip[]; 
+  holidays: Holiday[]; 
   toasts: ToastMessage[];
   isLoading: boolean;
   currentUser: User | null;
@@ -55,9 +55,9 @@ interface AppContextType {
 
   // Leave Actions
   addLeave: (leave: any) => Promise<void>; 
-  addLeaves: (Leaves: any[]) => Promise<void>;
+  addLeaves: (leaves: any[]) => Promise<void>;
   updateLeave: (id: string, data: any) => Promise<void>;
-  updateLeavestatus: (id: string, status: Leavestatus, comment?: string) => Promise<void>;
+  updateLeaveStatus: (id: string, status: LeaveStatus, comment?: string) => Promise<void>;
 
   // Leave Type Actions
   addLeaveType: (type: any) => Promise<void>;
@@ -90,16 +90,16 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [Employees, setEmployees] = useState<Employee[]>([]);
-  const [Departments, setDepartments] = useState<Department[]>([]);
-  const [Projects, setProjects] = useState<Project[]>([]);
-  const [Leaves, setLeaves] = useState<LeaveRequest[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeConfig[]>([]);
-  const [Attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
-  const [Notifications, setNotifications] = useState<Notification[]>([]);
-  const [Payslips, setPayslips] = useState<Payslip[]>([]);
-  const [Holidays, setHolidays] = useState<Holiday[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -211,7 +211,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Helper to handle user registration/session creation
   const handleUserAuthSuccess = async (name: string, email: string) => {
-      // Re-fetch Employees to ensure we have latest list
+      // Re-fetch employees to ensure we have latest list
       const currentEmployees = await db.getEmployees();
       const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
       
@@ -245,7 +245,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               department: 'General',
               departmentId: '',
               joinDate: new Date().toISOString().split('T')[0],
-              status: Employeestatus.ACTIVE,
+              status: EmployeeStatus.ACTIVE,
               salary: 0,
               avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`,
               projectIds: []
@@ -366,7 +366,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       type
     });
 
-    const recipient = Employees.find(e => e.id === userId);
+    const recipient = employees.find(e => e.id === userId);
     if (recipient && recipient.email) {
       emailService.sendEmail({
         to: recipient.email,
@@ -406,7 +406,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateUser = async (id: string, data: Partial<Employee>) => {
-    const existing = Employees.find(e => e.id === id);
+    const existing = employees.find(e => e.id === id);
     if (existing) {
         const updated = { ...existing, ...data };
         await db.updateEmployee(updated);
@@ -414,7 +414,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         // Notify on role/dept change if relevant
         if (data.departmentId && data.departmentId !== existing.departmentId) {
-             const dept = Departments.find(d => d.id === data.departmentId);
+             const dept = departments.find(d => d.id === data.departmentId);
              await sendSystemNotification(id, 'Department Change', `You have been assigned to ${dept?.name || 'a new department'}.`, 'info');
         }
         if (data.projectIds && JSON.stringify(data.projectIds) !== JSON.stringify(existing.projectIds)) {
@@ -440,7 +440,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateDepartment = async (id: string, data: Partial<Department>) => {
-    const existing = Departments.find(d => d.id === id);
+    const existing = departments.find(d => d.id === id);
     if (existing) {
        await db.updateDepartment({ ...existing, ...data });
        setDepartments(await db.getDepartments());
@@ -462,7 +462,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateProject = async (id: string, data: Partial<Project>) => {
-    const existing = Projects.find(p => p.id === id);
+    const existing = projects.find(p => p.id === id);
     if (existing) {
        await db.updateProject({ ...existing, ...data });
        setProjects(await db.getProjects());
@@ -491,11 +491,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addLeaves = async (newLeaves: any[]) => {
     for (const leave of newLeaves) { await db.addLeave(leave); }
     setLeaves(await db.getLeaves());
-    showToast(`${newLeaves.length} Leaves uploaded`, 'success');
+    showToast(`${newLeaves.length} leaves uploaded`, 'success');
   };
 
   const updateLeave = async (id: string, data: any) => {
-    const existing = Leaves.find(l => l.id === id);
+    const existing = leaves.find(l => l.id === id);
     if (existing) {
       await db.updateLeave({ ...existing, ...data });
       setLeaves(await db.getLeaves());
@@ -503,20 +503,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const updateLeavestatus = async (id: string, status: Leavestatus, comment?: string) => {
-    const leave = Leaves.find(l => l.id === id);
+  const updateLeaveStatus = async (id: string, status: LeaveStatus, comment?: string) => {
+    const leave = leaves.find(l => l.id === id);
     if (leave) {
-       const updated = { ...leave, status, managerComment: (status === Leavestatus.PENDING_HR || status === Leavestatus.REJECTED) ? comment : leave.managerComment, hrComment: (status === Leavestatus.APPROVED) ? comment : leave.hrComment };
+       const updated = { ...leave, status, managerComment: (status === LeaveStatus.PENDING_HR || status === LeaveStatus.REJECTED) ? comment : leave.managerComment, hrComment: (status === LeaveStatus.APPROVED) ? comment : leave.hrComment };
        await db.updateLeave(updated);
        setLeaves(await db.getLeaves());
 
-       if (status === Leavestatus.PENDING_HR) {
-         const hrAdmins = Employees.filter(e => e.role.includes('HR'));
+       if (status === LeaveStatus.PENDING_HR) {
+         const hrAdmins = employees.filter(e => e.role.includes('HR'));
          for (const hr of hrAdmins) { await sendSystemNotification(hr.id, 'Manager Approved Leave', `Requires Final HR Approval for ${leave.userName}.`, 'warning'); }
          await sendSystemNotification(leave.userId, 'Manager Approved', `Your manager approved leave. Pending HR.`, 'info');
-       } else if (status === Leavestatus.APPROVED) {
+       } else if (status === LeaveStatus.APPROVED) {
          await sendSystemNotification(leave.userId, 'Leave Approved', `Your leave for ${leave.type} is approved.`, 'success');
-       } else if (status === Leavestatus.REJECTED) {
+       } else if (status === LeaveStatus.REJECTED) {
          await sendSystemNotification(leave.userId, 'Leave Rejected', `Reason: ${comment}`, 'error');
        }
        showToast(`Leave ${status}`, 'success');
@@ -569,7 +569,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
     const today = new Date().toISOString().split('T')[0];
-    return Attendance.find(a => a.employeeId === currentUser.id && a.date === today);
+    return attendance.find(a => a.employeeId === currentUser.id && a.date === today);
   };
 
   const checkIn = async () => {
@@ -637,7 +637,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const generatePayslips = async (month: string) => {
-      const activeEmployees = Employees.filter(e => e.status === 'Active');
+      const activeEmployees = employees.filter(e => e.status === 'Active');
       const currentPayslips = await db.getPayslips();
       let count = 0;
 
@@ -659,20 +659,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       setPayslips(await db.getPayslips());
       if (count > 0) {
-          showToast(`Generated ${count} Payslips for ${month}`, 'success');
+          showToast(`Generated ${count} payslips for ${month}`, 'success');
       } else {
           showToast(`Payslips for ${month} already exist. No new slips generated.`, 'info');
       }
   };
 
   const value = {
-    Employees, users: Employees, Departments, Projects, Leaves, leaveTypes, Attendance, timeEntries, Notifications, 
-    Holidays, Payslips, toasts, isLoading, currentUser, theme,
+    employees, users: employees, departments, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
+    holidays, payslips, toasts, isLoading, currentUser, theme,
     login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     addEmployee, updateEmployee, updateUser, deleteEmployee,
     addDepartment, updateDepartment, deleteDepartment,
     addProject, updateProject, deleteProject,
-    addLeave, addLeaves, updateLeave, updateLeavestatus,
+    addLeave, addLeaves, updateLeave, updateLeaveStatus,
     addLeaveType, updateLeaveType, deleteLeaveType,
     addTimeEntry, updateTimeEntry, deleteTimeEntry,
     checkIn, checkOut, getTodayAttendance,

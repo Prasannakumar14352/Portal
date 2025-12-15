@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff } from 'lucide-react';
-import { Employee, DepartmentType, Employeestatus, UserRole } from '../types';
+import { Employee, DepartmentType, EmployeeStatus, UserRole } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
 interface EmployeeListProps {
-  Employees: Employee[];
+  employees: Employee[];
   onAddEmployee: (emp: Employee) => void;
   onUpdateEmployee: (emp: Employee) => void;
   onDeleteEmployee: (id: string) => void;
 }
 
-const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
+const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
   const { currentUser, showToast } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<string>('All');
@@ -42,11 +42,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
     email: '',
     role: '',
     department: DepartmentType.IT,
-    status: Employeestatus.ACTIVE,
+    status: EmployeeStatus.ACTIVE,
     salary: 0,
   });
 
-  const filteredEmployees = Employees.filter(emp => {
+  const filteredEmployees = employees.filter(emp => {
     const matchesSearch = 
       emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,7 +126,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
       email: '',
       role: '',
       department: DepartmentType.IT,
-      status: Employeestatus.ACTIVE,
+      status: EmployeeStatus.ACTIVE,
       salary: 0,
     });
     setShowModal(true);
@@ -182,7 +182,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search Employees..." 
+                placeholder="Search employees..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
@@ -213,7 +213,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
                   className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-400 transition-colors cursor-pointer shadow-sm"
                 >
                   <option value="All">All Status</option>
-                  {Object.values(Employeestatus).map(status => (
+                  {Object.values(EmployeeStatus).map(status => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
@@ -222,7 +222,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
           
           <div className="flex justify-end mt-2">
              <div className="text-xs text-slate-500">
-                Showing <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> Employees
+                Showing <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> employees
              </div>
           </div>
         </div>
@@ -262,11 +262,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
                   )}
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center space-x-1
-                      ${emp.status === Employeestatus.ACTIVE ? 'bg-emerald-100 text-emerald-700' : 
-                        emp.status === Employeestatus.INACTIVE ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-100 text-emerald-700' : 
+                        emp.status === EmployeeStatus.INACTIVE ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                       <span className={`w-1.5 h-1.5 rounded-full 
-                        ${emp.status === Employeestatus.ACTIVE ? 'bg-emerald-500' : 
-                          emp.status === Employeestatus.INACTIVE ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                        ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-500' : 
+                          emp.status === EmployeeStatus.INACTIVE ? 'bg-red-500' : 'bg-amber-500'}`}></span>
                       <span>{emp.status}</span>
                     </span>
                   </td>
@@ -290,7 +290,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
               {paginatedEmployees.length === 0 && (
                 <tr>
                   <td colSpan={isHR ? (isSuperAdmin && showPasswords ? 6 : 5) : 4} className="px-6 py-8 text-center text-slate-500">
-                    No Employees found matching your filters.
+                    No employees found matching your filters.
                   </td>
                 </tr>
               )}
@@ -438,10 +438,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ Employees, onAddEmployee, o
                    <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
                    <select
                     value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value as Employeestatus})}
+                    onChange={(e) => setFormData({...formData, status: e.target.value as EmployeeStatus})}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   >
-                    {Object.values(Employeestatus).map(status => (
+                    {Object.values(EmployeeStatus).map(status => (
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>

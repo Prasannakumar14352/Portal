@@ -14,7 +14,7 @@ import Reports from './components/Reports';
 import Profile from './components/Profile';
 import Holidays from './components/Holidays'; // New
 import Payslips from './components/Payslips'; // New
-import { User, UserRole, LeaveRequest, Leavestatus } from './types';
+import { User, UserRole, LeaveRequest, LeaveStatus } from './types';
 import { useAppContext } from './contexts/AppContext';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
 
@@ -56,10 +56,10 @@ const App: React.FC = () => {
     currentUser,
     login,
     logout,
-    Employees, 
-    Leaves, 
+    employees, 
+    leaves, 
     leaveTypes, 
-    Attendance, 
+    attendance, 
     isLoading,
     addEmployee,
     updateEmployee,
@@ -67,14 +67,14 @@ const App: React.FC = () => {
     addLeave,
     addLeaves,
     updateLeave,
-    updateLeavestatus,
+    updateLeaveStatus,
     addLeaveType,
     updateLeaveType,
     deleteLeaveType
   } = useAppContext();
 
   // Convert Employees to Users for the Leave Component props
-  const users: User[] = Employees.map(emp => ({
+  const users: User[] = employees.map(emp => ({
     id: emp.id,
     name: `${emp.firstName} ${emp.lastName}`,
     role: emp.role.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
@@ -103,7 +103,7 @@ const App: React.FC = () => {
       id: Math.random().toString(36).substr(2, 9),
       userId: currentUser!.id,
       userName: currentUser!.name,
-      status: Leavestatus.PENDING_MANAGER,
+      status: LeaveStatus.PENDING_MANAGER,
       createdAt: new Date().toISOString(),
       ...leaveData
     };
@@ -133,7 +133,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard Employees={Employees} />;
+        return <Dashboard employees={employees} />;
       case 'organization':
         return <Organization />;
       case 'time-logs':
@@ -142,23 +142,23 @@ const App: React.FC = () => {
         return <Reports />;
       case 'profile':
         return <Profile />;
-      case 'Attendance':
-        return <Attendance records={Attendance} />;
-      case 'Holidays':
+      case 'attendance':
+        return <Attendance records={attendance} />;
+      case 'holidays':
         return <Holidays />;
-      case 'Payslips':
+      case 'payslips':
         return <Payslips />;
-      case 'Leaves':
+      case 'leaves':
         return (
           <LeaveManagement 
             currentUser={currentUser}
             users={users}
-            Leaves={Leaves}
+            leaves={leaves}
             leaveTypes={leaveTypes}
             addLeave={handleCreateLeave}
             editLeave={updateLeave}
             addLeaves={addLeaves}
-            updateLeavestatus={updateLeavestatus}
+            updateLeaveStatus={updateLeaveStatus}
             addLeaveType={addLeaveType}
             updateLeaveType={updateLeaveType}
             deleteLeaveType={deleteLeaveType}
@@ -167,7 +167,7 @@ const App: React.FC = () => {
       case 'ai-assistant':
         return <HRAssistant />;
       default:
-        return <Dashboard Employees={Employees} />;
+        return <Dashboard employees={employees} />;
     }
   };
 

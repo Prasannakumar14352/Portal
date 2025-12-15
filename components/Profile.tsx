@@ -10,7 +10,7 @@ declare global {
 }
 
 const Profile = () => {
-  const { currentUser, users, updateUser, Departments, Projects } = useAppContext();
+  const { currentUser, users, updateUser, departments, projects } = useAppContext();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   
   // Form State
@@ -422,7 +422,7 @@ const Profile = () => {
                           onChange={e => setFormData({...formData, departmentId: e.target.value})}
                         >
                            <option value="">Select Department...</option>
-                           {Departments.map(dept => (
+                           {departments.map(dept => (
                              <option key={dept.id} value={dept.id}>{dept.name}</option>
                            ))}
                         </select>
@@ -433,7 +433,7 @@ const Profile = () => {
                    <div className="relative">
                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assigned Projects</label>
                      <div className={`border border-gray-200 rounded-lg max-h-40 overflow-y-auto p-2 space-y-2 ${canEditAllocations ? 'bg-gray-50' : 'bg-white'}`}>
-                        {Projects.map(proj => {
+                        {projects.map(proj => {
                           const isAssigned = formData.projectIds.includes(proj.id);
                           if (!canEditAllocations && !isAssigned) return null; // If not editing, only show assigned
                           
@@ -456,8 +456,8 @@ const Profile = () => {
                             </label>
                           );
                         })}
-                        {Projects.length === 0 && <span className="text-xs text-gray-400 italic p-1 block">No Projects available</span>}
-                        {!canEditAllocations && formData.projectIds.length === 0 && <span className="text-xs text-gray-400 italic p-1 block">No Projects assigned</span>}
+                        {projects.length === 0 && <span className="text-xs text-gray-400 italic p-1 block">No projects available</span>}
+                        {!canEditAllocations && formData.projectIds.length === 0 && <span className="text-xs text-gray-400 italic p-1 block">No projects assigned</span>}
                      </div>
                      {canEditAllocations && !canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400" />}
                    </div>

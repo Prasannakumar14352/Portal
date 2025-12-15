@@ -47,65 +47,65 @@ const api = {
 // --- MOCK DATA STORE ---
 // Mutable store for the session
 const store = {
-    Employees: [...mockEmployees],
-    Departments: [...mockDepartments],
-    Projects: [...mockProjects],
-    Leaves: [...mockLeaves],
+    employees: [...mockEmployees],
+    departments: [...mockDepartments],
+    projects: [...mockProjects],
+    leaves: [...mockLeaves],
     leaveTypes: [...mockLeaveTypes],
-    Attendance: [...mockAttendance],
+    attendance: [...mockAttendance],
     timeEntries: [...mockTimeEntries],
-    Notifications: [...mockNotifications],
-    Holidays: [...mockHolidays],
-    Payslips: [...mockPayslips]
+    notifications: [...mockNotifications],
+    holidays: [...mockHolidays],
+    payslips: [...mockPayslips]
 };
 
 // --- MOCK IMPLEMENTATION ---
 const mockDb = {
-    // Employees
-    getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.Employees]),
-    addEmployee: async (emp: Employee) => { store.Employees.push(emp); return Promise.resolve(emp); },
+    // EMPLOYEES
+    getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
+    addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
     updateEmployee: async (emp: Employee) => {
-        const idx = store.Employees.findIndex(e => e.id === emp.id);
-        if(idx !== -1) store.Employees[idx] = emp;
+        const idx = store.employees.findIndex(e => e.id === emp.id);
+        if(idx !== -1) store.employees[idx] = emp;
         return Promise.resolve(emp);
     },
     deleteEmployee: async (id: string) => {
-        store.Employees = store.Employees.filter(e => e.id !== id);
+        store.employees = store.employees.filter(e => e.id !== id);
         return Promise.resolve();
     },
 
-    // Departments
-    getDepartments: async (): Promise<Department[]> => Promise.resolve([...store.Departments]),
-    addDepartment: async (dept: Department) => { store.Departments.push(dept); return Promise.resolve(dept); },
+    // DEPARTMENTS
+    getDepartments: async (): Promise<Department[]> => Promise.resolve([...store.departments]),
+    addDepartment: async (dept: Department) => { store.departments.push(dept); return Promise.resolve(dept); },
     updateDepartment: async (dept: Department) => {
-        const idx = store.Departments.findIndex(d => d.id === dept.id);
-        if(idx !== -1) store.Departments[idx] = dept;
+        const idx = store.departments.findIndex(d => d.id === dept.id);
+        if(idx !== -1) store.departments[idx] = dept;
         return Promise.resolve(dept);
     },
     deleteDepartment: async (id: string) => {
-        store.Departments = store.Departments.filter(d => d.id !== id);
+        store.departments = store.departments.filter(d => d.id !== id);
         return Promise.resolve();
     },
 
-    // Projects
-    getProjects: async (): Promise<Project[]> => Promise.resolve([...store.Projects]),
-    addProject: async (proj: Project) => { store.Projects.push(proj); return Promise.resolve(proj); },
+    // PROJECTS
+    getProjects: async (): Promise<Project[]> => Promise.resolve([...store.projects]),
+    addProject: async (proj: Project) => { store.projects.push(proj); return Promise.resolve(proj); },
     updateProject: async (proj: Project) => {
-        const idx = store.Projects.findIndex(p => p.id === proj.id);
-        if(idx !== -1) store.Projects[idx] = proj;
+        const idx = store.projects.findIndex(p => p.id === proj.id);
+        if(idx !== -1) store.projects[idx] = proj;
         return Promise.resolve(proj);
     },
     deleteProject: async (id: string) => {
-        store.Projects = store.Projects.filter(p => p.id !== id);
+        store.projects = store.projects.filter(p => p.id !== id);
         return Promise.resolve();
     },
 
-    // Leaves
-    getLeaves: async (): Promise<LeaveRequest[]> => Promise.resolve([...store.Leaves]),
-    addLeave: async (leave: LeaveRequest) => { store.Leaves.push(leave); return Promise.resolve(leave); },
+    // LEAVES
+    getLeaves: async (): Promise<LeaveRequest[]> => Promise.resolve([...store.leaves]),
+    addLeave: async (leave: LeaveRequest) => { store.leaves.push(leave); return Promise.resolve(leave); },
     updateLeave: async (leave: LeaveRequest) => {
-        const idx = store.Leaves.findIndex(l => l.id === leave.id);
-        if(idx !== -1) store.Leaves[idx] = leave;
+        const idx = store.leaves.findIndex(l => l.id === leave.id);
+        if(idx !== -1) store.leaves[idx] = leave;
         return Promise.resolve(leave);
     },
 
@@ -122,12 +122,12 @@ const mockDb = {
         return Promise.resolve();
     },
 
-    // Attendance
-    getAttendance: async (): Promise<AttendanceRecord[]> => Promise.resolve([...store.Attendance]),
-    addAttendance: async (record: AttendanceRecord) => { store.Attendance.push(record); return Promise.resolve(record); },
+    // ATTENDANCE
+    getAttendance: async (): Promise<AttendanceRecord[]> => Promise.resolve([...store.attendance]),
+    addAttendance: async (record: AttendanceRecord) => { store.attendance.push(record); return Promise.resolve(record); },
     updateAttendance: async (record: AttendanceRecord) => {
-        const idx = store.Attendance.findIndex(a => a.id === record.id);
-        if(idx !== -1) store.Attendance[idx] = record;
+        const idx = store.attendance.findIndex(a => a.id === record.id);
+        if(idx !== -1) store.attendance[idx] = record;
         return Promise.resolve(record);
     },
 
@@ -144,80 +144,80 @@ const mockDb = {
         return Promise.resolve();
     },
 
-    // Notifications
-    getNotifications: async (): Promise<Notification[]> => Promise.resolve([...store.Notifications]),
-    addNotification: async (notif: Notification) => { store.Notifications.push(notif); return Promise.resolve(notif); },
+    // NOTIFICATIONS
+    getNotifications: async (): Promise<Notification[]> => Promise.resolve([...store.notifications]),
+    addNotification: async (notif: Notification) => { store.notifications.push(notif); return Promise.resolve(notif); },
     markNotificationRead: async (id: string) => {
-        const idx = store.Notifications.findIndex(n => n.id === id);
-        if(idx !== -1) store.Notifications[idx].read = true;
+        const idx = store.notifications.findIndex(n => n.id === id);
+        if(idx !== -1) store.notifications[idx].read = true;
         return Promise.resolve();
     },
     markAllNotificationsRead: async (userId: string) => {
-        store.Notifications.forEach(n => {
+        store.notifications.forEach(n => {
             if(n.userId === userId) n.read = true;
         });
         return Promise.resolve();
     },
 
-    // Holidays
-    getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.Holidays]),
-    addHoliday: async (holiday: Holiday) => { store.Holidays.push(holiday); return Promise.resolve(holiday); },
+    // HOLIDAYS
+    getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
+    addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
     deleteHoliday: async (id: string) => {
-        store.Holidays = store.Holidays.filter(h => h.id !== id);
+        store.holidays = store.holidays.filter(h => h.id !== id);
         return Promise.resolve();
     },
 
-    // Payslips
-    getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.Payslips]),
-    addPayslip: async (payslip: Payslip) => { store.Payslips.push(payslip); return Promise.resolve(payslip); }
+    // PAYSLIPS
+    getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
+    addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
 };
 
 // --- REAL IMPLEMENTATION OBJECT ---
 const apiDb = {
-  getEmployees: () => api.get('/Employees'),
-  addEmployee: (emp: Employee) => api.post('/Employees', emp),
-  updateEmployee: (emp: Employee) => api.put(`/Employees/${emp.id}`, emp),
-  deleteEmployee: (id: string) => api.delete(`/Employees/${id}`),
+  getEmployees: () => api.get('/employees'),
+  addEmployee: (emp: Employee) => api.post('/employees', emp),
+  updateEmployee: (emp: Employee) => api.put(`/employees/${emp.id}`, emp),
+  deleteEmployee: (id: string) => api.delete(`/employees/${id}`),
 
-  getDepartments: () => api.get('/Departments'),
-  addDepartment: (dept: Department) => api.post('/Departments', dept),
-  updateDepartment: (dept: Department) => api.put(`/Departments/${dept.id}`, dept),
-  deleteDepartment: (id: string) => api.delete(`/Departments/${id}`),
+  getDepartments: () => api.get('/departments'),
+  addDepartment: (dept: Department) => api.post('/departments', dept),
+  updateDepartment: (dept: Department) => api.put(`/departments/${dept.id}`, dept),
+  deleteDepartment: (id: string) => api.delete(`/departments/${id}`),
 
-  getProjects: () => api.get('/Projects'),
-  addProject: (proj: Project) => api.post('/Projects', proj),
-  updateProject: (proj: Project) => api.put(`/Projects/${proj.id}`, proj),
-  deleteProject: (id: string) => api.delete(`/Projects/${id}`),
+  getProjects: () => api.get('/projects'),
+  addProject: (proj: Project) => api.post('/projects', proj),
+  updateProject: (proj: Project) => api.put(`/projects/${proj.id}`, proj),
+  deleteProject: (id: string) => api.delete(`/projects/${id}`),
 
-  getLeaves: () => api.get('/Leaves'),
-  addLeave: (leave: LeaveRequest) => api.post('/Leaves', leave),
-  updateLeave: (leave: LeaveRequest) => api.put(`/Leaves/${leave.id}`, leave),
+  getLeaves: () => api.get('/leaves'),
+  addLeave: (leave: LeaveRequest) => api.post('/leaves', leave),
+  updateLeave: (leave: LeaveRequest) => api.put(`/leaves/${leave.id}`, leave),
 
-  getLeaveTypes: () => api.get('/LeaveTypes'),
-  addLeaveType: (type: LeaveTypeConfig) => api.post('/LeaveTypes', type),
-  updateLeaveType: (type: LeaveTypeConfig) => api.put(`/LeaveTypes/${type.id}`, type),
-  deleteLeaveType: (id: string) => api.delete(`/LeaveTypes/${id}`),
+  getLeaveTypes: () => api.get('/leave_types'),
+  addLeaveType: (type: LeaveTypeConfig) => api.post('/leave_types', type),
+  updateLeaveType: (type: LeaveTypeConfig) => api.put(`/leave_types/${type.id}`, type),
+  deleteLeaveType: (id: string) => api.delete(`/leave_types/${id}`),
 
-  getAttendance: () => api.get('/Attendance'),
-  addAttendance: (record: AttendanceRecord) => api.post('/Attendance', record),
-  updateAttendance: (record: AttendanceRecord) => api.put(`/Attendance/${record.id}`, record),
+  getAttendance: () => api.get('/attendance'),
+  addAttendance: (record: AttendanceRecord) => api.post('/attendance', record),
+  updateAttendance: (record: AttendanceRecord) => api.put(`/attendance/${record.id}`, record),
 
-  getTimeEntries: () => api.get('/TimeEntries'),
-  addTimeEntry: (entry: TimeEntry) => api.post('/TimeEntries', entry),
-  updateTimeEntry: (entry: TimeEntry) => api.put(`/TimeEntries/${entry.id}`, entry),
-  deleteTimeEntry: (id: string) => api.delete(`/TimeEntries/${id}`),
+  getTimeEntries: () => api.get('/time_entries'),
+  addTimeEntry: (entry: TimeEntry) => api.post('/time_entries', entry),
+  updateTimeEntry: (entry: TimeEntry) => api.put(`/time_entries/${entry.id}`, entry),
+  deleteTimeEntry: (id: string) => api.delete(`/time_entries/${id}`),
 
-  getNotifications: () => api.get('/Notifications'),
-  addNotification: (notif: Notification) => api.post('/Notifications', notif),
-  markNotificationRead: (id: string) => api.put(`/Notifications/${id}/read`, {}),
-  markAllNotificationsRead: (userId: string) => api.put(`/Notifications/read-all/${userId}`, {}),
+  getNotifications: () => api.get('/notifications'),
+  addNotification: (notif: Notification) => api.post('/notifications', notif),
+  markNotificationRead: (id: string) => api.put(`/notifications/${id}/read`, {}),
+  markAllNotificationsRead: (userId: string) => api.put(`/notifications/read-all/${userId}`, {}),
 
-  getHolidays: () => api.get('/Holidays'),
-  addHoliday: (holiday: Holiday) => api.post('/Holidays', holiday),
-  deleteHoliday: (id: string) => api.delete(`/Holidays/${id}`),
+  getHolidays: () => api.get('/holidays'),
+  addHoliday: (holiday: Holiday) => api.post('/holidays', holiday),
+  deleteHoliday: (id: string) => api.delete(`/holidays/${id}`),
 
-  getPayslips: () => api.get('/Payslips'),
-  addPayslip: (payslip: Payslip) => api.post('/Payslips', payslip)
+  getPayslips: () => api.get('/payslips'),
+  addPayslip: (payslip: Payslip) => api.post('/payslips', payslip)
 };
 
 // --- HYBRID EXPORT ---

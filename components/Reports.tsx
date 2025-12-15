@@ -13,7 +13,7 @@ import html2canvas from 'html2canvas';
 const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1'];
 
 const Reports = () => {
-  const { timeEntries, Projects, users, showToast } = useAppContext();
+  const { timeEntries, projects, users, showToast } = useAppContext();
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [filterPeriod, setFilterPeriod] = useState('This Month');
   const [filterProject, setFilterProject] = useState('All');
@@ -35,26 +35,26 @@ const Reports = () => {
   // --- Data Aggregation Helpers ---
 
   // 1. Project Status Overview (Pie)
-  const ProjectstatusData = useMemo(() => {
+  const projectStatusData = useMemo(() => {
     const counts = { Active: 0, 'On Hold': 0, Completed: 0 };
-    Projects.forEach(p => {
+    projects.forEach(p => {
       if (counts[p.status] !== undefined) counts[p.status]++;
     });
     return Object.keys(counts).map(key => ({ name: key, value: counts[key as keyof typeof counts] }));
-  }, [Projects]);
+  }, [projects]);
 
   // 2. Project Time Allocation (Pie)
   const projectTimeAllocation = useMemo(() => {
     const allocation: Record<string, number> = {};
     timeEntries.forEach(e => {
-        const projName = Projects.find(p => p.id === e.projectId)?.name || 'General';
+        const projName = projects.find(p => p.id === e.projectId)?.name || 'General';
         allocation[projName] = (allocation[projName] || 0) + e.durationMinutes;
     });
     return Object.keys(allocation).map(name => ({ 
         name, 
         value: parseFloat((allocation[name] / 60).toFixed(1)) // Hours
     }));
-  }, [timeEntries, Projects]);
+  }, [timeEntries, projects]);
 
   // 3. Team Member Contributions (Bar)
   const teamContributionData = useMemo(() => {
@@ -101,14 +101,14 @@ const Reports = () => {
 
   // 6. Project Progress (Bar - Mocked as % of tasks completed if available, else random for demo visualization matching image)
   const projectProgressData = useMemo(() => {
-      return Projects.map(p => {
+      return projects.map(p => {
           // In a real app, calculate based on closed tasks / total tasks
           const totalTasks = p.tasks?.length || 1; 
           // Mocking completion for visualization as we don't track individual task status in db yet
           const completion = p.status === 'Completed' ? 100 : Math.floor(Math.random() * 80) + 10; 
           return { name: p.name, progress: completion };
       });
-  }, [Projects]);
+  }, [projects]);
 
   // 7. Task Status Distribution (Pie - Mocked)
   const taskStatusData = [
@@ -137,8 +137,8 @@ const Reports = () => {
     switch(activeTab) {
         case 'Projects':
             title = 'Projects Report';
-            filename = 'Projects_report';
-            dataToExport = Projects.map(p => ({ 
+            filename = 'projects_report';
+            dataToExport = projects.map(p => ({ 
                 Name: p.name, 
                 Status: p.status, 
                 Description: p.description || '',
@@ -150,7 +150,7 @@ const Reports = () => {
             filename = 'time_tracking_report';
             dataToExport = timeEntries.map(t => ({ 
                 Date: t.date, 
-                Project: Projects.find(p => p.id === t.projectId)?.name || 'N/A', 
+                Project: projects.find(p => p.id === t.projectId)?.name || 'N/A', 
                 User: users.find(u => u.id === t.userId)?.firstName || 'Unknown', 
                 Task: t.task,
                 Hours: (t.durationMinutes/60).toFixed(2),
@@ -169,7 +169,7 @@ const Reports = () => {
              title = 'Dashboard Summary Report';
              filename = 'dashboard_report';
              dataToExport = [
-                 ...ProjectstatusData.map(d => ({ Metric: 'Project Status', Category: d.name, Value: d.value })),
+                 ...projectStatusData.map(d => ({ Metric: 'Project Status', Category: d.name, Value: d.value })),
                  ...taskStatusData.map(d => ({ Metric: 'Task Status', Category: d.name, Value: d.value }))
              ];
     }
@@ -288,7 +288,7 @@ const Reports = () => {
                 onChange={(e) => setFilterProject(e.target.value)}
             >
                 <option value="All">All Projects</option>
-                {Projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             
             {/* Export Dropdown */}
@@ -353,7 +353,7 @@ const Reports = () => {
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                                data={ProjectstatusData}
+                                data={projectStatusData}
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={60}
@@ -361,7 +361,7 @@ const Reports = () => {
                                 paddingAngle={5}
                                 dataKey="value"
                             >
-                                {ProjectstatusData.map((entry, index) => (
+                                {projectStatusData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>

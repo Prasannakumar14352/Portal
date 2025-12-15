@@ -1,5 +1,5 @@
 
-import { Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, UserRole, DepartmentType, Employeestatus, Leavestatus } from '../types';
+import { Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, UserRole, DepartmentType, EmployeeStatus, LeaveStatus } from '../types';
 
 // Mock Departments
 export const mockDepartments: Department[] = [
@@ -48,7 +48,7 @@ export const mockEmployees: Employee[] = [
     department: DepartmentType.HR,
     departmentId: 'd2',
     joinDate: '2020-01-15',
-    status: Employeestatus.ACTIVE,
+    status: EmployeeStatus.ACTIVE,
     salary: 95000,
     avatar: 'https://i.pravatar.cc/150?u=super1',
     location: { latitude: 40.7128, longitude: -74.0060, address: 'New York, NY' },
@@ -66,7 +66,7 @@ export const mockEmployees: Employee[] = [
     department: DepartmentType.IT,
     departmentId: 'd1',
     joinDate: '2021-03-10',
-    status: Employeestatus.ACTIVE,
+    status: EmployeeStatus.ACTIVE,
     salary: 85000,
     avatar: 'https://i.pravatar.cc/150?u=u2',
     managerId: 'u3',
@@ -85,7 +85,7 @@ export const mockEmployees: Employee[] = [
     department: DepartmentType.IT,
     departmentId: 'd1',
     joinDate: '2019-06-20',
-    status: Employeestatus.ACTIVE,
+    status: EmployeeStatus.ACTIVE,
     salary: 110000,
     avatar: 'https://i.pravatar.cc/150?u=u3',
     location: { latitude: 34.0522, longitude: -118.2437, address: 'Los Angeles, CA' },
@@ -103,7 +103,7 @@ export const mockEmployees: Employee[] = [
     department: DepartmentType.SALES,
     departmentId: 'd3',
     joinDate: '2022-01-05',
-    status: Employeestatus.ACTIVE,
+    status: EmployeeStatus.ACTIVE,
     salary: 90000,
     avatar: 'https://i.pravatar.cc/150?u=u4',
     location: { latitude: 41.8781, longitude: -87.6298, address: 'Chicago, IL' },
@@ -131,7 +131,7 @@ export const mockLeaves: LeaveRequest[] = [
     startDate: '2024-05-10',
     endDate: '2024-05-15',
     reason: 'Family Vacation',
-    status: Leavestatus.APPROVED,
+    status: LeaveStatus.APPROVED,
     createdAt: '2024-04-20T10:00:00Z',
     approverId: 'u3'
   },
@@ -143,7 +143,7 @@ export const mockLeaves: LeaveRequest[] = [
     startDate: '2024-06-01',
     endDate: '2024-06-02',
     reason: 'Flu',
-    status: Leavestatus.PENDING_MANAGER,
+    status: LeaveStatus.PENDING_MANAGER,
     createdAt: '2024-05-30T08:00:00Z',
     approverId: 'u3'
   },
@@ -155,7 +155,7 @@ export const mockLeaves: LeaveRequest[] = [
     startDate: '2024-07-01',
     endDate: '2024-07-10',
     reason: 'Summer Trip',
-    status: Leavestatus.PENDING_HR,
+    status: LeaveStatus.PENDING_HR,
     createdAt: '2024-06-15T09:00:00Z',
     approverId: 'super1'
   }

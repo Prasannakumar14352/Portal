@@ -15,7 +15,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
   const getMenuItems = () => {
     const commonItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'Holidays', label: 'Holidays', icon: Coffee }, // New
+      { id: 'holidays', label: 'Holidays', icon: Coffee }, // New
       { id: 'ai-assistant', label: 'HR Assistant', icon: MessageSquareText },
     ];
 
@@ -24,9 +24,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
         commonItems[0],
         { id: 'organization', label: 'Organization', icon: Building2 },
         { id: 'time-logs', label: 'Time Logs', icon: Timer },
-        { id: 'Attendance', label: 'My Attendance', icon: Clock },
-        { id: 'Leaves', label: 'Leaves', icon: Calendar },
-        { id: 'Payslips', label: 'Payslips', icon: FileText }, // New
+        { id: 'attendance', label: 'My Attendance', icon: Clock },
+        { id: 'leaves', label: 'Leaves', icon: Calendar },
+        { id: 'payslips', label: 'Payslips', icon: FileText }, // New
         commonItems[1], // Holidays
         commonItems[2]  // AI
       ];
@@ -38,9 +38,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
       { id: 'organization', label: 'Organization', icon: Building2 },
       { id: 'time-logs', label: 'Time Logs', icon: Timer },
       { id: 'reports', label: 'Reports', icon: BarChart3 },
-      { id: 'Attendance', label: 'Attendance', icon: Clock },
-      { id: 'Leaves', label: 'Leave Management', icon: Calendar },
-      { id: 'Payslips', label: 'Payslips', icon: FileText }, // New
+      { id: 'attendance', label: 'Attendance', icon: Clock },
+      { id: 'leaves', label: 'Leave Management', icon: Calendar },
+      { id: 'payslips', label: 'Payslips', icon: FileText }, // New
       commonItems[1], // Holidays
       commonItems[2]  // AI
     ];

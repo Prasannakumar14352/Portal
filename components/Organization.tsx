@@ -8,13 +8,13 @@ import EmployeeList from './EmployeeList';
 const Organization = () => {
   const { 
     currentUser, 
-    Departments, addDepartment, updateDepartment, deleteDepartment, 
-    Projects, addProject, updateProject, deleteProject, 
+    departments, addDepartment, updateDepartment, deleteDepartment, 
+    projects, addProject, updateProject, deleteProject, 
     users, updateUser, notify,
-    Employees, addEmployee, updateEmployee, deleteEmployee 
+    employees, addEmployee, updateEmployee, deleteEmployee 
   } = useAppContext();
   
-  const [activeTab, setActiveTab] = useState<'Employees' | 'Departments' | 'Projects' | 'allocations'>('Departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations'>('departments');
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
@@ -143,7 +143,7 @@ const Organization = () => {
     if (selectedUser) {
        updateUser(selectedUser.id, { departmentId: allocForm.departmentId, projectIds: allocForm.projectIds });
        
-       // Calculate notified users (colleagues in same dept or Projects)
+       // Calculate notified users (colleagues in same dept or projects)
        const colleagueIds = new Set<string>();
        
        // Add dept colleagues
@@ -153,9 +153,9 @@ const Organization = () => {
           if (u.projectIds?.some(pid => allocForm.projectIds.includes(pid))) colleagueIds.add(u.id);
        });
 
-       const deptName = Departments.find(d => d.id === allocForm.departmentId)?.name || 'their department';
+       const deptName = departments.find(d => d.id === allocForm.departmentId)?.name || 'their department';
 
-       notify(`Assignment updated. Email sent to ${selectedUser.firstName} ${selectedUser.lastName}. System Notifications sent to ${colleagueIds.size} colleagues in ${deptName} and related Projects.`);
+       notify(`Assignment updated. Email sent to ${selectedUser.firstName} ${selectedUser.lastName}. System notifications sent to ${colleagueIds.size} colleagues in ${deptName} and related projects.`);
        
        setShowConfirmAlloc(false);
        setSelectedUser(null);
@@ -182,21 +182,21 @@ const Organization = () => {
   };
 
   // Filtered Lists & Pagination Logic
-  const filteredProjects = Projects.filter(p => projFilter === 'All' || p.status === projFilter);
+  const filteredProjects = projects.filter(p => projFilter === 'All' || p.status === projFilter);
   const totalProjects = filteredProjects.length;
   const paginatedProjects = filteredProjects.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const totalAllocations = users.length;
   const paginatedAllocations = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const totalDepartments = Departments.length;
-  const paginatedDepartments = Departments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalDepartments = departments.length;
+  const paginatedDepartments = departments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Derived lists for modals
-  const EmployeesInCurrentDept = users.filter(u => u.departmentId === deptForm.id);
+  const employeesInCurrentDept = users.filter(u => u.departmentId === deptForm.id);
   const availableEmployeesForDept = users.filter(u => u.departmentId !== deptForm.id);
   
-  const EmployeesInCurrentProj = users.filter(u => u.projectIds?.includes(projForm.id!));
+  const employeesInCurrentProj = users.filter(u => u.projectIds?.includes(projForm.id!));
   const availableEmployeesForProj = users.filter(u => !u.projectIds?.includes(projForm.id!));
 
   const PaginationControls = ({ total }: { total: number }) => {
@@ -259,7 +259,7 @@ const Organization = () => {
                  <h3 className="text-lg font-bold text-gray-800">Confirm Assignment</h3>
               </div>
               <p className="text-gray-600 mb-6">
-                 Are you sure you want to assign <strong>{selectedUser?.firstName} {selectedUser?.lastName}</strong> to the selected department and {allocForm.projectIds.length} Projects?
+                 Are you sure you want to assign <strong>{selectedUser?.firstName} {selectedUser?.lastName}</strong> to the selected department and {allocForm.projectIds.length} projects?
                  <br/><span className="text-xs text-gray-500 mt-2 block">All members of the selected project/department will be notified.</span>
               </p>
               <div className="flex justify-end space-x-3">
@@ -273,19 +273,19 @@ const Organization = () => {
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Organization Settings</h2>
-            <p className="text-sm text-gray-500">Manage company Departments, Projects, and people allocations.</p>
+            <p className="text-sm text-gray-500">Manage company departments, projects, and people allocations.</p>
           </div>
           
           <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto w-full xl:w-auto max-w-full no-scrollbar">
              <button 
-               onClick={() => setActiveTab('Departments')}
-               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'Departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               onClick={() => setActiveTab('departments')}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Departments
              </button>
              <button 
-               onClick={() => setActiveTab('Projects')}
-               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'Projects' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+               onClick={() => setActiveTab('projects')}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'projects' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Projects
              </button>
@@ -297,8 +297,8 @@ const Organization = () => {
              </button>
              {showEmployeesTab && (
                <button 
-                 onClick={() => setActiveTab('Employees')}
-                 className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'Employees' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+                 onClick={() => setActiveTab('employees')}
+                 className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'employees' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
                >
                  Employees
                </button>
@@ -306,11 +306,11 @@ const Organization = () => {
           </div>
        </div>
 
-       {/* --- Employees TAB --- */}
-       {activeTab === 'Employees' && (
+       {/* --- EMPLOYEES TAB --- */}
+       {activeTab === 'employees' && (
          <div className="animate-fade-in">
             <EmployeeList 
-              Employees={Employees} 
+              employees={employees} 
               onAddEmployee={addEmployee}
               onUpdateEmployee={updateEmployee}
               onDeleteEmployee={deleteEmployee}
@@ -318,8 +318,8 @@ const Organization = () => {
          </div>
        )}
 
-       {/* --- Departments TAB --- */}
-       {activeTab === 'Departments' && (
+       {/* --- DEPARTMENTS TAB --- */}
+       {activeTab === 'departments' && (
          <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
                <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
@@ -394,8 +394,8 @@ const Organization = () => {
          </div>
        )}
 
-       {/* --- Projects TAB --- */}
-       {activeTab === 'Projects' && (
+       {/* --- PROJECTS TAB --- */}
+       {activeTab === 'projects' && (
          <div className="space-y-4 animate-fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
@@ -488,7 +488,7 @@ const Organization = () => {
                })}
                {paginatedProjects.length === 0 && (
                   <div className="col-span-full text-center py-10 text-gray-500">
-                     No Projects found matching the filter.
+                     No projects found matching the filter.
                   </div>
                )}
             </div>
@@ -520,8 +520,8 @@ const Organization = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                    {paginatedAllocations.map(user => {
-                     const userDept = Departments.find(d => d.id === user.departmentId);
-                     const userProjects = Projects.filter(p => user.projectIds?.includes(p.id));
+                     const userDept = departments.find(d => d.id === user.departmentId);
+                     const userProjects = projects.filter(p => user.projectIds?.includes(p.id));
                      const displayName = `${user.firstName} ${user.lastName}`;
                      const displayTitle = user.role;
                      return (
@@ -551,7 +551,7 @@ const Organization = () => {
                                     {p.name}
                                  </span>
                                ))}
-                               {userProjects.length === 0 && <span className="text-gray-400 text-xs italic">No Projects</span>}
+                               {userProjects.length === 0 && <span className="text-gray-400 text-xs italic">No projects</span>}
                             </div>
                          </td>
                          <td className="px-6 py-4 text-right">
@@ -603,7 +603,7 @@ const Organization = () => {
                     <div className="bg-gray-50 rounded-lg p-3 space-y-3">
                        {/* Current Members */}
                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {EmployeesInCurrentDept.map(u => (
+                          {employeesInCurrentDept.map(u => (
                              <div key={u.id} className="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-gray-100">
                                 <div className="flex items-center gap-2">
                                    <img src={u.avatar} className="w-6 h-6 rounded-full"/>
@@ -612,7 +612,7 @@ const Organization = () => {
                                 {isHR && <button type="button" onClick={() => removeUserFromDept(u.id)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>}
                              </div>
                           ))}
-                          {EmployeesInCurrentDept.length === 0 && <span className="text-xs text-gray-400 italic">No members assigned</span>}
+                          {employeesInCurrentDept.length === 0 && <span className="text-xs text-gray-400 italic">No members assigned</span>}
                        </div>
                        
                        {/* Add Member */}
@@ -720,7 +720,7 @@ const Organization = () => {
                     <div className="bg-gray-50 rounded-lg p-3 space-y-3">
                        {/* Current Team */}
                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {EmployeesInCurrentProj.map(u => (
+                          {employeesInCurrentProj.map(u => (
                              <div key={u.id} className="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-gray-100">
                                 <div className="flex items-center gap-2">
                                    <img src={u.avatar} className="w-6 h-6 rounded-full"/>
@@ -729,7 +729,7 @@ const Organization = () => {
                                 {isHR && <button type="button" onClick={() => removeUserFromProj(u.id)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>}
                              </div>
                           ))}
-                          {EmployeesInCurrentProj.length === 0 && <span className="text-xs text-gray-400 italic">No team members assigned</span>}
+                          {employeesInCurrentProj.length === 0 && <span className="text-xs text-gray-400 italic">No team members assigned</span>}
                        </div>
                        
                        {/* Add Member */}
@@ -766,7 +766,7 @@ const Organization = () => {
          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
                <h3 className="text-lg font-bold text-gray-800 mb-2">Edit Allocations</h3>
-               <p className="text-sm text-gray-500 mb-4">Assign department and Projects for <span className="font-semibold text-gray-800">{selectedUser.firstName} {selectedUser.lastName}</span>.</p>
+               <p className="text-sm text-gray-500 mb-4">Assign department and projects for <span className="font-semibold text-gray-800">{selectedUser.firstName} {selectedUser.lastName}</span>.</p>
                
                <div className="space-y-5">
                   <div>
@@ -777,7 +777,7 @@ const Organization = () => {
                         onChange={e => setAllocForm({ ...allocForm, departmentId: e.target.value })}
                      >
                         <option value="">Select Department...</option>
-                        {Departments.map(d => (
+                        {departments.map(d => (
                            <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
                      </select>
@@ -786,7 +786,7 @@ const Organization = () => {
                   <div>
                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assigned Projects</label>
                      <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto p-2 space-y-1">
-                        {Projects.map(proj => (
+                        {projects.map(proj => (
                            <label key={proj.id} className={`flex items-center space-x-3 p-2 rounded cursor-pointer hover:bg-gray-50 ${allocForm.projectIds?.includes(proj.id) ? 'bg-emerald-50 border border-emerald-100' : ''}`}>
                               <input 
                                  type="checkbox" 
