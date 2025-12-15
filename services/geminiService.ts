@@ -1,8 +1,8 @@
-
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize the Google GenAI client
-// The API key is assumed to be available in the environment variables.
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+// Assume this variable is pre-configured, valid, and accessible.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getHRChatResponse = async (message: string): Promise<string> => {
