@@ -8,7 +8,7 @@ export enum DepartmentType {
   OPERATIONS = 'Operations'
 }
 
-export enum EmployeeStatus {
+export enum Employeestatus {
   ACTIVE = 'Active',
   INACTIVE = 'Inactive',
   ON_LEAVE = 'On Leave'
@@ -47,7 +47,7 @@ export interface Employee {
   departmentId?: string; 
   projectIds?: string[]; 
   joinDate: string;
-  status: EmployeeStatus;
+  status: Employeestatus;
   salary: number;
   avatar: string;
   managerId?: string; 
@@ -65,7 +65,7 @@ export interface LeaveTypeConfig {
   color?: string;
 }
 
-export enum LeaveStatus {
+export enum Leavestatus {
   PENDING = 'Pending', 
   PENDING_MANAGER = 'Pending Manager',
   PENDING_HR = 'Pending HR',
@@ -81,7 +81,7 @@ export interface LeaveRequest {
   startDate: string;
   endDate: string;
   reason: string;
-  status: LeaveStatus;
+  status: Leavestatus;
   attachmentUrl?: string;
   managerConsent?: boolean;
   notifyUserIds?: string[];

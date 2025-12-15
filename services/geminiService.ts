@@ -11,7 +11,7 @@ export const getHRChatResponse = async (message: string): Promise<string> => {
       model: 'gemini-2.5-flash',
       contents: message,
       config: {
-        systemInstruction: "You are a helpful and professional HR Assistant for EmpowerCorp. You help employees with questions about leave policies, holidays, benefits, and general HR queries. Keep answers concise and friendly.",
+        systemInstruction: "You are a helpful and professional HR Assistant for EmpowerCorp. You help Employees with questions about leave policies, Holidays, benefits, and general HR queries. Keep answers concise and friendly.",
       }
     });
     

@@ -10,7 +10,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const TimeLogs = () => {
-  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, users, showToast } = useAppContext();
+  const { currentUser, Projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, users, showToast } = useAppContext();
   
   // UI State
   const [showModal, setShowModal] = useState(false);
@@ -54,8 +54,8 @@ const TimeLogs = () => {
 
   // Derived state for tasks based on selected project
   const selectedProjectTasks = useMemo(() => {
-    return projects.find(p => p.id === formData.projectId)?.tasks || [];
-  }, [formData.projectId, projects]);
+    return Projects.find(p => p.id === formData.projectId)?.tasks || [];
+  }, [formData.projectId, Projects]);
 
   const hasPredefinedTasks = selectedProjectTasks.length > 0;
 
@@ -86,7 +86,7 @@ const TimeLogs = () => {
   
   const getProjectName = (id?: string) => {
       if (!id || id === NO_PROJECT_ID) return 'No Client - General';
-      return projects.find(p => p.id === id)?.name || 'Unknown Project';
+      return Projects.find(p => p.id === id)?.name || 'Unknown Project';
   };
 
   const getWeekDays = (date: Date) => {
@@ -177,7 +177,7 @@ const TimeLogs = () => {
       return groups;
   }, [visibleEntries]);
 
-  // Set all projects expanded by default initially
+  // Set all Projects expanded by default initially
   useEffect(() => {
       const allIds = Object.keys(groupedEntries);
       const initialState: Record<string, boolean> = {};
@@ -477,7 +477,7 @@ const TimeLogs = () => {
                       className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white"
                    >
                       <option value="All">All Projects</option>
-                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {Projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       <option value={NO_PROJECT_ID}>No Client - General</option>
                    </select>
                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -728,7 +728,7 @@ const TimeLogs = () => {
                         }}
                      >
                         <option value="">Select Project...</option>
-                        {projects.map(p => (
+                        {Projects.map(p => (
                            <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                         <option value={NO_PROJECT_ID}>No Client - General</option>

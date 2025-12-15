@@ -15,7 +15,7 @@ if (pdfjs.GlobalWorkerOptions) {
 }
 
 const Payslips = () => {
-  const { payslips, currentUser, employees, showToast, manualAddPayslip } = useAppContext();
+  const { Payslips, currentUser, Employees, showToast, manualAddPayslip } = useAppContext();
   const [month, setMonth] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -73,7 +73,7 @@ const Payslips = () => {
       
       const file = e.target.files[0];
       if (!month) {
-          showToast("Please select a month first to tag imported payslips.", "warning");
+          showToast("Please select a month first to tag imported Payslips.", "warning");
           return;
       }
 
@@ -92,14 +92,14 @@ const Payslips = () => {
                   filePromises.push((async () => {
                       const normalizedName = zipEntry.name.toLowerCase();
                       
-                      const matchedEmployee = employees.find(emp => {
+                      const matchedEmployee = Employees.find(emp => {
                           const fname = emp.firstName.toLowerCase();
                           const lname = emp.lastName.toLowerCase();
                           return normalizedName.includes(fname) && normalizedName.includes(lname);
                       });
 
                       if (matchedEmployee) {
-                          const exists = payslips.some(p => p.userId === matchedEmployee.id && p.month === month);
+                          const exists = Payslips.some(p => p.userId === matchedEmployee.id && p.month === month);
                           
                           if (!exists) {
                               const arrayBuffer = await zipEntry.async("arraybuffer");
@@ -142,13 +142,13 @@ const Payslips = () => {
           await Promise.all(filePromises);
           
           if (importedCount > 0) {
-             let msg = `Successfully imported ${importedCount} payslips.`;
+             let msg = `Successfully imported ${importedCount} Payslips.`;
              if (parsedAmounts > 0) msg += ` Extracted Net Pay from ${parsedAmounts} files.`;
              showToast(msg, "success");
           } else if (skippedCount > 0) {
-             showToast(`No new payslips. ${skippedCount} duplicates found.`, "info");
+             showToast(`No new Payslips. ${skippedCount} duplicates found.`, "info");
           } else {
-             showToast("No matching employee payslips found in the ZIP.", "warning");
+             showToast("No matching employee Payslips found in the ZIP.", "warning");
           }
 
       } catch (err: any) {
@@ -190,7 +190,7 @@ const Payslips = () => {
 
   // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
-    let filtered = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
+    let filtered = isHR ? Payslips : Payslips.filter(p => p.userId === currentUser?.id);
     
     if (searchTerm) {
         filtered = filtered.filter(p => 
@@ -200,7 +200,7 @@ const Payslips = () => {
     }
     // Sort by date desc (assuming generatedDate matches chronological order roughly)
     return filtered.sort((a, b) => new Date(b.generatedDate).getTime() - new Date(a.generatedDate).getTime());
-  }, [payslips, currentUser, isHR, searchTerm]);
+  }, [Payslips, currentUser, isHR, searchTerm]);
 
   const totalPages = Math.ceil(visiblePayslips.length / itemsPerPage);
   const paginatedPayslips = visiblePayslips.slice(
@@ -211,7 +211,7 @@ const Payslips = () => {
   // Summary Logic
   const summaryStats = useMemo(() => {
       // Calculate based on ALL visible slips for the user
-      const userSlips = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
+      const userSlips = isHR ? Payslips : Payslips.filter(p => p.userId === currentUser?.id);
       
       const totalCount = userSlips.length;
       const totalAmount = userSlips.reduce((sum, p) => sum + p.amount, 0);
@@ -230,7 +230,7 @@ const Payslips = () => {
       const displayCurrency = userSlips.length > 0 ? (userSlips[0].currency || '₹') : '₹';
 
       return { totalCount, totalAmount, thisYearAmount, thisYearCount, displayCurrency };
-  }, [payslips, currentUser, isHR, currentYear]);
+  }, [Payslips, currentUser, isHR, currentYear]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -238,7 +238,7 @@ const Payslips = () => {
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
             <div>
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Payslips</h2>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">View and download your salary payslips.</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">View and download your salary Payslips.</p>
             </div>
             
             {isHR && (
@@ -285,7 +285,7 @@ const Payslips = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                         type="text" 
-                        placeholder="Search payslips..." 
+                        placeholder="Search Payslips..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-transparent dark:text-slate-200"
@@ -337,7 +337,7 @@ const Payslips = () => {
                         </div>
                     ))}
                     {paginatedPayslips.length === 0 && (
-                        <div className="text-center py-10 text-slate-500 dark:text-slate-400">No payslips found.</div>
+                        <div className="text-center py-10 text-slate-500 dark:text-slate-400">No Payslips found.</div>
                     )}
                 </div>
 
@@ -395,7 +395,7 @@ const Payslips = () => {
                         <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
                             {summaryStats.displayCurrency}{summaryStats.thisYearAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </p>
-                        <p className="text-xs text-slate-400 mt-1">{summaryStats.thisYearCount} payslips</p>
+                        <p className="text-xs text-slate-400 mt-1">{summaryStats.thisYearCount} Payslips</p>
                     </div>
                     <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Earnings</p>

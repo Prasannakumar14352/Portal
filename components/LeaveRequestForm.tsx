@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { LeaveRequest, LeaveStatus, User } from '../types';
+import { LeaveRequest, Leavestatus, User } from '../types';
 import { Calendar, FileText, Send } from 'lucide-react';
 
-const LEAVE_TYPES = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Unpaid Leave'];
+const LeaveTypes = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Unpaid Leave'];
 
 interface LeaveRequestFormProps {
   user: User;
@@ -11,7 +11,7 @@ interface LeaveRequestFormProps {
 
 const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ user, onSubmit }) => {
   const [formData, setFormData] = useState({
-    type: LEAVE_TYPES[0],
+    type: LeaveTypes[0],
     startDate: '',
     endDate: '',
     reason: ''
@@ -23,7 +23,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ user, onSubmit }) =
       id: Math.random().toString(36).substr(2, 9),
       userId: user.id,
       userName: user.name,
-      status: LeaveStatus.PENDING_MANAGER,
+      status: Leavestatus.PENDING_MANAGER,
       ...formData,
       // Optional legacy fields
       employeeId: user.id,
@@ -33,7 +33,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ user, onSubmit }) =
     // Reset form or show success message
     alert("Leave request submitted successfully!");
     setFormData({
-      type: LEAVE_TYPES[0],
+      type: LeaveTypes[0],
       startDate: '',
       endDate: '',
       reason: ''
@@ -53,7 +53,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ user, onSubmit }) =
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Leave Type</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {LEAVE_TYPES.map((type) => (
+              {LeaveTypes.map((type) => (
                 <div key={type}>
                   <input
                     type="radio"

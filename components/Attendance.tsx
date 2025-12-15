@@ -9,7 +9,7 @@ interface AttendanceProps {
 }
 
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
-  const { checkIn, checkOut, getTodayAttendance, timeEntries, addTimeEntry, projects, currentUser } = useAppContext();
+  const { checkIn, checkOut, getTodayAttendance, timeEntries, addTimeEntry, Projects, currentUser } = useAppContext();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchName, setSearchName] = useState('');
@@ -43,8 +43,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   // Derived state for tasks based on selected project
   const selectedProjectTasks = useMemo(() => {
-    return projects.find(p => p.id === logForm.projectId)?.tasks || [];
-  }, [logForm.projectId, projects]);
+    return Projects.find(p => p.id === logForm.projectId)?.tasks || [];
+  }, [logForm.projectId, Projects]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -154,8 +154,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     currentPage * itemsPerPage
   );
 
-  // Filter projects assigned to user
-  const userProjects = projects.filter(p => currentUser?.projectIds?.includes(p.id));
+  // Filter Projects assigned to user
+  const userProjects = Projects.filter(p => currentUser?.projectIds?.includes(p.id));
 
   return (
     <div className="space-y-6">
@@ -468,7 +468,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               {paginatedRecords.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                    No attendance records found matching your filters.
+                    No Attendance records found matching your filters.
                   </td>
                 </tr>
               )}

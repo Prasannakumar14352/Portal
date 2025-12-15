@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { UserRole, LeaveStatus, LeaveRequest, LeaveTypeConfig, User } from '../types';
+import { UserRole, Leavestatus, LeaveRequest, LeaveTypeConfig, User } from '../types';
 import { 
   Upload, Paperclip, CheckSquare, Search, Edit2, Calendar as CalendarIcon, 
   List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers
@@ -10,12 +10,12 @@ import { useAppContext } from '../contexts/AppContext';
 export interface LeaveManagementProps {
   currentUser: User;
   users: User[];
-  leaves: LeaveRequest[];
+  Leaves: LeaveRequest[];
   leaveTypes: LeaveTypeConfig[];
   addLeave: (leave: any) => void;
   editLeave: (id: string, data: any) => void;
-  addLeaves: (leaves: any[]) => void;
-  updateLeaveStatus: (id: string, status: LeaveStatus, comment?: string) => void;
+  addLeaves: (Leaves: any[]) => void;
+  updateLeavestatus: (id: string, status: Leavestatus, comment?: string) => void;
   addLeaveType: (type: any) => void;
   updateLeaveType: (id: string, data: any) => void;
   deleteLeaveType: (id: string) => void;
@@ -162,8 +162,8 @@ const LeaveTypeCard: React.FC<{
 );
 
 const LeaveManagement: React.FC<LeaveManagementProps> = ({ 
-  currentUser, users, leaves, leaveTypes, 
-  addLeave, editLeave, addLeaves, updateLeaveStatus,
+  currentUser, users, Leaves, leaveTypes, 
+  addLeave, editLeave, addLeaves, updateLeavestatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
   const { showToast } = useAppContext();
@@ -247,11 +247,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const visibleLeaves = useMemo(() => {
     let filtered = [];
     if (currentUser?.role === UserRole.HR) {
-      filtered = leaves;
+      filtered = Leaves;
     } else if (currentUser?.role === UserRole.MANAGER) {
       const directReports = users.filter(u => u.managerId === currentUser.id).map(u => u.id);
       
-      const relevantLeaves = leaves.filter(l => 
+      const relevantLeaves = Leaves.filter(l => 
         l.userId === currentUser.id || 
         l.approverId === currentUser.id || 
         (directReports.includes(l.userId) && (!l.approverId || l.approverId === currentUser.id)) 
@@ -259,10 +259,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       
       filtered = relevantLeaves;
     } else {
-      filtered = leaves.filter(l => l.userId === currentUser?.id);
+      filtered = Leaves.filter(l => l.userId === currentUser?.id);
     }
     return filtered;
-  }, [leaves, currentUser, users]);
+  }, [Leaves, currentUser, users]);
 
   const searchedLeaves = useMemo(() => {
     const lowerQ = searchQuery.toLowerCase();
@@ -287,15 +287,15 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   // Pending Actions Logic
   const pendingApprovals = searchedLeaves.filter(l => 
-    (currentUser?.role === UserRole.MANAGER && l.status === LeaveStatus.PENDING_MANAGER && l.userId !== currentUser.id) ||
-    (currentUser?.role === UserRole.HR && l.status === LeaveStatus.PENDING_HR)
+    (currentUser?.role === UserRole.MANAGER && l.status === Leavestatus.PENDING_MANAGER && l.userId !== currentUser.id) ||
+    (currentUser?.role === UserRole.HR && l.status === Leavestatus.PENDING_HR)
   );
 
   // Balance Calculation Logic (Generic per type)
   const getBalance = (typeName: string, limit: number, userId?: string) => {
     const targetId = userId || currentUser?.id;
-    const used = leaves
-      .filter(l => l.userId === targetId && l.type === typeName && l.status === LeaveStatus.APPROVED)
+    const used = Leaves
+      .filter(l => l.userId === targetId && l.type === typeName && l.status === Leavestatus.APPROVED)
       .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate), 0);
     return Math.max(0, limit - used);
   };
@@ -320,7 +320,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   };
 
   const handleOpenEdit = (leave: LeaveRequest) => {
-    if (leave.status !== LeaveStatus.PENDING_MANAGER) {
+    if (leave.status !== Leavestatus.PENDING_MANAGER) {
         showToast("You can only edit pending requests.", "error");
         return;
     }
@@ -346,8 +346,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const handleApproveAll = () => {
     if (confirm(`Are you sure you want to approve all ${pendingApprovals.length} pending requests?`)) {
       pendingApprovals.forEach(l => {
-        const nextStatus = currentUser?.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED;
-        updateLeaveStatus(l.id, nextStatus, "Bulk Approved");
+        const nextStatus = currentUser?.role === UserRole.MANAGER ? Leavestatus.PENDING_HR : Leavestatus.APPROVED;
+        updateLeavestatus(l.id, nextStatus, "Bulk Approved");
       });
       showToast(`Approved ${pendingApprovals.length} requests`, "success");
     }
@@ -393,12 +393,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   };
 
   // --- Sub-Components ---
-  const StatusBadge = ({ status }: { status: LeaveStatus | string }) => {
+  const StatusBadge = ({ status }: { status: Leavestatus | string }) => {
     const styles: Record<string, string> = {
-      [LeaveStatus.APPROVED]: 'bg-green-100 text-green-700 border-green-200',
-      [LeaveStatus.REJECTED]: 'bg-red-100 text-red-700 border-red-200',
-      [LeaveStatus.PENDING_MANAGER]: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      [LeaveStatus.PENDING_HR]: 'bg-purple-100 text-purple-700 border-purple-200',
+      [Leavestatus.APPROVED]: 'bg-green-100 text-green-700 border-green-200',
+      [Leavestatus.REJECTED]: 'bg-red-100 text-red-700 border-red-200',
+      [Leavestatus.PENDING_MANAGER]: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      [Leavestatus.PENDING_HR]: 'bg-purple-100 text-purple-700 border-purple-200',
     };
     
     return <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${styles[status] || 'bg-slate-100 text-slate-700'}`}>{status}</span>;
@@ -438,7 +438,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     if (!date) return <div key={i} className="h-24 bg-slate-50/50 rounded-lg"></div>;
                     const dateLeaves = getLeavesForDate(date);
                     const pendingCount = dateLeaves.filter(l => l.status.includes('Pending')).length;
-                    const approvedCount = dateLeaves.filter(l => l.status === LeaveStatus.APPROVED).length;
+                    const approvedCount = dateLeaves.filter(l => l.status === Leavestatus.APPROVED).length;
 
                     return (
                         <div 
@@ -473,7 +473,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                         <h3 className="font-bold text-lg mb-4 text-slate-800">{selectedCalDate.toLocaleDateString()} Leaves</h3>
                         <div className="space-y-3">
                             {getLeavesForDate(selectedCalDate).length === 0 ? (
-                                <p className="text-slate-500 text-sm">No leaves for this date.</p>
+                                <p className="text-slate-500 text-sm">No Leaves for this date.</p>
                             ) : (
                                 getLeavesForDate(selectedCalDate).map(l => (
                                     <div key={l.id} className="border border-slate-100 p-3 rounded-lg bg-slate-50">
@@ -500,7 +500,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
         {myTeam.map(member => {
-           const memberLeaves = leaves.filter(l => l.userId === member.id);
+           const memberLeaves = Leaves.filter(l => l.userId === member.id);
            
            return (
              <div key={member.id} className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition">
@@ -516,7 +516,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   <h5 className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 pb-1">Leave Balances</h5>
                   {leaveTypes.filter(t => t.isActive).slice(0, 3).map(type => {
                      const used = memberLeaves
-                        .filter(l => l.type === type.name && l.status === LeaveStatus.APPROVED)
+                        .filter(l => l.type === type.name && l.status === Leavestatus.APPROVED)
                         .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate), 0);
                      const balance = Math.max(0, type.days - used);
                      const percent = Math.min(100, Math.round((balance / type.days) * 100));
@@ -581,7 +581,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             <div className="relative flex-1 md:w-64">
                <input 
                  type="text" 
-                 placeholder="Search leaves..." 
+                 placeholder="Search Leaves..." 
                  className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-full"
                  value={searchQuery}
                  onChange={(e) => setSearchQuery(e.target.value)}
@@ -656,14 +656,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               <>
                 {isHR && viewMode === 'requests' && (
                   <div className="relative">
-                     <input type="file" id="leaves-bulk-upload" className="hidden" onChange={(e) => {
+                     <input type="file" id="Leaves-bulk-upload" className="hidden" onChange={(e) => {
                        if (e.target.files?.length) addLeaves([{ 
                           id: `l-bulk-${Date.now()}`, userId: 'u1', userName: 'Bulk User', 
                           type: 'Annual Leave', startDate: '2024-07-01', endDate: '2024-07-05', 
-                          reason: 'Bulk', status: LeaveStatus.APPROVED, createdAt: new Date().toISOString() 
+                          reason: 'Bulk', status: Leavestatus.APPROVED, createdAt: new Date().toISOString() 
                        }]);
                      }} />
-                     <label htmlFor="leaves-bulk-upload" className="cursor-pointer bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50 flex items-center space-x-2 text-sm whitespace-nowrap shadow-sm">
+                     <label htmlFor="Leaves-bulk-upload" className="cursor-pointer bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50 flex items-center space-x-2 text-sm whitespace-nowrap shadow-sm">
                        <Upload size={16} />
                        <span className="hidden sm:inline">Bulk Upload</span>
                        <span className="sm:hidden">Upload</span>
@@ -785,10 +785,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                          className="flex-1 text-xs border border-orange-200 rounded px-2 py-1 focus:ring-1 focus:ring-orange-500 outline-none"
                          onChange={(e) => setReviewComment(e.target.value)}
                        />
-                       <button onClick={() => updateLeaveStatus(leave.id, currentUser.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED, reviewComment)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200"><CheckCircle size={18}/></button>
+                       <button onClick={() => updateLeavestatus(leave.id, currentUser.role === UserRole.MANAGER ? Leavestatus.PENDING_HR : Leavestatus.APPROVED, reviewComment)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200"><CheckCircle size={18}/></button>
                        <button onClick={() => {
                            const reason = prompt("Reason for rejection:");
-                           if(reason) updateLeaveStatus(leave.id, LeaveStatus.REJECTED, reason);
+                           if(reason) updateLeavestatus(leave.id, Leavestatus.REJECTED, reason);
                        }} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"><XCircle size={18}/></button>
                     </div>
                   </div>
@@ -836,16 +836,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                       </td>
                       <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
                       <td className="px-6 py-4">
-                        {currentUser?.role === UserRole.EMPLOYEE && leave.status === LeaveStatus.PENDING_MANAGER ? (
+                        {currentUser?.role === UserRole.EMPLOYEE && leave.status === Leavestatus.PENDING_MANAGER ? (
                           <button onClick={() => handleOpenEdit(leave)} className="text-emerald-600 hover:text-emerald-800 text-xs font-medium flex items-center">
                             <Edit2 size={12} className="mr-1"/> Edit
                           </button>
                         ) : (
-                          ((currentUser?.role === UserRole.HR && leave.status === LeaveStatus.PENDING_HR) || 
-                           (currentUser?.role === UserRole.MANAGER && leave.status === LeaveStatus.PENDING_MANAGER)) ? (
+                          ((currentUser?.role === UserRole.HR && leave.status === Leavestatus.PENDING_HR) || 
+                           (currentUser?.role === UserRole.MANAGER && leave.status === Leavestatus.PENDING_MANAGER)) ? (
                             <div className="flex gap-2">
                                 <button 
-                                  onClick={() => updateLeaveStatus(leave.id, currentUser.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED, "Approved from list")} 
+                                  onClick={() => updateLeavestatus(leave.id, currentUser.role === UserRole.MANAGER ? Leavestatus.PENDING_HR : Leavestatus.APPROVED, "Approved from list")} 
                                   className="p-1.5 text-green-600 hover:bg-green-50 rounded transition" 
                                   title={currentUser.role === UserRole.MANAGER ? "Approve (Forward to HR)" : "Final Approve"}
                                 >
@@ -854,7 +854,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                                 <button 
                                   onClick={() => {
                                       const reason = prompt("Reason for rejection:");
-                                      if(reason) updateLeaveStatus(leave.id, LeaveStatus.REJECTED, reason);
+                                      if(reason) updateLeavestatus(leave.id, Leavestatus.REJECTED, reason);
                                   }} 
                                   className="p-1.5 text-red-600 hover:bg-red-50 rounded transition" 
                                   title="Reject"
@@ -1050,7 +1050,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               </div>
               <div className="flex items-center space-x-2 pt-2">
                  <input type="checkbox" id="isActive" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"/>
-                 <label htmlFor="isActive" className="text-sm text-slate-700">Active (Visible to employees)</label>
+                 <label htmlFor="isActive" className="text-sm text-slate-700">Active (Visible to Employees)</label>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
                 <button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>

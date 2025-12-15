@@ -5,10 +5,10 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { Users, UserCheck, CalendarOff, TrendingUp } from 'lucide-react';
-import { Employee, EmployeeStatus } from '../types';
+import { Employee, Employeestatus } from '../types';
 
 interface DashboardProps {
-  employees: Employee[];
+  Employees: Employee[];
 }
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
@@ -28,20 +28,20 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string,
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
-  const totalEmployees = employees.length;
-  const activeEmployees = employees.filter(e => e.status === EmployeeStatus.ACTIVE).length;
-  const onLeaveEmployees = employees.filter(e => e.status === EmployeeStatus.ON_LEAVE).length;
+const Dashboard: React.FC<DashboardProps> = ({ Employees }) => {
+  const totalEmployees = Employees.length;
+  const activeEmployees = Employees.filter(e => e.status === Employeestatus.ACTIVE).length;
+  const onLeaveEmployees = Employees.filter(e => e.status === Employeestatus.ON_LEAVE).length;
   
   // Data for Department Chart
-  const deptCounts = employees.reduce((acc, curr) => {
+  const deptCounts = Employees.reduce((acc, curr) => {
     acc[curr.department] = (acc[curr.department] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const deptData = Object.keys(deptCounts).map(key => ({
     name: key,
-    employees: deptCounts[key]
+    Employees: deptCounts[key]
   }));
 
   // Data for Status Chart
@@ -90,7 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
           value="8" 
           icon={TrendingUp} 
           color="bg-violet-500"
-          subtext="Across 3 departments"
+          subtext="Across 3 Departments"
         />
       </div>
 
@@ -104,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="employees" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="Employees" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

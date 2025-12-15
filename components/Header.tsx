@@ -12,7 +12,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuClick }) => {
-  const { notifications, markNotificationRead, markAllRead, theme, toggleTheme } = useAppContext();
+  const { Notifications, markNotificationRead, markAllRead, theme, toggleTheme } = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -31,8 +31,8 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter notifications for the current user
-  const myNotifications = notifications
+  // Filter Notifications for the current user
+  const myNotifications = Notifications
     .filter(n => n.userId === user.id)
     .sort((a, b) => {
         if (a.read === b.read) return 0;
@@ -98,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
               </div>
               <div className="max-h-80 overflow-y-auto scrollbar-hide">
                 {myNotifications.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
+                    <div className="p-8 text-center text-slate-400 text-sm">No Notifications</div>
                 ) : (
                     myNotifications.map(notif => (
                     <div 
