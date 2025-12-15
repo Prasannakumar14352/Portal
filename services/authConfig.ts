@@ -7,9 +7,7 @@ export const msalConfig: Configuration = {
         clientId: "af84ee21-88c6-4cb7-9586-957230a8f583",
         authority: "https://login.microsoftonline.com/e917b365-0776-4fcc-b8f6-5c12396474e0",
         redirectUri: window.location.origin, // e.g., http://localhost:5173
-        postLogoutRedirectUri: window.location.origin,
         navigateToLoginRequestUrl: false,
-        responseMode: "fragment", // Force SPA response mode to help disambiguate platform config
     },
     cache: {
         cacheLocation: "sessionStorage", 
@@ -19,5 +17,5 @@ export const msalConfig: Configuration = {
 
 export const loginRequest: PopupRequest = {
     scopes: ["User.Read"],
-    prompt: "select_account" // Forces account selection to avoid stale session loops
+    prompt: "select_account"
 };
