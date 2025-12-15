@@ -62,7 +62,7 @@ const Holidays = () => {
       return hDate >= today;
   };
 
-  const HolidayCard = ({ holiday, compact = false }: { holiday: Holiday, compact?: boolean }) => {
+  const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean }> = ({ holiday, compact = false }) => {
       const { day, month, dayName } = getDateParts(holiday.date);
       const upcoming = isUpcoming(holiday.date);
 

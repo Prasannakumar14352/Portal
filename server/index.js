@@ -1,44 +1,30 @@
 
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const sql = require('mssql');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const path = require('path');
 
 const app = express();
 const PORT = 8000;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' })); // Increased limit for file uploads (avatars, PDFs)
+app.use(bodyParser.json({ limit: '50mb' }));
 
-// Database Setup
-const db = new sqlite3.Database('./hr_portal.db', (err) => {
-    if (err) {
-        console.error('Error opening database:', err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-        initDb();
+// Database Configuration
+// defaults set based on your provided configuration
+const dbConfig = {
+    user: process.env.DB_USER || 'DHLE',
+    password: process.env.DB_PASSWORD || 'DHLE',
+    server: process.env.DB_SERVER || 'isthydpc107', 
+    database: process.env.DB_NAME || 'DHLEDB',
+    port: parseInt(process.env.DB_PORT || '1433'),
+    options: {
+        encrypt: false, // Set to false for local/internal network servers
+        trustServerCertificate: true, // Trust self-signed certificates
+        enableArithAbort: true,
+        instancename: undefined // If using a named instance (e.g. isthydpc107\SQLEXPRESS), set this.
     }
-});
-
-// Helper functions for DB operations
-const run = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-};
-
-const get = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
 };
 
 // JSON Helper
@@ -50,136 +36,193 @@ const parseJSON = (str) => {
     }
 };
 
-const boolToInt = (val) => (val === true || val === 'true' ? 1 : 0);
-const intToBool = (val) => val === 1;
+// Connection Pool
+let pool;
 
-// Initialize Database Tables
+const connectDb = async () => {
+    try {
+        // Connect to the specific database
+        pool = await sql.connect(dbConfig);
+        console.log(`Connected to SQL Server: ${dbConfig.server} / ${dbConfig.database}`);
+        
+        // Check schema only (creates tables only if they don't exist)
+        await initDb();
+    } catch (err) {
+        console.error('Database Connection Failed!');
+        console.error('Please check if SQL Server is running on isthydpc107 and TCP/IP is enabled on port 1433.');
+        console.error('Error Details:', err.message);
+    }
+};
+
+// Initialize Database Tables (Idempotent - only creates if missing)
 const initDb = async () => {
     try {
-        await run(`CREATE TABLE IF NOT EXISTS employees (
-            id TEXT PRIMARY KEY,
-            firstName TEXT,
-            lastName TEXT,
-            email TEXT,
-            password TEXT,
-            role TEXT,
-            department TEXT,
-            departmentId TEXT,
-            projectIds TEXT,
-            joinDate TEXT,
-            status TEXT,
-            salary REAL,
-            avatar TEXT,
-            managerId TEXT,
-            location TEXT,
-            phone TEXT,
-            jobTitle TEXT
-        )`);
+        const request = pool.request();
 
-        await run(`CREATE TABLE IF NOT EXISTS departments (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            description TEXT,
-            managerId TEXT
-        )`);
+        // 1. Employees
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U')
+            CREATE TABLE employees (
+                id NVARCHAR(50) PRIMARY KEY,
+                firstName NVARCHAR(100),
+                lastName NVARCHAR(100),
+                email NVARCHAR(255),
+                password NVARCHAR(255),
+                role NVARCHAR(50),
+                department NVARCHAR(100),
+                departmentId NVARCHAR(50),
+                projectIds NVARCHAR(MAX),
+                joinDate NVARCHAR(50),
+                status NVARCHAR(50),
+                salary FLOAT,
+                avatar NVARCHAR(MAX),
+                managerId NVARCHAR(50),
+                location NVARCHAR(MAX),
+                phone NVARCHAR(50),
+                jobTitle NVARCHAR(100)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            description TEXT,
-            status TEXT,
-            tasks TEXT,
-            dueDate TEXT
-        )`);
+        // 2. Departments
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U')
+            CREATE TABLE departments (
+                id NVARCHAR(50) PRIMARY KEY,
+                name NVARCHAR(100),
+                description NVARCHAR(MAX),
+                managerId NVARCHAR(50)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS leaves (
-            id TEXT PRIMARY KEY,
-            userId TEXT,
-            userName TEXT,
-            type TEXT,
-            startDate TEXT,
-            endDate TEXT,
-            reason TEXT,
-            status TEXT,
-            attachmentUrl TEXT,
-            managerConsent INTEGER,
-            notifyUserIds TEXT,
-            approverId TEXT,
-            isUrgent INTEGER,
-            managerComment TEXT,
-            hrComment TEXT,
-            createdAt TEXT,
-            employeeId TEXT,
-            employeeName TEXT
-        )`);
+        // 3. Projects
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='projects' AND xtype='U')
+            CREATE TABLE projects (
+                id NVARCHAR(50) PRIMARY KEY,
+                name NVARCHAR(100),
+                description NVARCHAR(MAX),
+                status NVARCHAR(50),
+                tasks NVARCHAR(MAX),
+                dueDate NVARCHAR(50)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS leave_types (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            days INTEGER,
-            description TEXT,
-            isActive INTEGER,
-            color TEXT
-        )`);
+        // 4. Leaves
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U')
+            CREATE TABLE leaves (
+                id NVARCHAR(50) PRIMARY KEY,
+                userId NVARCHAR(50),
+                userName NVARCHAR(100),
+                type NVARCHAR(50),
+                startDate NVARCHAR(50),
+                endDate NVARCHAR(50),
+                reason NVARCHAR(MAX),
+                status NVARCHAR(50),
+                attachmentUrl NVARCHAR(MAX),
+                managerConsent BIT,
+                notifyUserIds NVARCHAR(MAX),
+                approverId NVARCHAR(50),
+                isUrgent BIT,
+                managerComment NVARCHAR(MAX),
+                hrComment NVARCHAR(MAX),
+                createdAt NVARCHAR(50),
+                employeeId NVARCHAR(50),
+                employeeName NVARCHAR(100)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS attendance (
-            id TEXT PRIMARY KEY,
-            employeeId TEXT,
-            employeeName TEXT,
-            date TEXT,
-            checkIn TEXT,
-            checkOut TEXT,
-            checkInTime TEXT,
-            checkOutTime TEXT,
-            status TEXT,
-            notes TEXT
-        )`);
+        // 5. Leave Types
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leave_types' AND xtype='U')
+            CREATE TABLE leave_types (
+                id NVARCHAR(50) PRIMARY KEY,
+                name NVARCHAR(100),
+                days INT,
+                description NVARCHAR(MAX),
+                isActive BIT,
+                color NVARCHAR(50)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS time_entries (
-            id TEXT PRIMARY KEY,
-            userId TEXT,
-            projectId TEXT,
-            task TEXT,
-            date TEXT,
-            durationMinutes INTEGER,
-            description TEXT,
-            status TEXT,
-            isBillable INTEGER
-        )`);
+        // 6. Attendance
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='attendance' AND xtype='U')
+            CREATE TABLE attendance (
+                id NVARCHAR(50) PRIMARY KEY,
+                employeeId NVARCHAR(50),
+                employeeName NVARCHAR(100),
+                date NVARCHAR(50),
+                checkIn NVARCHAR(50),
+                checkOut NVARCHAR(50),
+                checkInTime NVARCHAR(50),
+                checkOutTime NVARCHAR(50),
+                status NVARCHAR(50),
+                notes NVARCHAR(MAX)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS notifications (
-            id TEXT PRIMARY KEY,
-            userId TEXT,
-            title TEXT,
-            message TEXT,
-            time TEXT,
-            read INTEGER,
-            type TEXT
-        )`);
+        // 7. Time Entries
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='time_entries' AND xtype='U')
+            CREATE TABLE time_entries (
+                id NVARCHAR(50) PRIMARY KEY,
+                userId NVARCHAR(50),
+                projectId NVARCHAR(50),
+                task NVARCHAR(100),
+                date NVARCHAR(50),
+                durationMinutes INT,
+                description NVARCHAR(MAX),
+                status NVARCHAR(50),
+                isBillable BIT
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS holidays (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            date TEXT,
-            type TEXT
-        )`);
+        // 8. Notifications
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U')
+            CREATE TABLE notifications (
+                id NVARCHAR(50) PRIMARY KEY,
+                userId NVARCHAR(50),
+                title NVARCHAR(255),
+                message NVARCHAR(MAX),
+                time NVARCHAR(50),
+                [read] BIT,
+                type NVARCHAR(50)
+            )
+        `);
 
-        await run(`CREATE TABLE IF NOT EXISTS payslips (
-            id TEXT PRIMARY KEY,
-            userId TEXT,
-            userName TEXT,
-            month TEXT,
-            amount REAL,
-            currency TEXT,
-            status TEXT,
-            generatedDate TEXT,
-            fileData TEXT,
-            fileName TEXT
-        )`);
+        // 9. Holidays
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='holidays' AND xtype='U')
+            CREATE TABLE holidays (
+                id NVARCHAR(50) PRIMARY KEY,
+                name NVARCHAR(100),
+                date NVARCHAR(50),
+                type NVARCHAR(50)
+            )
+        `);
 
-        console.log("Database tables initialized.");
+        // 10. Payslips
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='payslips' AND xtype='U')
+            CREATE TABLE payslips (
+                id NVARCHAR(50) PRIMARY KEY,
+                userId NVARCHAR(50),
+                userName NVARCHAR(100),
+                month NVARCHAR(50),
+                amount FLOAT,
+                currency NVARCHAR(10),
+                status NVARCHAR(50),
+                generatedDate NVARCHAR(50),
+                fileData NVARCHAR(MAX),
+                fileName NVARCHAR(255)
+            )
+        `);
+
+        console.log("Database schema checked/initialized.");
     } catch (err) {
-        console.error("Error creating tables:", err);
+        console.error("Error creating/checking tables:", err);
     }
 };
 
@@ -188,8 +231,8 @@ const initDb = async () => {
 // Employees
 app.get('/api/employees', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM employees");
-        const employees = rows.map(e => ({
+        const result = await pool.request().query("SELECT * FROM employees");
+        const employees = result.recordset.map(e => ({
             ...e,
             projectIds: parseJSON(e.projectIds) || [],
             location: parseJSON(e.location),
@@ -201,8 +244,30 @@ app.get('/api/employees', async (req, res) => {
 app.post('/api/employees', async (req, res) => {
     const e = req.body;
     try {
-        await run(`INSERT INTO employees (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, phone, jobTitle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-        [e.id, e.firstName, e.lastName, e.email, e.password, e.role, e.department, e.departmentId, JSON.stringify(e.projectIds), e.joinDate, e.status, e.salary, e.avatar, e.managerId, JSON.stringify(e.location), e.phone, e.jobTitle]);
+        const reqSql = pool.request();
+        // Bind inputs
+        reqSql.input('id', sql.NVarChar, e.id);
+        reqSql.input('firstName', sql.NVarChar, e.firstName);
+        reqSql.input('lastName', sql.NVarChar, e.lastName);
+        reqSql.input('email', sql.NVarChar, e.email);
+        reqSql.input('password', sql.NVarChar, e.password);
+        reqSql.input('role', sql.NVarChar, e.role);
+        reqSql.input('department', sql.NVarChar, e.department);
+        reqSql.input('departmentId', sql.NVarChar, e.departmentId);
+        reqSql.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds));
+        reqSql.input('joinDate', sql.NVarChar, e.joinDate);
+        reqSql.input('status', sql.NVarChar, e.status);
+        reqSql.input('salary', sql.Float, e.salary);
+        reqSql.input('avatar', sql.NVarChar, e.avatar);
+        reqSql.input('managerId', sql.NVarChar, e.managerId);
+        reqSql.input('location', sql.NVarChar, JSON.stringify(e.location));
+        reqSql.input('phone', sql.NVarChar, e.phone);
+        reqSql.input('jobTitle', sql.NVarChar, e.jobTitle);
+
+        await reqSql.query(`INSERT INTO employees 
+            (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, phone, jobTitle) 
+            VALUES (@id, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @phone, @jobTitle)`);
+        
         res.json(e);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -210,15 +275,40 @@ app.post('/api/employees', async (req, res) => {
 app.put('/api/employees/:id', async (req, res) => {
     const e = req.body;
     try {
-        await run(`UPDATE employees SET firstName=?, lastName=?, email=?, password=?, role=?, department=?, departmentId=?, projectIds=?, joinDate=?, status=?, salary=?, avatar=?, managerId=?, location=?, phone=?, jobTitle=? WHERE id=?`, 
-        [e.firstName, e.lastName, e.email, e.password, e.role, e.department, e.departmentId, JSON.stringify(e.projectIds), e.joinDate, e.status, e.salary, e.avatar, e.managerId, JSON.stringify(e.location), e.phone, e.jobTitle, req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('firstName', sql.NVarChar, e.firstName);
+        reqSql.input('lastName', sql.NVarChar, e.lastName);
+        reqSql.input('email', sql.NVarChar, e.email);
+        reqSql.input('password', sql.NVarChar, e.password);
+        reqSql.input('role', sql.NVarChar, e.role);
+        reqSql.input('department', sql.NVarChar, e.department);
+        reqSql.input('departmentId', sql.NVarChar, e.departmentId);
+        reqSql.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds));
+        reqSql.input('joinDate', sql.NVarChar, e.joinDate);
+        reqSql.input('status', sql.NVarChar, e.status);
+        reqSql.input('salary', sql.Float, e.salary);
+        reqSql.input('avatar', sql.NVarChar, e.avatar);
+        reqSql.input('managerId', sql.NVarChar, e.managerId);
+        reqSql.input('location', sql.NVarChar, JSON.stringify(e.location));
+        reqSql.input('phone', sql.NVarChar, e.phone);
+        reqSql.input('jobTitle', sql.NVarChar, e.jobTitle);
+
+        await reqSql.query(`UPDATE employees SET 
+            firstName=@firstName, lastName=@lastName, email=@email, password=@password, role=@role, 
+            department=@department, departmentId=@departmentId, projectIds=@projectIds, joinDate=@joinDate, 
+            status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, 
+            phone=@phone, jobTitle=@jobTitle WHERE id=@id`);
+        
         res.json(e);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/employees/:id', async (req, res) => {
     try {
-        await run("DELETE FROM employees WHERE id = ?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM employees WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -226,15 +316,20 @@ app.delete('/api/employees/:id', async (req, res) => {
 // Departments
 app.get('/api/departments', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM departments");
-        res.json(rows);
+        const result = await pool.request().query("SELECT * FROM departments");
+        res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/departments', async (req, res) => {
     const d = req.body;
     try {
-        await run("INSERT INTO departments (id, name, description, managerId) VALUES (?, ?, ?, ?)", [d.id, d.name, d.description, d.managerId]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, d.id);
+        reqSql.input('name', sql.NVarChar, d.name);
+        reqSql.input('description', sql.NVarChar, d.description);
+        reqSql.input('managerId', sql.NVarChar, d.managerId);
+        await reqSql.query("INSERT INTO departments (id, name, description, managerId) VALUES (@id, @name, @description, @managerId)");
         res.json(d);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -242,14 +337,21 @@ app.post('/api/departments', async (req, res) => {
 app.put('/api/departments/:id', async (req, res) => {
     const d = req.body;
     try {
-        await run("UPDATE departments SET name=?, description=?, managerId=? WHERE id=?", [d.name, d.description, d.managerId, req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('name', sql.NVarChar, d.name);
+        reqSql.input('description', sql.NVarChar, d.description);
+        reqSql.input('managerId', sql.NVarChar, d.managerId);
+        await reqSql.query("UPDATE departments SET name=@name, description=@description, managerId=@managerId WHERE id=@id");
         res.json(d);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/departments/:id', async (req, res) => {
     try {
-        await run("DELETE FROM departments WHERE id = ?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM departments WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -257,16 +359,22 @@ app.delete('/api/departments/:id', async (req, res) => {
 // Projects
 app.get('/api/projects', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM projects");
-        res.json(rows.map(r => ({ ...r, tasks: parseJSON(r.tasks) || [] })));
+        const result = await pool.request().query("SELECT * FROM projects");
+        res.json(result.recordset.map(r => ({ ...r, tasks: parseJSON(r.tasks) || [] })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/projects', async (req, res) => {
     const p = req.body;
     try {
-        await run("INSERT INTO projects (id, name, description, status, tasks, dueDate) VALUES (?, ?, ?, ?, ?, ?)", 
-        [p.id, p.name, p.description, p.status, JSON.stringify(p.tasks), p.dueDate]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, p.id);
+        reqSql.input('name', sql.NVarChar, p.name);
+        reqSql.input('description', sql.NVarChar, p.description);
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('tasks', sql.NVarChar, JSON.stringify(p.tasks));
+        reqSql.input('dueDate', sql.NVarChar, p.dueDate);
+        await reqSql.query("INSERT INTO projects (id, name, description, status, tasks, dueDate) VALUES (@id, @name, @description, @status, @tasks, @dueDate)");
         res.json(p);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -274,15 +382,23 @@ app.post('/api/projects', async (req, res) => {
 app.put('/api/projects/:id', async (req, res) => {
     const p = req.body;
     try {
-        await run("UPDATE projects SET name=?, description=?, status=?, tasks=?, dueDate=? WHERE id=?", 
-        [p.name, p.description, p.status, JSON.stringify(p.tasks), p.dueDate, req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('name', sql.NVarChar, p.name);
+        reqSql.input('description', sql.NVarChar, p.description);
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('tasks', sql.NVarChar, JSON.stringify(p.tasks));
+        reqSql.input('dueDate', sql.NVarChar, p.dueDate);
+        await reqSql.query("UPDATE projects SET name=@name, description=@description, status=@status, tasks=@tasks, dueDate=@dueDate WHERE id=@id");
         res.json(p);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/projects/:id', async (req, res) => {
     try {
-        await run("DELETE FROM projects WHERE id = ?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM projects WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -290,12 +406,13 @@ app.delete('/api/projects/:id', async (req, res) => {
 // Leaves
 app.get('/api/leaves', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM leaves");
-        res.json(rows.map(r => ({ 
+        const result = await pool.request().query("SELECT * FROM leaves");
+        res.json(result.recordset.map(r => ({ 
             ...r, 
             notifyUserIds: parseJSON(r.notifyUserIds) || [],
-            managerConsent: intToBool(r.managerConsent),
-            isUrgent: intToBool(r.isUrgent)
+            // Convert DB BIT (true/false) to JS boolean
+            managerConsent: !!r.managerConsent,
+            isUrgent: !!r.isUrgent
         })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -303,9 +420,28 @@ app.get('/api/leaves', async (req, res) => {
 app.post('/api/leaves', async (req, res) => {
     const l = req.body;
     try {
-        await run(`INSERT INTO leaves (id, userId, userName, type, startDate, endDate, reason, status, attachmentUrl, managerConsent, notifyUserIds, approverId, isUrgent, managerComment, hrComment, createdAt, employeeId, employeeName) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-        [l.id, l.userId, l.userName, l.type, l.startDate, l.endDate, l.reason, l.status, l.attachmentUrl, boolToInt(l.managerConsent), JSON.stringify(l.notifyUserIds), l.approverId, boolToInt(l.isUrgent), l.managerComment, l.hrComment, l.createdAt, l.employeeId, l.employeeName]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, l.id);
+        reqSql.input('userId', sql.NVarChar, l.userId);
+        reqSql.input('userName', sql.NVarChar, l.userName);
+        reqSql.input('type', sql.NVarChar, l.type);
+        reqSql.input('startDate', sql.NVarChar, l.startDate);
+        reqSql.input('endDate', sql.NVarChar, l.endDate);
+        reqSql.input('reason', sql.NVarChar, l.reason);
+        reqSql.input('status', sql.NVarChar, l.status);
+        reqSql.input('attachmentUrl', sql.NVarChar, l.attachmentUrl);
+        reqSql.input('managerConsent', sql.Bit, l.managerConsent ? 1 : 0);
+        reqSql.input('notifyUserIds', sql.NVarChar, JSON.stringify(l.notifyUserIds));
+        reqSql.input('approverId', sql.NVarChar, l.approverId);
+        reqSql.input('isUrgent', sql.Bit, l.isUrgent ? 1 : 0);
+        reqSql.input('managerComment', sql.NVarChar, l.managerComment);
+        reqSql.input('hrComment', sql.NVarChar, l.hrComment);
+        reqSql.input('createdAt', sql.NVarChar, l.createdAt);
+        reqSql.input('employeeId', sql.NVarChar, l.employeeId);
+        reqSql.input('employeeName', sql.NVarChar, l.employeeName);
+
+        await reqSql.query(`INSERT INTO leaves (id, userId, userName, type, startDate, endDate, reason, status, attachmentUrl, managerConsent, notifyUserIds, approverId, isUrgent, managerComment, hrComment, createdAt, employeeId, employeeName) 
+        VALUES (@id, @userId, @userName, @type, @startDate, @endDate, @reason, @status, @attachmentUrl, @managerConsent, @notifyUserIds, @approverId, @isUrgent, @managerComment, @hrComment, @createdAt, @employeeId, @employeeName)`);
         res.json(l);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -313,8 +449,24 @@ app.post('/api/leaves', async (req, res) => {
 app.put('/api/leaves/:id', async (req, res) => {
     const l = req.body;
     try {
-        await run(`UPDATE leaves SET userId=?, userName=?, type=?, startDate=?, endDate=?, reason=?, status=?, attachmentUrl=?, managerConsent=?, notifyUserIds=?, approverId=?, isUrgent=?, managerComment=?, hrComment=? WHERE id=?`, 
-        [l.userId, l.userName, l.type, l.startDate, l.endDate, l.reason, l.status, l.attachmentUrl, boolToInt(l.managerConsent), JSON.stringify(l.notifyUserIds), l.approverId, boolToInt(l.isUrgent), l.managerComment, l.hrComment, req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('userId', sql.NVarChar, l.userId);
+        reqSql.input('userName', sql.NVarChar, l.userName);
+        reqSql.input('type', sql.NVarChar, l.type);
+        reqSql.input('startDate', sql.NVarChar, l.startDate);
+        reqSql.input('endDate', sql.NVarChar, l.endDate);
+        reqSql.input('reason', sql.NVarChar, l.reason);
+        reqSql.input('status', sql.NVarChar, l.status);
+        reqSql.input('attachmentUrl', sql.NVarChar, l.attachmentUrl);
+        reqSql.input('managerConsent', sql.Bit, l.managerConsent ? 1 : 0);
+        reqSql.input('notifyUserIds', sql.NVarChar, JSON.stringify(l.notifyUserIds));
+        reqSql.input('approverId', sql.NVarChar, l.approverId);
+        reqSql.input('isUrgent', sql.Bit, l.isUrgent ? 1 : 0);
+        reqSql.input('managerComment', sql.NVarChar, l.managerComment);
+        reqSql.input('hrComment', sql.NVarChar, l.hrComment);
+
+        await reqSql.query(`UPDATE leaves SET userId=@userId, userName=@userName, type=@type, startDate=@startDate, endDate=@endDate, reason=@reason, status=@status, attachmentUrl=@attachmentUrl, managerConsent=@managerConsent, notifyUserIds=@notifyUserIds, approverId=@approverId, isUrgent=@isUrgent, managerComment=@managerComment, hrComment=@hrComment WHERE id=@id`);
         res.json(l);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -322,16 +474,22 @@ app.put('/api/leaves/:id', async (req, res) => {
 // Leave Types
 app.get('/api/leave_types', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM leave_types");
-        res.json(rows.map(r => ({ ...r, isActive: intToBool(r.isActive) })));
+        const result = await pool.request().query("SELECT * FROM leave_types");
+        res.json(result.recordset.map(r => ({ ...r, isActive: !!r.isActive })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/leave_types', async (req, res) => {
     const t = req.body;
     try {
-        await run("INSERT INTO leave_types (id, name, days, description, isActive, color) VALUES (?, ?, ?, ?, ?, ?)", 
-        [t.id, t.name, t.days, t.description, boolToInt(t.isActive), t.color]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, t.id);
+        reqSql.input('name', sql.NVarChar, t.name);
+        reqSql.input('days', sql.Int, t.days);
+        reqSql.input('description', sql.NVarChar, t.description);
+        reqSql.input('isActive', sql.Bit, t.isActive ? 1 : 0);
+        reqSql.input('color', sql.NVarChar, t.color);
+        await reqSql.query("INSERT INTO leave_types (id, name, days, description, isActive, color) VALUES (@id, @name, @days, @description, @isActive, @color)");
         res.json(t);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -339,15 +497,23 @@ app.post('/api/leave_types', async (req, res) => {
 app.put('/api/leave_types/:id', async (req, res) => {
     const t = req.body;
     try {
-        await run("UPDATE leave_types SET name=?, days=?, description=?, isActive=?, color=? WHERE id=?", 
-        [t.name, t.days, t.description, boolToInt(t.isActive), t.color, req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('name', sql.NVarChar, t.name);
+        reqSql.input('days', sql.Int, t.days);
+        reqSql.input('description', sql.NVarChar, t.description);
+        reqSql.input('isActive', sql.Bit, t.isActive ? 1 : 0);
+        reqSql.input('color', sql.NVarChar, t.color);
+        await reqSql.query("UPDATE leave_types SET name=@name, days=@days, description=@description, isActive=@isActive, color=@color WHERE id=@id");
         res.json(t);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/leave_types/:id', async (req, res) => {
     try {
-        await run("DELETE FROM leave_types WHERE id = ?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM leave_types WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -355,16 +521,26 @@ app.delete('/api/leave_types/:id', async (req, res) => {
 // Attendance
 app.get('/api/attendance', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM attendance");
-        res.json(rows);
+        const result = await pool.request().query("SELECT * FROM attendance");
+        res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/attendance', async (req, res) => {
     const a = req.body;
     try {
-        await run("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-        [a.id, a.employeeId, a.employeeName, a.date, a.checkIn, a.checkOut, a.checkInTime, a.checkOutTime, a.status, a.notes]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, a.id);
+        reqSql.input('employeeId', sql.NVarChar, a.employeeId);
+        reqSql.input('employeeName', sql.NVarChar, a.employeeName);
+        reqSql.input('date', sql.NVarChar, a.date);
+        reqSql.input('checkIn', sql.NVarChar, a.checkIn);
+        reqSql.input('checkOut', sql.NVarChar, a.checkOut);
+        reqSql.input('checkInTime', sql.NVarChar, a.checkInTime);
+        reqSql.input('checkOutTime', sql.NVarChar, a.checkOutTime);
+        reqSql.input('status', sql.NVarChar, a.status);
+        reqSql.input('notes', sql.NVarChar, a.notes);
+        await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes)");
         res.json(a);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -372,8 +548,13 @@ app.post('/api/attendance', async (req, res) => {
 app.put('/api/attendance/:id', async (req, res) => {
     const a = req.body;
     try {
-        await run("UPDATE attendance SET checkOut=?, checkOutTime=?, status=?, notes=? WHERE id=?", 
-        [a.checkOut, a.checkOutTime, a.status, a.notes, req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('checkOut', sql.NVarChar, a.checkOut);
+        reqSql.input('checkOutTime', sql.NVarChar, a.checkOutTime);
+        reqSql.input('status', sql.NVarChar, a.status);
+        reqSql.input('notes', sql.NVarChar, a.notes);
+        await reqSql.query("UPDATE attendance SET checkOut=@checkOut, checkOutTime=@checkOutTime, status=@status, notes=@notes WHERE id=@id");
         res.json(a);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -381,16 +562,25 @@ app.put('/api/attendance/:id', async (req, res) => {
 // Time Entries
 app.get('/api/time_entries', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM time_entries");
-        res.json(rows.map(r => ({ ...r, isBillable: intToBool(r.isBillable) })));
+        const result = await pool.request().query("SELECT * FROM time_entries");
+        res.json(result.recordset.map(r => ({ ...r, isBillable: !!r.isBillable })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/time_entries', async (req, res) => {
     const t = req.body;
     try {
-        await run("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, description, status, isBillable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-        [t.id, t.userId, t.projectId, t.task, t.date, t.durationMinutes, t.description, t.status, boolToInt(t.isBillable)]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, t.id);
+        reqSql.input('userId', sql.NVarChar, t.userId);
+        reqSql.input('projectId', sql.NVarChar, t.projectId);
+        reqSql.input('task', sql.NVarChar, t.task);
+        reqSql.input('date', sql.NVarChar, t.date);
+        reqSql.input('durationMinutes', sql.Int, t.durationMinutes);
+        reqSql.input('description', sql.NVarChar, t.description);
+        reqSql.input('status', sql.NVarChar, t.status);
+        reqSql.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
+        await reqSql.query("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, description, status, isBillable) VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @description, @status, @isBillable)");
         res.json(t);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -398,15 +588,26 @@ app.post('/api/time_entries', async (req, res) => {
 app.put('/api/time_entries/:id', async (req, res) => {
     const t = req.body;
     try {
-        await run("UPDATE time_entries SET userId=?, projectId=?, task=?, date=?, durationMinutes=?, description=?, status=?, isBillable=? WHERE id=?", 
-        [t.userId, t.projectId, t.task, t.date, t.durationMinutes, t.description, t.status, boolToInt(t.isBillable), req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('userId', sql.NVarChar, t.userId);
+        reqSql.input('projectId', sql.NVarChar, t.projectId);
+        reqSql.input('task', sql.NVarChar, t.task);
+        reqSql.input('date', sql.NVarChar, t.date);
+        reqSql.input('durationMinutes', sql.Int, t.durationMinutes);
+        reqSql.input('description', sql.NVarChar, t.description);
+        reqSql.input('status', sql.NVarChar, t.status);
+        reqSql.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
+        await reqSql.query("UPDATE time_entries SET userId=@userId, projectId=@projectId, task=@task, date=@date, durationMinutes=@durationMinutes, description=@description, status=@status, isBillable=@isBillable WHERE id=@id");
         res.json(t);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/time_entries/:id', async (req, res) => {
     try {
-        await run("DELETE FROM time_entries WHERE id = ?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM time_entries WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -414,30 +615,41 @@ app.delete('/api/time_entries/:id', async (req, res) => {
 // Notifications
 app.get('/api/notifications', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM notifications");
-        res.json(rows.map(r => ({ ...r, read: intToBool(r.read) })));
+        const result = await pool.request().query("SELECT * FROM notifications");
+        res.json(result.recordset.map(r => ({ ...r, read: !!r.read })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/notifications', async (req, res) => {
     const n = req.body;
     try {
-        await run("INSERT INTO notifications (id, userId, title, message, time, read, type) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-        [n.id, n.userId, n.title, n.message, n.time, boolToInt(n.read), n.type]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, n.id);
+        reqSql.input('userId', sql.NVarChar, n.userId);
+        reqSql.input('title', sql.NVarChar, n.title);
+        reqSql.input('message', sql.NVarChar, n.message);
+        reqSql.input('time', sql.NVarChar, n.time);
+        reqSql.input('read', sql.Bit, n.read ? 1 : 0);
+        reqSql.input('type', sql.NVarChar, n.type);
+        await reqSql.query("INSERT INTO notifications (id, userId, title, message, time, [read], type) VALUES (@id, @userId, @title, @message, @time, @read, @type)");
         res.json(n);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/notifications/:id/read', async (req, res) => {
     try {
-        await run("UPDATE notifications SET read=1 WHERE id=?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("UPDATE notifications SET [read]=1 WHERE id=@id");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/notifications/read-all/:userId', async (req, res) => {
     try {
-        await run("UPDATE notifications SET read=1 WHERE userId=?", [req.params.userId]);
+        const reqSql = pool.request();
+        reqSql.input('userId', sql.NVarChar, req.params.userId);
+        await reqSql.query("UPDATE notifications SET [read]=1 WHERE userId=@userId");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -445,22 +657,29 @@ app.put('/api/notifications/read-all/:userId', async (req, res) => {
 // Holidays
 app.get('/api/holidays', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM holidays");
-        res.json(rows);
+        const result = await pool.request().query("SELECT * FROM holidays");
+        res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/holidays', async (req, res) => {
     const h = req.body;
     try {
-        await run("INSERT INTO holidays (id, name, date, type) VALUES (?, ?, ?, ?)", [h.id, h.name, h.date, h.type]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, h.id);
+        reqSql.input('name', sql.NVarChar, h.name);
+        reqSql.input('date', sql.NVarChar, h.date);
+        reqSql.input('type', sql.NVarChar, h.type);
+        await reqSql.query("INSERT INTO holidays (id, name, date, type) VALUES (@id, @name, @date, @type)");
         res.json(h);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/holidays/:id', async (req, res) => {
     try {
-        await run("DELETE FROM holidays WHERE id = ?", [req.params.id]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM holidays WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -468,21 +687,33 @@ app.delete('/api/holidays/:id', async (req, res) => {
 // Payslips
 app.get('/api/payslips', async (req, res) => {
     try {
-        const rows = await get("SELECT * FROM payslips");
-        res.json(rows);
+        const result = await pool.request().query("SELECT * FROM payslips");
+        res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/payslips', async (req, res) => {
     const p = req.body;
     try {
-        await run("INSERT INTO payslips (id, userId, userName, month, amount, currency, status, generatedDate, fileData, fileName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-        [p.id, p.userId, p.userName, p.month, p.amount, p.currency, p.status, p.generatedDate, p.fileData, p.fileName]);
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, p.id);
+        reqSql.input('userId', sql.NVarChar, p.userId);
+        reqSql.input('userName', sql.NVarChar, p.userName);
+        reqSql.input('month', sql.NVarChar, p.month);
+        reqSql.input('amount', sql.Float, p.amount);
+        reqSql.input('currency', sql.NVarChar, p.currency);
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('generatedDate', sql.NVarChar, p.generatedDate);
+        reqSql.input('fileData', sql.NVarChar, p.fileData);
+        reqSql.input('fileName', sql.NVarChar, p.fileName);
+        
+        await reqSql.query("INSERT INTO payslips (id, userId, userName, month, amount, currency, status, generatedDate, fileData, fileName) VALUES (@id, @userId, @userName, @month, @amount, @currency, @status, @generatedDate, @fileData, @fileName)");
         res.json(p);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-app.listen(PORT, () => {
+// Start Server
+app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
+    await connectDb();
 });

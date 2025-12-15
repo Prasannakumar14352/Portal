@@ -205,7 +205,7 @@ const TimeLogs = () => {
      if (filterProject !== 'All') relevantEntries = relevantEntries.filter(e => (e.projectId || NO_PROJECT_ID) === filterProject);
 
      const report: { projectId: string, days: number[], total: number }[] = [];
-     const relevantProjectIds = Array.from(new Set(relevantEntries.map(e => e.projectId || NO_PROJECT_ID)));
+     const relevantProjectIds = Array.from(new Set(relevantEntries.map(e => e.projectId || NO_PROJECT_ID))) as string[];
      
      relevantProjectIds.forEach(projId => {
         const projEntries = relevantEntries.filter(e => (e.projectId || NO_PROJECT_ID) === projId);

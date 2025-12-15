@@ -509,7 +509,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     );
   };
 
-  const LeaveTypeCard = ({ config }: { config: LeaveTypeConfig }) => (
+  const LeaveTypeCard: React.FC<{ config: LeaveTypeConfig }> = ({ config }) => (
     <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative">
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center space-x-2">
