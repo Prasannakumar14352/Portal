@@ -286,9 +286,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return true;
         }
     } catch (error: any) {
-        console.error("Microsoft Login Error:", error);
-        
         const errorMsg = error.message || error.toString();
+        const isConfigError = errorMsg.includes("9002326") || errorMsg.includes("AADSTS9002326");
+
+        if (!isConfigError) {
+            console.error("Microsoft Login Error:", error);
+        }
 
         // Handle User Cancellation gracefully
         if (error.errorCode === 'user_cancelled') {
@@ -304,9 +307,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         // Specific handling for Azure Platform Config Mismatch (9002326)
         // Fallback to Mock Login to allow user to proceed
-        if (errorMsg.includes("9002326") || errorMsg.includes("AADSTS9002326")) {
-             console.warn("Azure Platform Config Error (Web vs SPA). Falling back to simulated login.");
-             showToast("Azure Config Error Detected (Web Platform). Logging in with Demo User.", "warning");
+        if (isConfigError) {
+             console.group("⚠️ AZURE CONFIGURATION ERROR DETECTED");
+             console.warn("Reason: The Redirect URI 'http://localhost:5173' is configured as 'Web' platform in Azure.");
+             console.warn("Fix: In Azure Portal > Authentication, remove this URI from the 'Web' section and ensure it is only under 'Single-page application'.");
+             console.groupEnd();
+
+             showToast("Azure Config Mismatch: Using Demo User", "warning");
              
              // Simulate a successful login with a demo Microsoft user
              await registerOrLoginUser("Azure Demo User", "azure.demo@empower.com");
