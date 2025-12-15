@@ -13,36 +13,39 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, isOpen = false, onClose }) => {
   const getMenuItems = () => {
+    // Items visible to EVERYONE
     const commonItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'holidays', label: 'Holidays', icon: Coffee }, // New
+      { id: 'reports', label: 'Reports', icon: BarChart3 }, // Made visible to all
+      { id: 'holidays', label: 'Holidays', icon: Coffee },
       { id: 'ai-assistant', label: 'HR Assistant', icon: MessageSquareText },
     ];
 
     if (userRole === UserRole.EMPLOYEE) {
       return [
-        commonItems[0],
+        commonItems[0], // Dashboard
         { id: 'organization', label: 'Organization', icon: Building2 },
         { id: 'time-logs', label: 'Time Logs', icon: Timer },
         { id: 'attendance', label: 'My Attendance', icon: Clock },
         { id: 'leaves', label: 'Leaves', icon: Calendar },
-        { id: 'payslips', label: 'Payslips', icon: FileText }, // New
-        commonItems[1], // Holidays
-        commonItems[2]  // AI
+        { id: 'payslips', label: 'Payslips', icon: FileText },
+        commonItems[1], // Reports
+        commonItems[2], // Holidays
+        commonItems[3]  // AI
       ];
     }
 
     // HR and Manager
     return [
-      commonItems[0],
+      commonItems[0], // Dashboard
       { id: 'organization', label: 'Organization', icon: Building2 },
       { id: 'time-logs', label: 'Time Logs', icon: Timer },
-      { id: 'reports', label: 'Reports', icon: BarChart3 },
+      commonItems[1], // Reports
       { id: 'attendance', label: 'Attendance', icon: Clock },
       { id: 'leaves', label: 'Leave Management', icon: Calendar },
-      { id: 'payslips', label: 'Payslips', icon: FileText }, // New
-      commonItems[1], // Holidays
-      commonItems[2]  // AI
+      { id: 'payslips', label: 'Payslips', icon: FileText },
+      commonItems[2], // Holidays
+      commonItems[3]  // AI
     ];
   };
 

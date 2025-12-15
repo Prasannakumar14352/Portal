@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { useAppContext } from '../contexts/AppContext';
 import { Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 
@@ -36,11 +36,11 @@ const Reports = () => {
 
   // 1. Project Status Overview (Pie)
   const projectStatusData = useMemo(() => {
-    const counts = { Active: 0, 'On Hold': 0, Completed: 0 };
+    const counts: Record<string, number> = { Active: 0, 'On Hold': 0, Completed: 0 };
     projects.forEach(p => {
       if (counts[p.status] !== undefined) counts[p.status]++;
     });
-    return Object.keys(counts).map(key => ({ name: key, value: counts[key as keyof typeof counts] }));
+    return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
   }, [projects]);
 
   // 2. Project Time Allocation (Pie)
@@ -103,7 +103,6 @@ const Reports = () => {
   const projectProgressData = useMemo(() => {
       return projects.map(p => {
           // In a real app, calculate based on closed tasks / total tasks
-          const totalTasks = p.tasks?.length || 1; 
           // Mocking completion for visualization as we don't track individual task status in db yet
           const completion = p.status === 'Completed' ? 100 : Math.floor(Math.random() * 80) + 10; 
           return { name: p.name, progress: completion };
