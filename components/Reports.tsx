@@ -321,13 +321,13 @@ const Reports = () => {
     <div className="space-y-6 pb-10 animate-fade-in print:p-0">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 print:hidden">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Reports & Analytics</h2>
-          <p className="text-slate-500 text-sm">Analyze project performance, time logs, and attendance.</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Reports & Analytics</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Analyze project performance, time logs, and attendance.</p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
             <select 
-                className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
                 value={filterPeriod}
                 onChange={(e) => setFilterPeriod(e.target.value)}
             >
@@ -336,7 +336,7 @@ const Reports = () => {
                 <option>This Year</option>
             </select>
             <select 
-                className="w-full sm:w-auto bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
                 value={filterProject}
                 onChange={(e) => setFilterProject(e.target.value)}
             >
@@ -348,25 +348,25 @@ const Reports = () => {
             <div className="relative w-full sm:w-auto" ref={exportMenuRef}>
               <button 
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-colors"
               >
                 <Download size={16} /> Export
               </button>
               
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-2 w-full sm:w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                    <div className="px-4 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase bg-slate-50/50">
+                <div className="absolute right-0 top-full mt-2 w-full sm:w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase bg-slate-50/50 dark:bg-slate-900/50">
                         Export Format
                     </div>
                     <button 
                         onClick={() => handleExport('pdf')} 
-                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
                     >
                         <FileText size={16} className="text-slate-500"/> PDF
                     </button>
                     <button 
                         onClick={() => handleExport('csv')} 
-                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
                     >
                         <FileSpreadsheet size={16} className="text-slate-500"/> CSV
                     </button>
@@ -377,7 +377,7 @@ const Reports = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 print:hidden overflow-x-auto">
+      <div className="border-b border-slate-200 dark:border-slate-700 print:hidden overflow-x-auto">
         <nav className="flex space-x-8 min-w-max pb-1">
           {['Dashboard', 'Projects', 'Tasks', 'Time Logs', 'Attendance', 'Team Performance'].map((tab) => (
             <button
@@ -385,8 +385,8 @@ const Reports = () => {
               onClick={() => setActiveTab(tab)}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                 activeTab === tab
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
               {tab}
@@ -400,9 +400,9 @@ const Reports = () => {
         
         {/* Row 1 - Attendance Specific */}
         {(activeTab === 'Dashboard' || activeTab === 'Attendance') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-slate-800">Attendance Status</h3>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">Attendance Status</h3>
                     <CalendarCheck size={18} className="text-slate-400"/>
                 </div>
                 <div className="h-64">
@@ -430,17 +430,17 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Attendance') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-slate-800">Punctuality Overview</h3>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">Punctuality Overview</h3>
                     <Clock size={18} className="text-slate-400"/>
                 </div>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={attendancePunctualityData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis allowDecimals={false} stroke="#94a3b8" />
                             <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={50}>
                                 {attendancePunctualityData.map((entry, index) => (
@@ -455,14 +455,14 @@ const Reports = () => {
 
         {/* HR Only Attendance Trend */}
         {isHR && activeTab === 'Attendance' && (
-             <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Daily Attendance Count (Last 7 Days)</h3>
+             <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Daily Attendance Count (Last 7 Days)</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={dailyAttendanceData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="date" />
-                            <YAxis allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                            <XAxis dataKey="date" stroke="#94a3b8" />
+                            <YAxis allowDecimals={false} stroke="#94a3b8" />
                             <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={3} dot={{r: 4}} />
                         </LineChart>
@@ -473,8 +473,8 @@ const Reports = () => {
 
         {/* Row 2 - Project Status (Dashboard/Projects) */}
         {(activeTab === 'Dashboard' || activeTab === 'Projects') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Project Status Overview</h3>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Project Status Overview</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -500,8 +500,8 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Tasks') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Task Completion Status</h3>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Task Completion Status</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -528,14 +528,14 @@ const Reports = () => {
 
         {/* Row 3 - Full Width Charts */}
         {(activeTab === 'Dashboard' || activeTab === 'Projects') && (
-            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Project Progress (%)</h3>
+            <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Project Progress (%)</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={projectProgressData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 11}} />
+                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                            <XAxis type="number" domain={[0, 100]} stroke="#94a3b8" />
+                            <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 11}} stroke="#94a3b8" />
                             <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Bar dataKey="progress" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
@@ -545,14 +545,14 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Tasks') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Task Priority Distribution</h3>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Task Priority Distribution</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={taskPriorityData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" />
                             <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={40} />
                         </BarChart>
@@ -562,8 +562,8 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Time Allocation by Project</h3>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Time Allocation by Project</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -590,14 +590,14 @@ const Reports = () => {
 
         {/* Row 4 - Time Logs Details */}
         {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
-            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Weekly Hours Logged</h3>
+            <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Weekly Hours Logged</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={weeklyHoursData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="day" />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                            <XAxis dataKey="day" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" />
                             <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Bar dataKey="hours" fill="#10b981" radius={[4, 4, 0, 0]} barSize={50} />
                         </BarChart>
@@ -608,14 +608,14 @@ const Reports = () => {
 
         {/* Row 5 - Team Performance */}
         {(activeTab === 'Dashboard' || activeTab === 'Team Performance') && (
-            <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Team Member Contributions (Hours)</h3>
+            <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Team Member Contributions (Hours)</h3>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={teamContributionData} margin={{bottom: 20}}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={60} tick={{fontSize: 11}} />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                            <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={60} tick={{fontSize: 11}} stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" />
                             <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Bar dataKey="hours" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={30} />
                         </BarChart>
@@ -625,8 +625,8 @@ const Reports = () => {
         )}
 
         {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Billable vs Non-Billable</h3>
+             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Billable vs Non-Billable</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>

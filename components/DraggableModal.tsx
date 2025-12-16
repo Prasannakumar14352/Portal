@@ -73,7 +73,7 @@ const DraggableModal: React.FC<DraggableModalProps> = ({ isOpen, onClose, title,
       {/* Modal Content */}
       <div 
         ref={modalRef}
-        className={`bg-white rounded-xl shadow-2xl w-full ${width} max-h-[90vh] flex flex-col relative animate-in zoom-in-95 duration-200`}
+        className={`bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full ${width} max-h-[90vh] flex flex-col relative animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-700`}
         style={{ 
           transform: `translate(${position.x}px, ${position.y}px)`,
           transition: isDragging ? 'none' : 'transform 0.1s ease-out'
@@ -81,23 +81,23 @@ const DraggableModal: React.FC<DraggableModalProps> = ({ isOpen, onClose, title,
       >
         {/* Draggable Header */}
         <div 
-          className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 rounded-t-xl cursor-move select-none"
+          className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-t-xl cursor-move select-none"
           onMouseDown={handleMouseDown}
         >
-          <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
+          <div className="flex items-center gap-2 text-slate-800 dark:text-white font-bold text-lg">
             <GripHorizontal size={18} className="text-slate-400" />
             <h3>{title}</h3>
           </div>
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full p-1 transition-colors"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-1 transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-6 overflow-y-auto custom-scrollbar">
+        <div className="p-6 overflow-y-auto custom-scrollbar dark:text-slate-200">
           {children}
         </div>
       </div>

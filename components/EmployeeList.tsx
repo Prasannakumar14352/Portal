@@ -136,10 +136,10 @@ const LocationMap: React.FC<{
   }, [location?.latitude, location?.longitude, readOnly]);
 
   return (
-    <div className="relative w-full h-full bg-slate-100 rounded-lg overflow-hidden">
+    <div className="relative w-full h-full bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden">
         <div ref={mapDiv} className="w-full h-full"></div>
         {!isMapLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-800 z-10">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
         )}
@@ -293,14 +293,14 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Employee Directory</h2>
-          <p className="text-slate-500">Manage your team members and their account details.</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Employee Directory</h2>
+          <p className="text-slate-500 dark:text-slate-400">Manage your team members and their account details.</p>
         </div>
         <div className="flex gap-2">
             {canViewPasswords && (
                 <button 
                   onClick={() => setShowPasswords(!showPasswords)}
-                  className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+                  className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors shadow-sm"
                 >
                     {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
                     <span>{showPasswords ? 'Hide Passwords' : 'Show Passwords'}</span>
@@ -318,32 +318,32 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         {/* Filters ... */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-4">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 text-slate-500 mr-2">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mr-2">
                   <Filter size={16} />
                   <span className="text-sm font-medium">Filters:</span>
               </div>
               <select 
                 value={filterDept}
                 onChange={(e) => setFilterDept(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
               >
-                <option value="All">All Departments</option>
+                <option className="bg-white dark:bg-slate-800" value="All">All Departments</option>
                 {Object.values(DepartmentType).map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
+                  <option className="bg-white dark:bg-slate-800" key={dept} value={dept}>{dept}</option>
                 ))}
               </select>
               <select 
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
               >
-                <option value="All">All Status</option>
+                <option className="bg-white dark:bg-slate-800" value="All">All Status</option>
                 {Object.values(EmployeeStatus).map(status => (
-                  <option key={status} value={status}>{status}</option>
+                  <option className="bg-white dark:bg-slate-800" key={status} value={status}>{status}</option>
                 ))}
               </select>
           </div>
@@ -355,11 +355,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 placeholder="Search employees by name, email or role..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-sm bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-slate-900 placeholder-slate-400"
               />
             </div>
-            <div className="text-xs text-slate-500 whitespace-nowrap self-end md:self-auto">
-               Showing <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> employees
+            <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap self-end md:self-auto">
+               Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{filteredEmployees.length}</span> employees
             </div>
           </div>
         </div>
@@ -367,60 +367,60 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider font-semibold">
+              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
                 <th className="px-6 py-4">Employee</th>
                 <th className="px-6 py-4">Role & Dept</th>
-                {canViewPasswords && showPasswords && <th className="px-6 py-4 text-red-600">Password</th>}
+                {canViewPasswords && showPasswords && <th className="px-6 py-4 text-red-600 dark:text-red-400">Password</th>}
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Join Date</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {paginatedEmployees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
-                      <img src={emp.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                      <img src={emp.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-600" />
                       <div>
-                        <div className="font-medium text-slate-900">{emp.firstName} {emp.lastName}</div>
-                        <div className="text-xs text-slate-500">{emp.email}</div>
+                        <div className="font-medium text-slate-900 dark:text-white">{emp.firstName} {emp.lastName}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{emp.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-slate-900 font-medium">{emp.role}</div>
-                    <div className="text-xs text-slate-500">{emp.department}</div>
+                    <div className="text-sm text-slate-900 dark:text-slate-200 font-medium">{emp.role}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{emp.department}</div>
                   </td>
                   {canViewPasswords && showPasswords && (
-                      <td className="px-6 py-4 text-sm font-mono text-red-600 bg-red-50/50">
+                      <td className="px-6 py-4 text-sm font-mono text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-900/20">
                           {emp.password}
                       </td>
                   )}
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center space-x-1
-                      ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-100 text-emerald-700' : 
-                        emp.status === EmployeeStatus.INACTIVE ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 
+                        emp.status === EmployeeStatus.INACTIVE ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
                       <span className={`w-1.5 h-1.5 rounded-full 
                         ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-500' : 
                           emp.status === EmployeeStatus.INACTIVE ? 'bg-red-500' : 'bg-amber-500'}`}></span>
                       <span>{emp.status}</span>
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500">
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
                     {emp.joinDate}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
-                      <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-1" title="View Details">
+                      <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1" title="View Details">
                         <Eye size={16} />
                       </button>
                       {isHR && (
                         <>
-                          <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 p-1">
+                          <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 p-1">
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={() => openDeleteConfirm(emp.id)} className="text-slate-400 hover:text-red-600 p-1">
+                          <button onClick={() => openDeleteConfirm(emp.id)} className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1">
                             <Trash2 size={16} />
                           </button>
                         </>
@@ -431,7 +431,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               ))}
               {paginatedEmployees.length === 0 && (
                 <tr>
-                  <td colSpan={isHR ? (canViewPasswords && showPasswords ? 6 : 5) : 4} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={isHR ? (canViewPasswords && showPasswords ? 6 : 5) : 4} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                     No employees found matching your filters.
                   </td>
                 </tr>
@@ -440,29 +440,29 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           </table>
         </div>
         {/* Pagination Controls */}
-        <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50/50">
-           <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex justify-between items-center p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
              <span>Show</span>
              <select 
                value={itemsPerPage}
                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-               className="border border-slate-300 rounded p-1 outline-none bg-white focus:ring-2 focus:ring-teal-500"
+               className="border border-slate-300 dark:border-slate-600 rounded p-1 outline-none bg-white dark:bg-slate-800 focus:ring-2 focus:ring-teal-500"
              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
+                <option className="bg-white dark:bg-slate-800" value={5}>5</option>
+                <option className="bg-white dark:bg-slate-800" value={10}>10</option>
+                <option className="bg-white dark:bg-slate-800" value={20}>20</option>
+                <option className="bg-white dark:bg-slate-800" value={50}>50</option>
              </select>
              <span>per page</span>
-             <span className="mx-2 text-slate-300">|</span>
+             <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
              <span>
-               Showing <span className="font-medium text-slate-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700">{Math.min(currentPage * itemsPerPage, filteredEmployees.length)}</span> of <span className="font-medium text-slate-700">{filteredEmployees.length}</span> results
+               Showing <span className="font-medium text-slate-700 dark:text-slate-200">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700 dark:text-slate-200">{Math.min(currentPage * itemsPerPage, filteredEmployees.length)}</span> of <span className="font-medium text-slate-700 dark:text-slate-200">{filteredEmployees.length}</span> results
              </span>
            </div>
            <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-slate-600 shadow-sm"><ChevronLeft size={16} /></button>
-              <span className="text-xs font-medium text-slate-600 px-2">Page {currentPage} of {totalPages || 1}</span>
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="p-1.5 rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white bg-white text-slate-600 shadow-sm"><ChevronRight size={16} /></button>
+              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm"><ChevronLeft size={16} /></button>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 px-2">Page {currentPage} of {totalPages || 1}</span>
+              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm"><ChevronRight size={16} /></button>
            </div>
         </div>
       </div>
@@ -477,27 +477,27 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         {viewingEmployee && (
           <div className="px-2 pb-4">
              <div className="relative flex items-center gap-4 mb-6">
-                <img src={viewingEmployee.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-slate-100 shadow-sm object-cover" />
+                <img src={viewingEmployee.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-slate-100 dark:border-slate-700 shadow-sm object-cover" />
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-800">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
-                  <p className="text-slate-500 font-medium">{viewingEmployee.role} • {viewingEmployee.department}</p>
-                  <span className={`mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${viewingEmployee.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>{viewingEmployee.status}</span>
+                  <h3 className="text-2xl font-bold text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium">{viewingEmployee.role} • {viewingEmployee.department}</p>
+                  <span className={`mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${viewingEmployee.status === 'Active' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>{viewingEmployee.status}</span>
                 </div>
              </div>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                 <div className="space-y-4">
-                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Contact Info</h4>
-                   <div className="flex items-center gap-3 text-sm text-slate-700"><Mail size={16} className="text-slate-400"/> {viewingEmployee.email}</div>
-                   <div className="flex items-center gap-3 text-sm text-slate-700"><Phone size={16} className="text-slate-400"/> {viewingEmployee.phone || 'N/A'}</div>
-                   <div className="flex items-center gap-3 text-sm text-slate-700"><Building2 size={16} className="text-slate-400"/> HQ Office</div>
+                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2">Contact Info</h4>
+                   <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Mail size={16} className="text-slate-400"/> {viewingEmployee.email}</div>
+                   <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Phone size={16} className="text-slate-400"/> {viewingEmployee.phone || 'N/A'}</div>
+                   <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Building2 size={16} className="text-slate-400"/> HQ Office</div>
                 </div>
                 <div className="space-y-4">
-                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Location</h4>
-                   <div className="h-40 rounded-lg overflow-hidden border border-slate-200 relative">
+                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2">Location</h4>
+                   <div className="h-40 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 relative">
                       <LocationMap location={viewingEmployee.location} readOnly={true} />
                    </div>
-                   <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0"/> {viewingEmployee.location?.address || 'No address set'}</p>
+                   <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0"/> {viewingEmployee.location?.address || 'No address set'}</p>
                 </div>
              </div>
           </div>
@@ -514,82 +514,82 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
-              <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">First Name</label>
+              <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
-              <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Last Name</label>
+              <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-              <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+              <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
             </div>
-            {!editingEmployee && <p className="text-xs text-slate-500 mt-1">A secure password will be generated automatically.</p>}
+            {!editingEmployee && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">A secure password will be generated automatically.</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Role/Title</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role/Title</label>
               {isSuperAdmin ? (
                    <select 
                       value={formData.role} 
                       onChange={(e) => setFormData({...formData, role: e.target.value})} 
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                    >
                      {roles.length > 0 ? (
                         roles.map(r => (
-                            <option key={r.id} value={r.name}>{r.name}</option>
+                            <option className="bg-white dark:bg-slate-800" key={r.id} value={r.name}>{r.name}</option>
                         ))
                      ) : (
                         <>
-                            <option value="Employee">Employee</option>
-                            <option value="Team Manager">Team Manager</option>
-                            <option value="HR Manager">HR Manager</option>
-                            <option value="Software Engineer">Software Engineer</option>
+                            <option className="bg-white dark:bg-slate-800" value="Employee">Employee</option>
+                            <option className="bg-white dark:bg-slate-800" value="Team Manager">Team Manager</option>
+                            <option className="bg-white dark:bg-slate-800" value="HR Manager">HR Manager</option>
+                            <option className="bg-white dark:bg-slate-800" value="Software Engineer">Software Engineer</option>
                         </>
                      )}
                    </select>
               ) : (
-                  <input required type="text" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. Software Engineer" />
+                  <input required type="text" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" placeholder="e.g. Software Engineer" />
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
-              <select value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
-                {Object.values(DepartmentType).map(dept => (<option key={dept} value={dept}>{dept}</option>))}
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
+              <select value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                {Object.values(DepartmentType).map(dept => (<option className="bg-white dark:bg-slate-800" key={dept} value={dept}>{dept}</option>))}
               </select>
             </div>
           </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-               <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as EmployeeStatus})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
-                {Object.values(EmployeeStatus).map(status => (<option key={status} value={status}>{status}</option>))}
+               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
+               <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as EmployeeStatus})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                {Object.values(EmployeeStatus).map(status => (<option className="bg-white dark:bg-slate-800" key={status} value={status}>{status}</option>))}
               </select>
             </div>
             <div>
-               <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone</label>
                <div className="flex">
                    <select 
-                      className="px-2 py-2 border border-r-0 border-slate-300 rounded-l-lg bg-slate-50 text-sm focus:ring-2 focus:ring-teal-500 outline-none min-w-[80px]"
+                      className="px-2 py-2 border border-r-0 border-slate-300 dark:border-slate-600 rounded-l-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 outline-none min-w-[80px]"
                       value={getPhoneParts(formData.phone).code}
                       onChange={(e) => handlePhoneChange(e.target.value, getPhoneParts(formData.phone).number)}
                    >
                       {COUNTRY_CODES.map(c => (
-                          <option key={c.code} value={c.code}>{c.code} {c.country}</option>
+                          <option className="bg-white dark:bg-slate-800" key={c.code} value={c.code}>{c.code} {c.country}</option>
                       ))}
                    </select>
                    <input 
                       type="text" 
                       value={getPhoneParts(formData.phone).number} 
                       onChange={(e) => handlePhoneChange(getPhoneParts(formData.phone).code, e.target.value)} 
-                      className="w-full px-3 py-2 border border-slate-300 rounded-r-lg focus:ring-2 focus:ring-teal-500 outline-none" 
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-r-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" 
                       placeholder="98765 43210" 
                    />
                </div>
@@ -597,22 +597,22 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
            </div>
 
            <div className="pt-2">
-              <label className="block text-sm font-medium text-slate-700 mb-2">Work Location (Click map to update)</label>
-              <div className="h-48 w-full border border-slate-300 rounded-lg overflow-hidden relative">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Work Location (Click map to update)</label>
+              <div className="h-48 w-full border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden relative">
                  <LocationMap 
                    location={formData.location} 
                    readOnly={!isHR} 
                    onChange={(loc) => setFormData({...formData, location: loc})}
                  />
               </div>
-              <div className="mt-1 flex justify-between items-center text-xs text-slate-500">
+              <div className="mt-1 flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
                  <span>{formData.location?.address || 'No location set'}</span>
-                 {isHR && <span className="text-emerald-600 font-medium">Editable by HR</span>}
+                 {isHR && <span className="text-emerald-600 dark:text-emerald-400 font-medium">Editable by HR</span>}
               </div>
            </div>
 
           <div className="pt-4 flex justify-end space-x-3">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancel</button>
             <button type="submit" className="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors">{editingEmployee ? 'Save Changes' : 'Create Employee'}</button>
           </div>
         </form>
@@ -626,17 +626,17 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         width="max-w-sm"
       >
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle size={32} className="text-red-600" />
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={32} className="text-red-600 dark:text-red-400" />
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Employee?</h3>
-          <p className="text-slate-500 mb-6">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Delete Employee?</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-6">
             Are you sure you want to delete this employee? This action cannot be undone.
           </p>
           <div className="flex gap-3 justify-center">
             <button 
               onClick={() => setShowDeleteConfirm(false)}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium"
+              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium"
             >
               Cancel
             </button>
@@ -661,25 +661,25 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           <div>
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400 to-teal-700 rounded-t-lg"></div>
             <div className="flex flex-col items-center text-center mb-6">
-               <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4"><Key size={32} className="text-teal-700" /></div>
-               <p className="text-slate-500 mt-2">A unique password has been generated.</p>
+               <div className="w-16 h-16 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center mb-4"><Key size={32} className="text-teal-700 dark:text-teal-400" /></div>
+               <p className="text-slate-500 dark:text-slate-400 mt-2">A unique password has been generated.</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mb-6 relative">
+            <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-6 border border-slate-200 dark:border-slate-600 mb-6 relative">
                <div className="mb-4">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Username / Email</p>
-                  <p className="font-mono text-slate-800 font-medium select-all">{generatedCreds.email}</p>
+                  <p className="font-mono text-slate-800 dark:text-white font-medium select-all">{generatedCreds.email}</p>
                </div>
                <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">One-Time Password</p>
-                  <p className="font-mono text-xl text-slate-800 font-bold select-all tracking-wide">{generatedCreds.password}</p>
+                  <p className="font-mono text-xl text-slate-800 dark:text-white font-bold select-all tracking-wide">{generatedCreds.password}</p>
                </div>
             </div>
             <div className="flex flex-col gap-3">
-               <button onClick={copyToClipboard} className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all shadow-md">
+               <button onClick={copyToClipboard} className="w-full bg-slate-800 hover:bg-slate-900 dark:bg-slate-600 dark:hover:bg-slate-500 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all shadow-md">
                   {copied ? <Check size={18} /> : <Copy size={18} />}
                   <span>{copied ? 'Copied to Clipboard' : 'Copy Credentials'}</span>
                </button>
-               <button onClick={() => setShowSuccessModal(false)} className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 py-3 rounded-lg font-medium transition-colors">Close</button>
+               <button onClick={() => setShowSuccessModal(false)} className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 py-3 rounded-lg font-medium transition-colors">Close</button>
             </div>
           </div>
         )}

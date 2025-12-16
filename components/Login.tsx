@@ -29,14 +29,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     // Smart Login Check:
-    // If the user exists and has the placeholder password 'ms-auth-user', 
-    // it means they registered via Microsoft. We should redirect them to the MS flow
-    // even if they tried to use the standard form.
     const targetUser = employees.find(emp => emp.email.toLowerCase() === email.trim().toLowerCase());
     
     if (targetUser && targetUser.password === 'ms-auth-user') {
         showToast("This account uses Microsoft Sign-In. Redirecting...", "info");
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief delay for user to read toast
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await loginWithMicrosoft();
         setIsLoading(false);
         return;
@@ -45,8 +42,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     // Normal Login Flow
     await new Promise(resolve => setTimeout(resolve, 800));
     await login(email, password);
-    // Success handled by context (currentUser state change)
-    
     setIsLoading(false);
   };
 
@@ -59,11 +54,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsResetting(true);
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing
-      
-      // In a real scenario, we would validate username matches email here
+      await new Promise(resolve => setTimeout(resolve, 1500));
       await forgotPassword(resetEmail);
-      
       setIsResetting(false);
       setShowForgotPasswordModal(false);
       setResetEmail('');
@@ -71,11 +63,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   const openForgotPassword = () => {
-      setResetEmail(email); // Pre-fill if user typed it in login
+      setResetEmail(email);
       setShowForgotPasswordModal(true);
   };
 
-  // Fill credentials for demo purposes
   const fillDemoCreds = (role: 'admin' | 'employee') => {
       if (role === 'admin') {
           setEmail('superadmin@empower.com');
@@ -116,7 +107,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <input 
                             type="text"
                             required
-                            className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
                             placeholder="Your username or email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -131,7 +122,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <input 
                             type="password" 
                             required
-                            className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
                             placeholder="Your password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -172,7 +163,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="button"
                 onClick={handleMicrosoftLogin}
                 disabled={isLoading}
-                className="w-full bg-white hover:bg-slate-50 text-slate-700 font-medium py-3 rounded-lg border border-slate-200 transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-70 shadow-sm"
+                className="w-full bg-white hover:bg-slate-50 text-slate-700 font-medium py-3 rounded-lg border border-slate-300 transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-70 shadow-sm"
             >
                 <svg width="20" height="20" viewBox="0 0 23 23">
                     <path fill="#f35325" d="M1 1h10v10H1z"/>
@@ -185,13 +176,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             {/* Demo Credentials Helper */}
             {showDemoAccess && (
-                <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
                     <p className="text-xs text-center text-slate-400 mb-2 uppercase font-bold tracking-wider">Quick Demo Access</p>
                     <div className="flex gap-2 justify-center">
-                        <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-200 hover:border-teal-300 text-slate-600 px-3 py-1.5 rounded transition shadow-sm">
+                        <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
                             Fill Admin
                         </button>
-                        <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-200 hover:border-teal-300 text-slate-600 px-3 py-1.5 rounded transition shadow-sm">
+                        <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
                             Fill Employee
                         </button>
                     </div>
@@ -202,7 +193,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       {/* Right Side - Brand/Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-teal-800 text-white p-16 flex-col justify-center relative overflow-hidden">
-         {/* Background Shapes */}
          <div className="absolute top-0 right-0 w-96 h-96 bg-teal-700 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2"></div>
          <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-900 rounded-full mix-blend-multiply filter blur-3xl opacity-50 translate-y-1/2 -translate-x-1/2"></div>
 
@@ -282,7 +272,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 <input 
                                     type="text"
                                     required
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
                                     placeholder="Your username"
                                     value={resetUsername}
                                     onChange={(e) => setResetUsername(e.target.value)}
@@ -297,7 +287,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 <input 
                                     type="email"
                                     required
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
                                     placeholder="Your email"
                                     value={resetEmail}
                                     onChange={(e) => setResetEmail(e.target.value)}
@@ -309,7 +299,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             <button 
                                 type="button" 
                                 onClick={() => setShowForgotPasswordModal(false)}
-                                className="px-4 py-3 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                                className="px-4 py-3 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -357,7 +347,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
       )}
 
-      {/* Features Modal (Existing) */}
+      {/* Features Modal */}
       {showFeaturesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row">

@@ -6,7 +6,7 @@ import {
   Clock, Plus, Filter, FileText, ChevronDown, ChevronRight, ChevronLeft, Calendar as CalendarIcon, Edit2, Trash2,
   DollarSign, FileSpreadsheet, File as FileIcon, AlertTriangle, CheckCircle2, Briefcase, Search, MoreHorizontal, X, Download, SlidersHorizontal
 } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const TimeLogs = () => {
@@ -381,12 +381,12 @@ const TimeLogs = () => {
   // --- Render Helpers ---
   const StatusBadge = ({ status }: { status: string }) => {
       const styles = {
-          'Pending': 'bg-orange-100 text-orange-600 border-orange-200',
-          'Approved': 'bg-emerald-100 text-emerald-600 border-emerald-200',
-          'Rejected': 'bg-red-100 text-red-600 border-red-200'
+          'Pending': 'bg-orange-100 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+          'Approved': 'bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
+          'Rejected': 'bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
       };
       return (
-          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold border ${styles[status as keyof typeof styles] || 'bg-gray-100'}`}>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold border ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
               {status}
           </span>
       );
@@ -398,16 +398,16 @@ const TimeLogs = () => {
        {/* Top Header & Actions */}
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
-             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+             <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Clock className="text-emerald-600" /> Time Logs
              </h2>
-             <p className="text-sm text-slate-500">View and manage your time entries</p>
+             <p className="text-sm text-slate-500 dark:text-slate-400">View and manage your time entries</p>
           </div>
           <div className="flex flex-col sm:flex-row w-full xl:w-auto gap-2">
              <div className="flex gap-2 w-full sm:w-auto">
                 <button 
                     onClick={() => setShowFilters(!showFilters)} 
-                    className="flex-1 sm:flex-none xl:hidden flex items-center justify-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition"
+                    className="flex-1 sm:flex-none xl:hidden flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition"
                 >
                     <SlidersHorizontal size={16} /> {showFilters ? 'Hide Filters' : 'Filters'}
                 </button>
@@ -418,28 +418,28 @@ const TimeLogs = () => {
              
              {/* Export Menu (Desktop) */}
              <div className="hidden sm:flex gap-2">
-                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm"><FileSpreadsheet size={16}/></button>
-                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm"><FileText size={16}/></button>
+                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"><FileSpreadsheet size={16}/></button>
+                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"><FileText size={16}/></button>
              </div>
           </div>
        </div>
 
        {/* Filters Section (Collapsible on Mobile) */}
-       <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-5 transition-all duration-300 ${!showFilters ? 'hidden xl:block' : 'block'}`}>
-          <div className="flex flex-col lg:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4">
+       <div className={`bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 space-y-5 transition-all duration-300 ${!showFilters ? 'hidden xl:block' : 'block'}`}>
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
              {/* Left: Time Period */}
              <div className="w-full lg:w-auto">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Time Period</label>
-                <div className="flex bg-slate-100 p-1 rounded-lg">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Time Period</label>
+                <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
                    <button 
                      onClick={() => setDateRange('Week')}
-                     className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Week' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}
+                     className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Week' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}
                    >
                      Week
                    </button>
                    <button 
                      onClick={() => setDateRange('Month')}
-                     className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Month' ? 'bg-white shadow text-emerald-600' : 'text-slate-500'}`}
+                     className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Month' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}
                    >
                      Month
                    </button>
@@ -448,17 +448,17 @@ const TimeLogs = () => {
 
              {/* Center: Date Navigation */}
              <div className="flex flex-col items-center w-full lg:w-auto">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date Range</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Date Range</label>
                 <div className="flex items-center gap-2 w-full lg:w-auto justify-center">
-                   <button onClick={() => handleDateNavigation('prev')} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500"><ChevronLeft size={16} /></button>
-                   <div className="flex-1 lg:flex-none px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 min-w-[180px] text-center shadow-sm">
+                   <button onClick={() => handleDateNavigation('prev')} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-500 dark:text-slate-400"><ChevronLeft size={16} /></button>
+                   <div className="flex-1 lg:flex-none px-4 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-[180px] text-center shadow-sm">
                       {dateRange === 'Month' 
                         ? viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })
                         : `${weekDays[0].toLocaleDateString()} - ${weekDays[4].toLocaleDateString()}`
                       }
                    </div>
-                   <button onClick={() => handleDateNavigation('next')} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500"><ChevronRight size={16} /></button>
-                   <button onClick={resetDateToToday} className="text-xs text-emerald-600 font-medium hover:underline ml-2">Today</button>
+                   <button onClick={() => handleDateNavigation('next')} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-500 dark:text-slate-400"><ChevronRight size={16} /></button>
+                   <button onClick={resetDateToToday} className="text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:underline ml-2">Today</button>
                 </div>
              </div>
 
@@ -468,391 +468,377 @@ const TimeLogs = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Filter by Project</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Filter by Project</label>
                 <div className="relative">
                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                    <select 
                       value={filterProject}
                       onChange={e => setFilterProject(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white"
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                    >
-                      <option value="All">All Projects</option>
-                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      <option value={NO_PROJECT_ID}>No Client - General</option>
+                      <option className="bg-white dark:bg-slate-800" value="All">All Projects</option>
+                      {projects.map(p => (
+                         <option className="bg-white dark:bg-slate-800" key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                      <option className="bg-white dark:bg-slate-800" value={NO_PROJECT_ID}>No Client - General</option>
                    </select>
-                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
              </div>
              
              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Filter by Task</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Filter by Status</label>
                 <div className="relative">
                    <CheckCircle2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                    <select 
-                      value={filterTask}
-                      onChange={e => setFilterTask(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white"
-                   >
-                      <option value="All">All Tasks</option>
-                      {uniqueTasks.map(t => <option key={t} value={t}>{t}</option>)}
-                   </select>
-                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-             </div>
-
-             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Filter by Status</label>
-                <div className="relative">
-                   <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <select 
                       value={filterStatus}
                       onChange={e => setFilterStatus(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white"
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                    >
-                      <option value="All">All Statuses</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
+                      <option className="bg-white dark:bg-slate-800" value="All">All Status</option>
+                      <option className="bg-white dark:bg-slate-800" value="Pending">Pending</option>
+                      <option className="bg-white dark:bg-slate-800" value="Approved">Approved</option>
+                      <option className="bg-white dark:bg-slate-800" value="Rejected">Rejected</option>
                    </select>
-                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
              </div>
-          </div>
-       </div>
 
-       {/* Timesheet List Grouped by Project */}
-       <div>
-          <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 py-3 rounded-t-xl font-semibold text-slate-700 text-sm">
-             Timesheet for {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-          </div>
-          <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden shadow-sm">
-             {/* Table Header - Desktop Only */}
-             <div className="hidden lg:grid grid-cols-12 bg-slate-50/50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase px-4 py-3">
-                <div className="col-span-2">Date</div>
-                <div className="col-span-2">Project</div>
-                <div className="col-span-3">Task</div>
-                <div className="col-span-2">User</div>
-                <div className="col-span-1">Duration</div>
-                <div className="col-span-1">Status</div>
-                <div className="col-span-1 text-right">Actions</div>
-             </div>
-
-             {/* Entries */}
-             {Object.keys(groupedEntries).length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-sm italic">No entries found for this period.</div>
-             ) : (
-                Object.keys(groupedEntries).map(pid => {
-                   const isExpanded = expandedProjects[pid];
-                   const entries = groupedEntries[pid];
-                   const projectName = getProjectName(pid);
-
-                   return (
-                      <div key={pid} className="border-b border-slate-100 last:border-0">
-                         {/* Group Header */}
-                         <div 
-                            onClick={() => toggleProjectGroup(pid)}
-                            className="flex items-center gap-2 px-4 py-3 bg-slate-50/30 cursor-pointer hover:bg-slate-50 transition border-l-4 border-l-transparent hover:border-l-emerald-500"
-                         >
-                            <button className="text-slate-400">
-                               {isExpanded ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
-                            </button>
-                            <span className="text-sm font-semibold text-slate-800">{projectName}</span>
-                            <span className="text-xs text-slate-500">({entries.length} entries)</span>
-                         </div>
-
-                         {/* Entries List */}
-                         {isExpanded && entries.map(entry => {
-                            const user = users.find(u => u.id === entry.userId);
-                            const entryDate = new Date(entry.date);
-                            return (
-                               <div key={entry.id} className="flex flex-col lg:grid lg:grid-cols-12 items-start lg:items-center px-4 py-4 lg:py-3 border-t border-slate-100 hover:bg-blue-50/30 text-sm transition relative group gap-2 lg:gap-0">
-                                  
-                                  {/* Mobile View Structure */}
-                                  <div className="lg:hidden w-full space-y-2">
-                                     <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-bold text-slate-800">{entry.task}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{entryDate.toLocaleDateString()} • {projectName}</p>
-                                        </div>
-                                        <span className="font-mono font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded text-xs">{formatDuration(entry.durationMinutes)}</span>
-                                     </div>
-                                     
-                                     {entry.description && <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">{entry.description}</p>}
-                                     
-                                     <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                                        <div className="flex items-center gap-2">
-                                            <StatusBadge status={entry.status} />
-                                            {entry.isBillable && <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><DollarSign size={10}/> Billable</span>}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleEdit(entry)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={14}/></button>
-                                            <button onClick={() => initiateDelete(entry.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
-                                        </div>
-                                     </div>
-                                  </div>
-
-                                  {/* Desktop Columns */}
-                                  <div className="col-span-2 hidden lg:flex flex-col">
-                                     <span className="font-medium text-slate-700">{entryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                                     <span className="text-xs text-slate-400">{entryDate.getFullYear()}</span>
-                                  </div>
-                                  
-                                  <div className="col-span-2 hidden lg:block truncate pr-2 text-slate-600 text-xs" title={projectName}>
-                                     {projectName}
-                                  </div>
-                                  
-                                  <div className="col-span-3 pr-2 w-full hidden lg:block">
-                                     <p className="text-slate-800 font-medium truncate">{entry.task}</p>
-                                     {entry.description && <p className="text-xs text-slate-400 truncate">{entry.description}</p>}
-                                  </div>
-                                  
-                                  <div className="col-span-2 text-slate-600 text-xs hidden lg:block">
-                                     {user ? `${user.firstName} ${user.lastName}` : 'Unknown'}
-                                  </div>
-                                  
-                                  <div className="col-span-1 font-mono text-slate-700 hidden lg:block">
-                                     {formatDuration(entry.durationMinutes)}
-                                  </div>
-
-                                  <div className="col-span-1 hidden lg:flex flex-col gap-1 items-start">
-                                     <StatusBadge status={entry.status} />
-                                     {entry.isBillable && (
-                                        <span className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-green-200">Billable</span>
-                                     )}
-                                  </div>
-                                  
-                                  <div className="col-span-1 text-right relative hidden lg:block">
-                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === entry.id ? null : entry.id); }}
-                                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
-                                     >
-                                        <MoreHorizontal size={16} />
-                                     </button>
-                                     {activeMenuId === entry.id && (
-                                        <div ref={menuRef} className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-10 animate-in fade-in zoom-in-95 duration-100">
-                                           <button onClick={() => handleEdit(entry)} className="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-2">
-                                              <Edit2 size={12} /> Edit
-                                           </button>
-                                           <button onClick={() => initiateDelete(entry.id)} className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2">
-                                              <Trash2 size={12} /> Delete
-                                           </button>
-                                        </div>
-                                     )}
-                                  </div>
-                               </div>
-                            );
-                         })}
-                      </div>
-                   );
-                })
+             {isHR && (
+               <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Search Employee</label>
+                  <div className="relative">
+                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                     <input 
+                        type="text"
+                        placeholder="Search name..."
+                        value={searchEmployee}
+                        onChange={e => setSearchEmployee(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                     />
+                  </div>
+               </div>
              )}
           </div>
        </div>
 
-       {/* Weekly Timesheet Report */}
-       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-slate-50/50">
-             <h3 className="font-bold text-slate-800">Weekly Timesheet Report</h3>
-             <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1 rounded-lg text-xs font-medium text-slate-600 shadow-sm">
-                <CalendarIcon size={14} className="text-slate-400" />
-                <span className="hidden sm:inline">{weekDays[0].toLocaleDateString()} - {weekDays[4].toLocaleDateString()}</span>
-                <span className="sm:hidden text-[10px]">Current Week</span>
-             </div>
+       {/* Weekly Summary (Visible on Desktop) */}
+       <div className="hidden lg:block bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+             <h3 className="font-bold text-slate-800 dark:text-white text-sm">Weekly Timesheet Matrix</h3>
           </div>
           <div className="overflow-x-auto">
-             <table className="w-full text-left border-collapse text-sm min-w-[600px]">
-                <thead>
-                   <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase">
-                      <th className="px-6 py-3 border-b border-slate-200">Client & Project</th>
+             <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-900/30 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                   <tr>
+                      <th className="px-4 py-3">Project</th>
                       {weekDays.map((d, i) => (
-                         <th key={i} className="px-4 py-3 border-b border-slate-200 text-center w-24">
-                            {d.toLocaleDateString('en-US', { weekday: 'short' })} <span className="text-slate-400 font-normal ml-1">{d.getDate()}</span>
-                         </th>
+                         <th key={i} className="px-4 py-3 text-center">{d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}</th>
                       ))}
-                      <th className="px-4 py-3 border-b border-slate-200 text-right w-24">Total</th>
+                      <th className="px-4 py-3 text-right">Total</th>
                    </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
                    {weeklyReportData.map((row) => (
-                      <tr key={row.projectId} className="hover:bg-slate-50/50 border-b border-slate-100 last:border-0">
-                         <td className="px-6 py-3 font-medium text-slate-700">
+                      <tr key={row.projectId} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                         <td className="px-4 py-3 font-medium text-slate-800 dark:text-white truncate max-w-[200px]" title={getProjectName(row.projectId)}>
                             {getProjectName(row.projectId)}
                          </td>
-                         {row.days.map((min, i) => (
-                            <td key={i} className="px-4 py-3 text-center text-slate-600">
-                               {min > 0 ? formatDuration(min) : <span className="text-slate-300">-</span>}
+                         {row.days.map((min, idx) => (
+                            <td key={idx} className="px-4 py-3 text-center text-slate-600 dark:text-slate-300">
+                               {min > 0 ? formatDuration(min) : '-'}
                             </td>
                          ))}
-                         <td className="px-4 py-3 text-right font-bold text-slate-800">
+                         <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">
                             {formatDuration(row.total)}
                          </td>
                       </tr>
                    ))}
-                   {weeklyReportData.length > 0 && (
-                      <tr className="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
-                         <td className="px-6 py-3">Grand Total</td>
-                         {weeklyGrandTotals.days.map((val, i) => (
-                            <td key={i} className="px-4 py-3 text-center">{formatDuration(val)}</td>
-                         ))}
-                         <td className="px-4 py-3 text-right">{formatDuration(weeklyGrandTotals.total)}</td>
-                      </tr>
-                   )}
                    {weeklyReportData.length === 0 && (
-                      <tr><td colSpan={7} className="p-6 text-center text-slate-400 italic">No data available for this week.</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400 italic">No logs for this week.</td></tr>
                    )}
                 </tbody>
+                <tfoot className="bg-slate-50 dark:bg-slate-900/30 font-bold text-sm text-slate-800 dark:text-white border-t border-slate-200 dark:border-slate-700">
+                   <tr>
+                      <td className="px-4 py-3">Total</td>
+                      {weeklyGrandTotals.days.map((min, idx) => (
+                         <td key={idx} className="px-4 py-3 text-center">{min > 0 ? formatDuration(min) : '-'}</td>
+                      ))}
+                      <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400">{formatDuration(weeklyGrandTotals.total)}</td>
+                   </tr>
+                </tfoot>
              </table>
           </div>
        </div>
 
-       {/* Modals remain mostly the same (Add/Delete) - Implementation abbreviated for existing logic */}
+       {/* Detailed Log List */}
+       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+             <h3 className="font-bold text-slate-800 dark:text-white text-sm">Detailed Logs</h3>
+             <span className="text-xs text-slate-500 dark:text-slate-400">{visibleEntries.length} entries found</span>
+          </div>
+          
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+             {Object.keys(groupedEntries).map(projectId => {
+                const projectEntries = groupedEntries[projectId];
+                const isExpanded = expandedProjects[projectId];
+                const projectName = getProjectName(projectId);
+                const totalMins = projectEntries.reduce((acc, curr) => acc + curr.durationMinutes, 0);
+
+                return (
+                   <div key={projectId} className="bg-white dark:bg-slate-800">
+                      {/* Group Header */}
+                      <div 
+                        onClick={() => toggleProjectGroup(projectId)}
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                         <div className="flex items-center gap-3">
+                            <button className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400">
+                               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            <div>
+                               <h4 className="font-bold text-slate-800 dark:text-white text-sm">{projectName}</h4>
+                               <p className="text-xs text-slate-500 dark:text-slate-400">{projectEntries.length} entries</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDuration(totalMins)}</span>
+                         </div>
+                      </div>
+
+                      {/* Entries List */}
+                      {isExpanded && (
+                         <div className="bg-slate-50/50 dark:bg-slate-900/20 border-t border-slate-100 dark:border-slate-700">
+                            {projectEntries.map(entry => {
+                               const user = users.find(u => u.id === entry.userId);
+                               return (
+                                  <div key={entry.id} className="p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors group relative">
+                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                           <div className="flex items-center gap-2 mb-1">
+                                              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{entry.date}</span>
+                                              <StatusBadge status={entry.status} />
+                                              {entry.isBillable && <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900 flex items-center gap-1"><DollarSign size={10}/> Billable</span>}
+                                           </div>
+                                           <h5 className="font-medium text-slate-800 dark:text-white text-sm truncate">{entry.task}</h5>
+                                           <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{entry.description}</p>
+                                           {isHR && user && <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1 font-medium">{user.firstName} {user.lastName}</p>}
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-4 self-end sm:self-center">
+                                           <span className="text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatDuration(entry.durationMinutes)}</span>
+                                           
+                                           {/* Actions Menu */}
+                                           <div className="relative">
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === entry.id ? null : entry.id); }}
+                                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                                              >
+                                                 <MoreHorizontal size={16} />
+                                              </button>
+                                              
+                                              {activeMenuId === entry.id && (
+                                                 <div 
+                                                   ref={menuRef} 
+                                                   className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                                                 >
+                                                    <button onClick={() => handleEdit(entry)} className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Edit2 size={12}/> Edit</button>
+                                                    <button onClick={() => initiateDelete(entry.id)} className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2"><Trash2 size={12}/> Delete</button>
+                                                 </div>
+                                              )}
+                                           </div>
+                                        </div>
+                                     </div>
+                                  </div>
+                               );
+                            })}
+                         </div>
+                      )}
+                   </div>
+                );
+             })}
+             {visibleEntries.length === 0 && (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                   <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Clock size={32} className="text-slate-300 dark:text-slate-600" />
+                   </div>
+                   <p className="font-medium">No time logs found</p>
+                   <p className="text-xs mt-1">Try adjusting filters or log a new entry.</p>
+                </div>
+             )}
+          </div>
+       </div>
+
+       {/* Modals */}
+       
+       {/* 1. Log Time Modal */}
        {showModal && (
-         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in duration-200">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-gray-800">{editingId ? 'Edit Time Log' : 'Log Time'}</h3>
-                  <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
-               </div>
-               
-               <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* ... (Existing form logic same as previous version) ... */}
-                  <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Project</label>
-                     <select 
-                        required
-                        className="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={formData.projectId}
-                        onChange={e => {
-                           setFormData({...formData, projectId: e.target.value, task: ''});
-                           setIsCustomTask(false);
-                        }}
-                     >
-                        <option value="">Select Project...</option>
-                        {projects.map(p => (
-                           <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                        <option value={NO_PROJECT_ID}>No Client - General</option>
-                     </select>
-                  </div>
-
-                  <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Task</label>
-                     {hasPredefinedTasks && !isCustomTask ? (
-                       <div className="flex gap-2">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-700">
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                   <h3 className="font-bold text-slate-800 dark:text-white">{editingId ? 'Edit Time Log' : 'Log Time'}</h3>
+                   <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X size={20}/></button>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                   {/* Project Selection */}
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Project / Client</label>
+                      <div className="relative">
+                         <Briefcase size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                          <select 
-                           className="w-full border rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                           value={formData.task}
-                           onChange={e => setFormData({...formData, task: e.target.value})}
-                           required
+                            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 appearance-none dark:text-white"
+                            value={formData.projectId}
+                            onChange={e => {
+                               setFormData({...formData, projectId: e.target.value, task: ''});
+                               setIsCustomTask(false);
+                            }}
+                            required
                          >
-                           <option value="">Select Task...</option>
-                           {selectedProjectTasks.map((t, idx) => <option key={idx} value={t}>{t}</option>)}
+                            <option value="" disabled>Select Project...</option>
+                            {projects.filter(p => p.status === 'Active' || p.id === formData.projectId).map(p => (
+                               <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                            <option value={NO_PROJECT_ID}>General / Internal (No Client)</option>
                          </select>
-                         <button type="button" onClick={() => setIsCustomTask(true)} className="px-3 border rounded-lg hover:bg-gray-50 text-xs font-bold text-gray-500 whitespace-nowrap">Other</button>
-                       </div>
-                     ) : (
-                       <div className="flex gap-2">
-                         <input 
-                           required
-                           type="text" 
-                           placeholder="What did you work on?"
-                           className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                           value={formData.task}
-                           onChange={e => setFormData({...formData, task: e.target.value})}
-                           autoFocus={hasPredefinedTasks && isCustomTask}
-                         />
-                         {hasPredefinedTasks && (
-                            <button type="button" onClick={() => setIsCustomTask(false)} className="px-3 border rounded-lg hover:bg-gray-50 text-xs font-bold text-gray-500 whitespace-nowrap">List</button>
-                         )}
-                       </div>
-                     )}
-                  </div>
+                         <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                        <input 
-                           type="date" 
-                           required
-                           className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                           value={formData.date}
-                           onChange={e => setFormData({...formData, date: e.target.value})}
-                        />
-                     </div>
-                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hours</label>
-                        <div className="flex items-center gap-2">
-                           <input 
-                              type="number" min="0" max="23"
-                              className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                              value={durationInput.hours}
-                              onChange={e => setDurationInput({...durationInput, hours: e.target.value})}
-                           />
-                           <span className="text-gray-400">:</span>
-                           <select 
-                              className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                              value={durationInput.minutes}
-                              onChange={e => setDurationInput({...durationInput, minutes: e.target.value})}
-                           >
-                              <option value="00">00</option>
-                              <option value="15">15</option>
-                              <option value="30">30</option>
-                              <option value="45">45</option>
-                           </select>
-                        </div>
-                     </div>
-                  </div>
+                   {/* Task Selection */}
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Task</label>
+                      {hasPredefinedTasks && !isCustomTask ? (
+                         <div className="flex gap-2">
+                            <div className="relative flex-1">
+                               <FileText size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                               <select 
+                                  className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 appearance-none dark:text-white"
+                                  value={formData.task}
+                                  onChange={e => setFormData({...formData, task: e.target.value})}
+                                  required
+                               >
+                                  <option value="" disabled>Select Task...</option>
+                                  {selectedProjectTasks.map(t => <option key={t} value={t}>{t}</option>)}
+                               </select>
+                               <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                            <button type="button" onClick={() => setIsCustomTask(true)} className="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600">Other</button>
+                         </div>
+                      ) : (
+                         <div className="flex gap-2">
+                            <input 
+                               type="text" 
+                               placeholder="What are you working on?" 
+                               className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white"
+                               value={formData.task}
+                               onChange={e => setFormData({...formData, task: e.target.value})}
+                               required
+                               autoFocus={isCustomTask}
+                            />
+                            {hasPredefinedTasks && <button type="button" onClick={() => setIsCustomTask(false)} className="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600">List</button>}
+                         </div>
+                      )}
+                   </div>
 
-                  <div className="flex items-center pt-2">
-                     <label className="flex items-center cursor-pointer select-none">
-                        <input 
-                           type="checkbox" 
-                           className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                           checked={formData.isBillable}
-                           onChange={e => setFormData({...formData, isBillable: e.target.checked})}
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Billable</span>
-                     </label>
-                  </div>
+                   {/* Date & Duration */}
+                   <div className="grid grid-cols-2 gap-4">
+                      <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Date</label>
+                         <div className="relative">
+                            <CalendarIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input 
+                               type="date" 
+                               className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white"
+                               value={formData.date}
+                               onChange={e => setFormData({...formData, date: e.target.value})}
+                               required
+                            />
+                         </div>
+                      </div>
+                      <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Duration (HH:MM)</label>
+                         <div className="flex gap-2">
+                            <input 
+                               type="number" min="0" max="23" placeholder="HH" 
+                               className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-center dark:text-white"
+                               value={durationInput.hours}
+                               onChange={e => setDurationInput({...durationInput, hours: e.target.value})}
+                            />
+                            <span className="self-center font-bold text-slate-400">:</span>
+                            <select 
+                               className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-center dark:text-white"
+                               value={durationInput.minutes}
+                               onChange={e => setDurationInput({...durationInput, minutes: e.target.value})}
+                            >
+                               <option value="00">00</option>
+                               <option value="15">15</option>
+                               <option value="30">30</option>
+                               <option value="45">45</option>
+                            </select>
+                         </div>
+                      </div>
+                   </div>
 
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                   {/* Description */}
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Description</label>
                       <textarea 
-                         required
-                         className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-                         rows={3}
+                         rows={3} 
+                         className="w-full px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 resize-none dark:text-white"
+                         placeholder="Optional details..."
                          value={formData.description}
                          onChange={e => setFormData({...formData, description: e.target.value})}
-                         placeholder="Work summary..."
                       />
-                  </div>
-                  
-                  <button type="submit" className="w-full bg-emerald-600 text-white py-2.5 rounded-lg font-bold shadow-md hover:bg-emerald-700 transition">
-                     {editingId ? 'Update Log' : 'Save Log'}
-                  </button>
-               </form>
-            </div>
-         </div>
+                   </div>
+
+                   {/* Billable Toggle */}
+                   <div className="flex items-center gap-3 pt-2">
+                      <div 
+                        className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${formData.isBillable ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        onClick={() => setFormData({...formData, isBillable: !formData.isBillable})}
+                      >
+                         <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${formData.isBillable ? 'translate-x-5' : ''}`} />
+                      </div>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Billable Entry</span>
+                   </div>
+
+                   <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700 mt-2">
+                      <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium transition">Cancel</button>
+                      <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 shadow-sm transition flex items-center gap-2">
+                         <CheckCircle2 size={16}/> Save Entry
+                      </button>
+                   </div>
+                </form>
+             </div>
+          </div>
        )}
 
-       {/* Delete Confirm Modal */}
+       {/* 2. Delete Confirmation Modal */}
        {showDeleteConfirm && (
-         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in duration-200">
-              <div className="flex items-center space-x-3 text-red-600 mb-4">
-                 <AlertTriangle size={24} />
-                 <h3 className="text-lg font-bold text-gray-800">Delete Entry?</h3>
-              </div>
-              <p className="text-gray-600 mb-6">
-                 Are you sure you want to delete this time entry? This action cannot be undone.
-              </p>
-              <div className="flex justify-end space-x-3">
-                 <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Cancel</button>
-                 <button onClick={() => { deleteTimeEntry(itemToDelete!); setShowDeleteConfirm(false); }} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg text-sm font-medium shadow-sm">Delete</button>
-              </div>
-           </div>
-        </div>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col items-center text-center">
+                   <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mb-4">
+                      <AlertTriangle size={24} />
+                   </div>
+                   <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Delete Time Log?</h3>
+                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to remove this entry? This action cannot be undone.</p>
+                   <div className="flex gap-3 w-full">
+                      <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition">Cancel</button>
+                      <button 
+                        onClick={() => {
+                           if (itemToDelete) deleteTimeEntry(itemToDelete);
+                           setShowDeleteConfirm(false);
+                        }} 
+                        className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 shadow-sm transition"
+                      >
+                         Delete
+                      </button>
+                   </div>
+                </div>
+             </div>
+          </div>
        )}
+
     </div>
   );
 };

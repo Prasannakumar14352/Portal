@@ -336,14 +336,14 @@ const Profile = () => {
        {/* Confirmation Modal */}
        {showConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
-           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
-              <div className="flex items-center space-x-3 text-amber-600 mb-4">
+           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center space-x-3 text-amber-600 dark:text-amber-400 mb-4">
                  <AlertTriangle size={24} />
-                 <h3 className="text-lg font-bold">Confirm Changes</h3>
+                 <h3 className="text-lg font-bold text-slate-800 dark:text-white">Confirm Changes</h3>
               </div>
-              <p className="text-gray-600 mb-6">Are you sure you want to update this profile? This action will overwrite existing information.</p>
+              <p className="text-gray-600 dark:text-slate-300 mb-6">Are you sure you want to update this profile? This action will overwrite existing information.</p>
               <div className="flex justify-end space-x-3">
-                 <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Cancel</button>
+                 <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium">Cancel</button>
                  <button onClick={confirmSave} className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-sm font-medium shadow-sm">Confirm Update</button>
               </div>
            </div>
@@ -354,10 +354,10 @@ const Profile = () => {
        <div className="flex flex-col space-y-2">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
                  My Profile
               </h2>
-              <p className="text-gray-500 text-sm">Manage personal information and work location.</p>
+              <p className="text-gray-500 dark:text-slate-400 text-sm">Manage personal information and work location.</p>
             </div>
             {canSave && (
               <button 
@@ -375,16 +375,16 @@ const Profile = () => {
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: User Details */}
           <div className="lg:col-span-1 space-y-6">
-             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
                 <div className="flex flex-col items-center text-center mb-6">
                    <div className="relative group">
-                     <img src={formData.avatar} alt="Avatar" className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-3 object-cover" />
+                     <img src={formData.avatar} alt="Avatar" className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-700 shadow-md mb-3 object-cover" />
                      {canEditAvatar && (
                        <>
                          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
                          <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute bottom-2 right-0 bg-white p-1.5 rounded-full shadow border border-gray-200 text-gray-600 hover:text-emerald-600 cursor-pointer transition-transform hover:scale-110"
+                            className="absolute bottom-2 right-0 bg-white dark:bg-slate-700 p-1.5 rounded-full shadow border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer transition-transform hover:scale-110"
                             title="Change Avatar"
                          >
                            <Camera size={14} />
@@ -392,34 +392,34 @@ const Profile = () => {
                        </>
                      )}
                    </div>
-                   <h3 className="text-xl font-bold text-gray-800">{formData.name}</h3>
-                   <span className="text-emerald-600 font-medium bg-emerald-50 px-3 py-1 rounded-full text-xs mt-1">{profileUser.role}</span>
+                   <h3 className="text-xl font-bold text-gray-800 dark:text-white">{formData.name}</h3>
+                   <span className="text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1 rounded-full text-xs mt-1">{profileUser.role}</span>
                 </div>
 
                 <div className="space-y-4">
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name</label>
-                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
-                        <UserIcon size={16} className="text-gray-400" />
+                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Full Name</label>
+                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
+                        <UserIcon size={16} className="text-gray-400 dark:text-slate-500" />
                         <input 
                           disabled={!canEditDetails}
                           type="text" 
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 disabled:text-gray-500" 
+                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500" 
                           value={formData.name} 
                           onChange={e => setFormData({...formData,name: e.target.value})}
                         />
                      </div>
-                     {!canEditDetails && <Lock size={12} className="absolute top-1 right-1 text-gray-400" />}
+                     {!canEditDetails && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Job Title</label>
-                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
-                        <Briefcase size={16} className="text-gray-400" />
+                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Job Title</label>
+                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
+                        <Briefcase size={16} className="text-gray-400 dark:text-slate-500" />
                         <input 
                           disabled={!canEditDetails}
                           type="text" 
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 disabled:text-gray-500" 
+                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500" 
                           value={formData.jobTitle} 
                           onChange={e => setFormData({...formData, jobTitle: e.target.value})}
                           placeholder="e.g. Senior Developer"
@@ -428,12 +428,12 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
-                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
-                        <Building2 size={16} className="text-gray-400" />
+                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Department</label>
+                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
+                        <Building2 size={16} className="text-gray-400 dark:text-slate-500" />
                         <select 
                           disabled={!canEditAllocations}
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 disabled:text-gray-500 appearance-none"
+                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none"
                           value={formData.departmentId}
                           onChange={e => setFormData({...formData, departmentId: e.target.value})}
                         >
@@ -443,18 +443,18 @@ const Profile = () => {
                            ))}
                         </select>
                      </div>
-                     {!canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400" />}
+                     {!canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assigned Projects</label>
-                     <div className={`border border-gray-200 rounded-lg max-h-40 overflow-y-auto p-2 space-y-2 ${canEditAllocations ? 'bg-gray-50' : 'bg-white'}`}>
+                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Assigned Projects</label>
+                     <div className={`border border-gray-200 dark:border-slate-600 rounded-lg max-h-40 overflow-y-auto p-2 space-y-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700' : 'bg-white dark:bg-slate-800'}`}>
                         {projects.map(proj => {
                           const isAssigned = formData.projectIds.includes(proj.id);
                           if (!canEditAllocations && !isAssigned) return null; // If not editing, only show assigned
                           
                           return (
-                            <label key={proj.id} className={`flex items-center space-x-3 p-2 rounded ${canEditAllocations ? 'cursor-pointer hover:bg-white hover:shadow-sm' : 'cursor-default border border-gray-100 bg-gray-50'}`}>
+                            <label key={proj.id} className={`flex items-center space-x-3 p-2 rounded ${canEditAllocations ? 'cursor-pointer hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm' : 'cursor-default border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50'}`}>
                               {canEditAllocations ? (
                                 <input 
                                   type="checkbox" 
@@ -463,106 +463,103 @@ const Profile = () => {
                                   className="rounded text-emerald-600 focus:ring-emerald-500"
                                 />
                               ) : (
-                                <CheckCircle2 size={16} className="text-emerald-600" />
+                                <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
                               )}
                               <div>
-                                <span className={`text-sm block ${canEditAllocations ? 'text-gray-700' : 'text-gray-800 font-medium'}`}>{proj.name}</span>
-                                {!canEditAllocations && <span className="text-[10px] text-gray-400 block">{proj.status}</span>}
+                                <span className={`text-sm block ${canEditAllocations ? 'text-gray-700 dark:text-slate-200' : 'text-gray-800 dark:text-white font-medium'}`}>{proj.name}</span>
+                                {!canEditAllocations && <span className="text-[10px] text-gray-400 dark:text-slate-500 block">{proj.status}</span>}
                               </div>
                             </label>
                           );
                         })}
-                        {projects.length === 0 && <span className="text-xs text-gray-400 italic p-1 block">No projects available</span>}
-                        {!canEditAllocations && formData.projectIds.length === 0 && <span className="text-xs text-gray-400 italic p-1 block">No projects assigned</span>}
+                        {projects.length === 0 && <span className="text-xs text-gray-400 dark:text-slate-500 italic p-1 block">No projects available</span>}
+                        {!canEditAllocations && formData.projectIds.length === 0 && <span className="text-xs text-gray-400 dark:text-slate-500 italic p-1 block">No projects assigned</span>}
                      </div>
-                     {canEditAllocations && !canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400" />}
+                     {canEditAllocations && !canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hire Date</label>
-                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
-                        <Calendar size={16} className="text-gray-400" />
+                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Hire Date</label>
+                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
+                        <Calendar size={16} className="text-gray-400 dark:text-slate-500" />
                         <input 
                           disabled={!canEditDetails}
                           type="date" 
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 disabled:text-gray-500" 
+                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500" 
                           value={formData.hireDate} 
                           onChange={e => setFormData({...formData, hireDate: e.target.value})}
                         />
                      </div>
+                     {!canEditDetails && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                    </div>
+                </div>
+             </div>
 
-                   <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address</label>
-                     <div className="flex items-center space-x-2 border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 opacity-70 cursor-not-allowed">
-                        <Mail size={16} className="text-gray-400" />
-                        <input type="text" disabled className="bg-transparent w-full text-sm outline-none text-gray-500" value={profileUser.email} />
-                     </div>
+             {/* Contact Info Card */}
+             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 space-y-4">
+                <h4 className="font-bold text-gray-800 dark:text-white text-sm uppercase tracking-wide border-b border-gray-100 dark:border-slate-700 pb-2">Contact Information</h4>
+                
+                <div className="relative">
+                   <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Email Address</label>
+                   <div className="flex items-center space-x-2 border border-transparent bg-gray-100 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-3 py-2">
+                      <Mail size={16} className="text-gray-400 dark:text-slate-500" />
+                      <input 
+                        disabled
+                        type="email" 
+                        className="bg-transparent w-full text-sm outline-none text-gray-500 dark:text-slate-400 cursor-not-allowed" 
+                        value={profileUser.email} 
+                      />
                    </div>
+                   <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />
+                </div>
 
-                   <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone Number</label>
-                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-transparent'}`}>
-                        <Phone size={16} className="text-gray-400" />
-                        <input 
-                          disabled={!canEditDetails}
-                          type="text" 
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 disabled:text-gray-500" 
-                          value={formData.phone} 
-                          onChange={e => setFormData({...formData, phone: e.target.value})}
-                          placeholder="+1 ..."
-                        />
-                     </div>
+                <div className="relative">
+                   <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Phone Number</label>
+                   <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
+                      <Phone size={16} className="text-gray-400 dark:text-slate-500" />
+                      <input 
+                        disabled={!canEditDetails}
+                        type="tel" 
+                        className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500" 
+                        value={formData.phone} 
+                        onChange={e => setFormData({...formData, phone: e.target.value})}
+                        placeholder="+1 (555) 000-0000"
+                      />
                    </div>
-
+                   {!canEditDetails && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                 </div>
              </div>
           </div>
 
-          {/* Right Column: Location Map */}
-          <div className="lg:col-span-2">
-             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
-                <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                   <h3 className="font-bold text-gray-700 flex items-center gap-2">
-                     <MapPin size={18} className="text-emerald-600"/>
-                     Work Location
+          {/* Right Column: Map & Location */}
+          <div className="lg:col-span-2 space-y-6">
+             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+                <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                   <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                      <MapPin size={18} className="text-emerald-600 dark:text-emerald-400" />
+                      Work Location
                    </h3>
-                   <div className="flex items-center space-x-3 text-xs">
-                     <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                        <span className="text-gray-600">This User</span>
-                     </div>
-                     <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                        <span className="text-gray-600">Colleagues</span>
-                     </div>
-                     {canEditLocation && <span className="text-green-600 font-medium border-l pl-3 ml-1">Editable: Click to update</span>}
-                   </div>
+                   {canEditLocation && <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-900 font-medium">Click map to update</span>}
                 </div>
                 
-                {/* Address Input */}
-                <div className="p-4 border-b border-gray-100">
-                   <input 
-                     disabled={!canEditLocation}
-                     type="text" 
-                     className={`w-full border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${canEditLocation ? 'border-gray-300' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
-                     placeholder={canEditLocation ? "Enter address manually or click on map..." : "Location set by HR"} 
-                     value={formData.address}
-                     onChange={e => setFormData({...formData, address: e.target.value})}
-                   />
-                </div>
-
-                {/* Map Container */}
-                <div className="flex-1 min-h-[400px] relative bg-gray-100">
-                   <div ref={mapDiv} className="w-full h-full absolute inset-0 outline-none"></div>
+                <div className="flex-1 relative">
+                   <div ref={mapDiv} className="w-full h-full"></div>
                    {!isMapLoaded && (
-                     <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
-                        <div className="flex flex-col items-center">
-                           <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2"></div>
-                           <p className="text-gray-500 text-sm">Loading Map...</p>
-                        </div>
-                     </div>
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800 z-10">
+                         <div className="flex flex-col items-center">
+                            <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <p className="text-gray-500 dark:text-slate-400 text-sm">Loading ArcGIS Map...</p>
+                         </div>
+                      </div>
                    )}
+                </div>
+                
+                <div className="p-4 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
+                   <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Address</label>
+                   <div className="flex items-center space-x-2">
+                      <MapPin size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                      <p className="text-sm text-gray-700 dark:text-slate-300 truncate w-full">{formData.address || 'No address set'}</p>
+                   </div>
                 </div>
              </div>
           </div>
