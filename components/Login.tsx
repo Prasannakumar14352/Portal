@@ -9,7 +9,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { login, loginWithMicrosoft, forgotPassword } = useAppContext();
+  const { login, loginWithMicrosoft, forgotPassword, employees, showToast } = useAppContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,9 +27,23 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Add a small delay to simulate network request
-    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Smart Login Check:
+    // If the user exists and has the placeholder password 'ms-auth-user', 
+    // it means they registered via Microsoft. We should redirect them to the MS flow
+    // even if they tried to use the standard form.
+    const targetUser = employees.find(emp => emp.email.toLowerCase() === email.trim().toLowerCase());
     
+    if (targetUser && targetUser.password === 'ms-auth-user') {
+        showToast("This account uses Microsoft Sign-In. Redirecting...", "info");
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief delay for user to read toast
+        await loginWithMicrosoft();
+        setIsLoading(false);
+        return;
+    }
+
+    // Normal Login Flow
+    await new Promise(resolve => setTimeout(resolve, 800));
     await login(email, password);
     // Success handled by context (currentUser state change)
     
