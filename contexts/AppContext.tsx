@@ -77,6 +77,7 @@ interface AppContextType {
   // Attendance Actions
   checkIn: () => Promise<void>;
   checkOut: (reason?: string) => Promise<void>;
+  updateAttendanceRecord: (record: AttendanceRecord) => Promise<void>; // Added capability to manually update record
   getTodayAttendance: () => AttendanceRecord | undefined;
 
   // Notification Actions
@@ -654,15 +655,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const todayRecord = getTodayAttendance();
     if (!todayRecord) return;
     const now = new Date();
+    
+    // Calculate total hours
+    const start = new Date(todayRecord.checkInTime || now.toISOString()); // fallback to now if checkInTime missing (edge case)
+    const durationMs = now.getTime() - start.getTime();
+    const durationHrs = durationMs / (1000 * 60 * 60);
+    
+    // If worked more than 9 hours, status becomes Present even if it was Late
+    const finalStatus = durationHrs >= 9 ? 'Present' : todayRecord.status;
+
     const updatedRecord: AttendanceRecord = {
       ...todayRecord,
       checkOut: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       checkOutTime: now.toISOString(),
+      status: finalStatus,
       notes: reason || todayRecord.notes
     };
     await db.updateAttendance(updatedRecord);
     setAttendance(await db.getAttendance());
     notify(`Checked out successfully at ${updatedRecord.checkOut}`);
+  };
+
+  // Add capability to manually update record
+  const updateAttendanceRecord = async (record: AttendanceRecord) => {
+      await db.updateAttendance(record);
+      setAttendance(await db.getAttendance());
+      showToast("Attendance record updated", "success");
   };
 
   const markNotificationRead = async (id: string) => {
@@ -744,7 +762,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addLeave, addLeaves, updateLeave, updateLeaveStatus,
     addLeaveType, updateLeaveType, deleteLeaveType,
     addTimeEntry, updateTimeEntry, deleteTimeEntry,
-    checkIn, checkOut, getTodayAttendance,
+    checkIn, checkOut, updateAttendanceRecord, getTodayAttendance,
     notify, markNotificationRead, markAllRead,
     addHoliday, addHolidays, deleteHoliday, generatePayslips, manualAddPayslip
   };

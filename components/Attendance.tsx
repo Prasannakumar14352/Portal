@@ -1,22 +1,23 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Lock } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
+import DraggableModal from './DraggableModal';
 
 interface AttendanceProps {
   records: AttendanceRecord[];
 }
 
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
-  const { checkIn, checkOut, getTodayAttendance, timeEntries, addTimeEntry, projects, currentUser } = useAppContext();
+  const { checkIn, checkOut, getTodayAttendance, timeEntries, addTimeEntry, projects, currentUser, updateAttendanceRecord, showToast, employees } = useAppContext();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchName, setSearchName] = useState('');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Default to 10 to show absent rows clearly
 
   // Attendance Logic State
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -36,11 +37,21 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     description: ''
   });
 
+  // Edit/Correction Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [editForm, setEditForm] = useState({ checkIn: '', checkOut: '' });
+
   // Toggle between project tasks and custom input
   const [isCustomTask, setIsCustomTask] = useState(false);
 
   const todayRecord = getTodayAttendance();
   const isHR = currentUser?.role === UserRole.HR;
+
+  // Filter projects for the dropdown
+  const userProjects = useMemo(() => {
+    return projects.filter(p => p.status === 'Active');
+  }, [projects]);
 
   // Derived state for tasks based on selected project
   const selectedProjectTasks = useMemo(() => {
@@ -52,51 +63,68 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // Set default filter to current month if no dates selected to show proper absent data
+  useEffect(() => {
+      if (!startDate && !endDate) {
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          setStartDate(firstDay.toISOString().split('T')[0]);
+          setEndDate(lastDay.toISOString().split('T')[0]);
+      }
+  }, []);
+
   // Calculate elapsed time for today
   const checkInTimeObj = todayRecord?.checkInTime ? new Date(todayRecord.checkInTime) : null;
   const elapsedMs = checkInTimeObj ? currentTime.getTime() - checkInTimeObj.getTime() : 0;
   const elapsedHours = elapsedMs / (1000 * 60 * 60);
   const isEarlyLogout = elapsedHours < 9;
 
-  // Helper to calculate total duration from record
-  const calculateDuration = (record: AttendanceRecord) => {
-    if (!record.checkInTime || !record.checkOutTime) return '--';
-    
+  // Helper to calculate duration in hours (number)
+  const getDurationHours = (record: AttendanceRecord): number => {
+    if (!record.checkInTime || !record.checkOutTime) return 0;
     const start = new Date(record.checkInTime);
     const end = new Date(record.checkOutTime);
-    
-    // Ensure valid dates
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '--';
-
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
     const diffMs = end.getTime() - start.getTime();
-    if (diffMs < 0) return '--'; // Should not happen ideally
+    return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
+  };
 
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+  // Helper to display duration text
+  const calculateDuration = (record: AttendanceRecord) => {
+    const hrs = getDurationHours(record);
+    if (hrs === 0) return '--';
+    const diffHrs = Math.floor(hrs);
+    const diffMins = Math.floor((hrs % 1) * 60);
     return `${diffHrs}h ${diffMins}m`;
+  };
+
+  // --- Date Helpers ---
+  const getAllDatesInRange = (start: string, end: string) => {
+      const dates = [];
+      const curr = new Date(start);
+      const last = new Date(end);
+      // Generate all dates in range, including today/future (we filter absent logic later)
+      while (curr <= last) {
+          dates.push(curr.toISOString().split('T')[0]);
+          curr.setDate(curr.getDate() + 1);
+      }
+      return dates;
   };
 
   const handleCheckOutClick = () => {
     if (!currentUser) return;
-
-    // 1. Check if a time log exists for today
     const todayStr = new Date().toISOString().split('T')[0];
     const hasLog = timeEntries.some(t => t.userId === currentUser.id && t.date === todayStr);
-
-    // Determine intended action
     const actionType = isEarlyLogout ? 'early' : 'normal';
 
     if (!hasLog) {
         setPendingCheckoutAction(actionType);
-        // Reset log form defaults
         setLogForm({ projectId: '', task: '', hours: '8', minutes: '00', description: '' });
         setIsCustomTask(false);
         setShowTimeLogModal(true);
         return;
     }
-
-    // 2. Proceed if log exists
     proceedToCheckout(actionType);
   };
 
@@ -111,9 +139,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const handleQuickLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
-
     const duration = (parseInt(logForm.hours) || 0) * 60 + (parseInt(logForm.minutes) || 0);
-    
     await addTimeEntry({
       userId: currentUser.id,
       projectId: logForm.projectId === 'NO_PROJECT' ? '' : logForm.projectId,
@@ -124,10 +150,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       status: 'Pending',
       isBillable: true
     });
-    
     setShowTimeLogModal(false);
-    
-    // Resume the pending action
     if (pendingCheckoutAction) {
         proceedToCheckout(pendingCheckoutAction);
         setPendingCheckoutAction(null);
@@ -142,43 +165,155 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     setEarlyReason('');
   };
 
-  const filteredRecords = records.filter(record => {
-    // Permission Check: If not HR, only show own records
-    if (!isHR && record.employeeId !== currentUser?.id) return false;
+  // Edit / Request Correction Handler
+  const openEditModal = (record: AttendanceRecord) => {
+      setEditingRecord(record);
+      // Convert time string "09:00 AM" to input time "09:00" if possible, or leave empty for user to fill
+      // For simplicity in this demo, we assume user picks standard time inputs.
+      // Better approach: Parse checkInTime ISO string to HH:mm for input type="time"
+      const cin = record.checkInTime ? new Date(record.checkInTime).toTimeString().substring(0, 5) : '';
+      const cout = record.checkOutTime ? new Date(record.checkOutTime).toTimeString().substring(0, 5) : '';
+      setEditForm({ checkIn: cin, checkOut: cout });
+      setShowEditModal(true);
+  };
 
-    // Filter by Name
-    const nameMatch = record.employeeName.toLowerCase().includes(searchName.toLowerCase());
-    
-    // Filter by Date Range
-    let dateMatch = true;
-    if (startDate && endDate) {
-      const recDate = new Date(record.date);
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      dateMatch = recDate >= start && recDate <= end;
-    } else if (startDate) {
-      const recDate = new Date(record.date);
-      const start = new Date(startDate);
-      dateMatch = recDate >= start;
-    }
+  const handleEditSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingRecord) return;
 
-    return nameMatch && dateMatch;
-  });
+      // Construct new ISO strings based on the record's date and new time
+      const datePart = editingRecord.date; // YYYY-MM-DD
+      const newCheckInISO = editForm.checkIn ? new Date(`${datePart}T${editForm.checkIn}:00`).toISOString() : undefined;
+      const newCheckOutISO = editForm.checkOut ? new Date(`${datePart}T${editForm.checkOut}:00`).toISOString() : undefined;
+      
+      // Calculate simplified formatted string e.g. "09:00 AM"
+      const formatTime = (iso: string | undefined) => {
+          if (!iso) return '--:--';
+          return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+      };
 
-  // Reset pagination when filters or items per page change
+      const updatedRecord: AttendanceRecord = {
+          ...editingRecord,
+          checkIn: formatTime(newCheckInISO),
+          checkInTime: newCheckInISO,
+          checkOut: formatTime(newCheckOutISO),
+          checkOutTime: newCheckOutISO,
+          // Recalculate status based on new duration if checkOut exists
+          status: editingRecord.status // You might want to recalc status here too
+      };
+
+      if (newCheckInISO && newCheckOutISO) {
+          const diffMs = new Date(newCheckOutISO).getTime() - new Date(newCheckInISO).getTime();
+          const hrs = diffMs / (1000 * 60 * 60);
+          if (hrs >= 9) updatedRecord.status = 'Present';
+      }
+
+      await updateAttendanceRecord(updatedRecord);
+      setShowEditModal(false);
+      setEditingRecord(null);
+  };
+
+  const isYesterday = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      return d.toDateString() === y.toDateString();
+  };
+
+  // --- Data Processing for Display ---
+  const processedRecords = useMemo(() => {
+      let baseRecords = records;
+
+      // 1. Filter records by Search Name
+      if (searchName) {
+          baseRecords = baseRecords.filter(r => r.employeeName.toLowerCase().includes(searchName.toLowerCase()));
+      }
+
+      // 2. Determine target user list for generating rows
+      let employeesToDisplay: { id: string, name: string }[] = [];
+
+      if (!isHR) {
+          if (currentUser) employeesToDisplay = [{ id: currentUser.id, name: currentUser.name }];
+      } else {
+          // HR View: Get target employees based on search or all
+          let sourceEmployees = employees;
+          if (searchName) {
+              sourceEmployees = sourceEmployees.filter(e => 
+                  `${e.firstName} ${e.lastName}`.toLowerCase().includes(searchName.toLowerCase())
+              );
+          }
+          employeesToDisplay = sourceEmployees.map(e => ({ 
+              id: e.id, 
+              name: `${e.firstName} ${e.lastName}` 
+          }));
+      }
+
+      // 3. Generate Rows (Existing + Absent)
+      let finalRows: any[] = [];
+      const sDate = startDate || new Date().toISOString().split('T')[0]; // Default to today/selected
+      const eDate = endDate || new Date().toISOString().split('T')[0];
+      const rangeDates = getAllDatesInRange(sDate, eDate);
+      
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      // Group existing records by Date -> EmployeeID
+      const recordMap: Record<string, Record<string, AttendanceRecord>> = {};
+      baseRecords.forEach(r => {
+          if (!recordMap[r.date]) recordMap[r.date] = {};
+          recordMap[r.date][r.employeeId] = r;
+      });
+
+      if (employeesToDisplay.length > 0) {
+          rangeDates.forEach(dateStr => {
+              const currentDateObj = new Date(dateStr);
+              // Set time to end of day to include 'today' in past check if needed, or strictly less than today
+              // Logic: Absent only if date is strictly in the past (before today)
+              const isPast = currentDateObj < today;
+
+              employeesToDisplay.forEach(emp => {
+                  const existing = recordMap[dateStr]?.[emp.id];
+                  if (existing) {
+                      finalRows.push(existing);
+                  } else if (isPast) {
+                      // Generate Absent Record for past dates only
+                      finalRows.push({
+                          id: `absent-${dateStr}-${emp.id}`,
+                          employeeId: emp.id,
+                          employeeName: emp.name,
+                          date: dateStr,
+                          checkIn: '--:--',
+                          checkOut: '--:--',
+                          status: 'Absent',
+                          workLocation: 'Office HQ India', // Default or fetch from profile
+                          isGhost: true // Flag for UI
+                      } as AttendanceRecord);
+                  }
+                  // If date is today or future and no record exists, we show nothing (empty)
+              });
+          });
+          // Sort by Date Descending
+          finalRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      } else {
+          // Fallback if no employees found (e.g. searching for non-existent name)
+          finalRows = [];
+      }
+
+      return finalRows;
+
+  }, [records, startDate, endDate, searchName, isHR, currentUser, employees]);
+
+  // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchName, startDate, endDate, itemsPerPage]);
 
   // Pagination Logic
-  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
-  const paginatedRecords = filteredRecords.slice(
+  const totalPages = Math.ceil(processedRecords.length / itemsPerPage);
+  const paginatedRecords = processedRecords.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  // Filter projects assigned to user
-  const userProjects = projects.filter(p => currentUser?.projectIds?.includes(p.id));
 
   return (
     <div className="space-y-6">
@@ -262,6 +397,47 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             </div>
          </div>
       </div>
+
+      {/* Edit/Correction Modal */}
+      <DraggableModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Update Attendance Record"
+        width="max-w-md"
+      >
+          <div className="space-y-4">
+              <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg text-xs text-yellow-800 dark:text-yellow-200">
+                  <p>You are updating a record for {editingRecord?.date}.</p>
+                  {!isHR && <p className="mt-1 font-semibold">Note: You can only edit records from yesterday. Older records require HR approval.</p>}
+              </div>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Check In Time</label>
+                      <input 
+                          type="time" 
+                          required
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                          value={editForm.checkIn}
+                          onChange={e => setEditForm({...editForm, checkIn: e.target.value})}
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Check Out Time</label>
+                      <input 
+                          type="time" 
+                          required
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                          value={editForm.checkOut}
+                          onChange={e => setEditForm({...editForm, checkOut: e.target.value})}
+                      />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                      <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm">Cancel</button>
+                      <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Update Record</button>
+                  </div>
+              </form>
+          </div>
+      </DraggableModal>
 
       {/* Required Time Log Modal */}
       {showTimeLogModal && (
@@ -448,7 +624,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px] md:min-w-0">
+          <table className="w-full text-left border-collapse min-w-[900px] md:min-w-0">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold">
                 <th className="px-6 py-4">Employee</th>
@@ -458,11 +634,22 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 <th className="px-6 py-4">Total Hours</th>
                 <th className="px-6 py-4">Work Location</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {paginatedRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+              {paginatedRecords.map((record, index) => {
+                // Logic to display status: if duration > 9h, show Present even if status says Late
+                const durationHrs = getDurationHours(record);
+                const isGhost = (record as any).isGhost;
+                const canEdit = isHR || isYesterday(record.date);
+                
+                // Determine display status
+                let displayStatus = record.status;
+                if (!isGhost && durationHrs >= 9) displayStatus = 'Present';
+
+                return (
+                <tr key={record.id || index} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isGhost ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                     {record.employeeName}
                   </td>
@@ -471,19 +658,21 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                      {!isGhost && <div className="w-2 h-2 rounded-full bg-emerald-500"></div>}
                       <span>{record.checkIn}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300">
-                      {record.checkOut ? (
+                      {record.checkOut && !isGhost ? (
                          <>
                            <div className="w-2 h-2 rounded-full bg-orange-400"></div>
                            <span>{record.checkOut}</span>
                          </>
-                      ) : (
+                      ) : !isGhost ? (
                          <span className="text-slate-400 text-xs italic">Active</span>
+                      ) : (
+                         <span>--:--</span>
                       )}
                     </div>
                     {record.notes && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 max-w-[150px] truncate" title={record.notes}>{record.notes}</p>}
@@ -499,17 +688,48 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs font-semibold
-                      ${record.status === 'Present' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 
-                        record.status === 'Late' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                      ${displayStatus === 'Present' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 
+                        displayStatus === 'Late' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                       }`}>
-                      {record.status}
+                      {displayStatus}
                     </span>
                   </td>
+                  <td className="px-6 py-4 text-center">
+                      {isGhost ? (
+                          isHR ? (
+                            <button 
+                                onClick={() => openEditModal({ ...record, id: Math.random().toString(36), isGhost: false } as AttendanceRecord)}
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold"
+                            >
+                                Add
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">Absent</span>
+                          )
+                      ) : (
+                          canEdit ? (
+                            <button 
+                                onClick={() => openEditModal(record)}
+                                className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-900/30 rounded transition"
+                                title="Edit Record"
+                            >
+                                <Edit2 size={16} />
+                            </button>
+                          ) : (
+                            <div className="group relative inline-block">
+                                <Lock size={16} className="text-slate-300 dark:text-slate-600 cursor-not-allowed" />
+                                <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-24 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center">
+                                    Request HR
+                                </span>
+                            </div>
+                          )
+                      )}
+                  </td>
                 </tr>
-              ))}
+              )})}
               {paginatedRecords.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                     {isHR ? "No attendance records found matching your filters." : "You have no attendance records matching the criteria."}
                   </td>
                 </tr>
@@ -535,7 +755,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
              <span>per page</span>
              <span className="hidden sm:inline mx-2 text-slate-300 dark:text-slate-600">|</span>
              <span className="hidden sm:inline">
-               Showing <span className="font-medium text-slate-700 dark:text-slate-200">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700 dark:text-slate-200">{Math.min(currentPage * itemsPerPage, filteredRecords.length)}</span> of <span className="font-medium text-slate-700 dark:text-slate-200">{filteredRecords.length}</span> results
+               Showing <span className="font-medium text-slate-700 dark:text-slate-200">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-slate-700 dark:text-slate-200">{Math.min(currentPage * itemsPerPage, processedRecords.length)}</span> of <span className="font-medium text-slate-700 dark:text-slate-200">{processedRecords.length}</span> results
              </span>
            </div>
            <div className="flex items-center gap-2">
