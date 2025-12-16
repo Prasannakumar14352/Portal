@@ -123,7 +123,8 @@ const Organization = () => {
   const [allocForm, setAllocForm] = useState<{ departmentId: string, projectIds: string[] }>({ departmentId: '', projectIds: [] });
 
   const isHR = currentUser?.role === UserRole.HR;
-  const showEmployeesTab = currentUser?.role !== UserRole.EMPLOYEE;
+  // Show Employees tab for everyone (EmployeeList component handles read-only state for non-HR)
+  const showEmployeesTab = true;
 
   // Memoized Tree Data
   const orgTreeData = useMemo(() => buildOrgTree(users), [users]);

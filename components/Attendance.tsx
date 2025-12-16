@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AttendanceRecord } from '../types';
+import { AttendanceRecord, UserRole } from '../types';
 import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -40,6 +40,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [isCustomTask, setIsCustomTask] = useState(false);
 
   const todayRecord = getTodayAttendance();
+  const isHR = currentUser?.role === UserRole.HR;
 
   // Derived state for tasks based on selected project
   const selectedProjectTasks = useMemo(() => {
@@ -123,6 +124,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   };
 
   const filteredRecords = records.filter(record => {
+    // Permission Check: If not HR, only show own records
+    if (!isHR && record.employeeId !== currentUser?.id) return false;
+
     // Filter by Name
     const nameMatch = record.employeeName.toLowerCase().includes(searchName.toLowerCase());
     
@@ -384,7 +388,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                placeholder="Search by name..."
                value={searchName}
                onChange={(e) => setSearchName(e.target.value)}
-               className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+               disabled={!isHR} // Disable search for non-HR
+               className={`w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${!isHR ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
              />
            </div>
         </div>
@@ -468,7 +473,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               {paginatedRecords.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                    No attendance records found matching your filters.
+                    {isHR ? "No attendance records found matching your filters." : "You have no attendance records matching the criteria."}
                   </td>
                 </tr>
               )}
