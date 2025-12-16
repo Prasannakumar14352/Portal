@@ -56,9 +56,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
       <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between h-16">
         <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center flex-shrink-0 text-white shadow-sm">
-            <span className="font-bold text-lg">IST</span>
+            <span className="font-bold text-sm">EMP</span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">Projects</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">HR Portal</h1>
         </div>
         {/* Mobile Close Button */}
         <button onClick={onClose} className="md:hidden text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
@@ -92,7 +92,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
       
       <div className="p-4 border-t border-slate-200 dark:border-slate-800">
          <div className="text-xs text-slate-500 dark:text-slate-500 text-center">
-            &copy; 2025 IST Projects
+            &copy; 2025 EMP HR Portal
          </div>
       </div>
     </div>

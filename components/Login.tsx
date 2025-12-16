@@ -57,7 +57,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div className="bg-teal-700 p-1.5 rounded-lg">
                     <Layout className="text-white w-6 h-6" />
                 </div>
-                <span className="text-xl font-bold text-teal-800">IST Projects</span>
+                <span className="text-xl font-bold text-teal-800">EMP HR Portal</span>
             </div>
 
             <div>
@@ -170,7 +170,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
          <div className="relative z-10 max-w-lg">
             <h1 className="text-4xl font-bold mb-6 leading-tight">Enterprise HR Management</h1>
             <p className="text-teal-100 text-lg mb-10 leading-relaxed">
-                IST Projects helps teams organize employees, track attendance, and manage HR operations in a collaborative environment.
+                EMP HR Portal helps teams organize employees, track attendance, and manage HR operations in a collaborative environment.
             </p>
 
             <div className="space-y-8">

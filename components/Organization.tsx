@@ -1,9 +1,92 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { UserRole, User, Department, Project, Employee } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UserRole, Department, Project, Employee } from '../types';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network } from 'lucide-react';
 import EmployeeList from './EmployeeList';
+
+// --- Org Chart Helper Types & Logic ---
+interface TreeNode extends Employee {
+  children: TreeNode[];
+}
+
+const buildOrgTree = (employees: Employee[]): TreeNode[] => {
+  const empMap: Record<string, TreeNode> = {};
+  
+  // Initialize map
+  employees.forEach(emp => {
+    empMap[emp.id] = { ...emp, children: [] };
+  });
+
+  const roots: TreeNode[] = [];
+
+  // Build relationships
+  employees.forEach(emp => {
+    const node = empMap[emp.id];
+    if (emp.managerId && empMap[emp.managerId]) {
+      empMap[emp.managerId].children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  return roots;
+};
+
+// --- Org Chart Component ---
+const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = node.children.length > 0;
+
+  return (
+    <li>
+      <div className="flex flex-col items-center relative">
+        <div className="org-node-card group bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all w-48 relative z-10 group-hover:border-emerald-400">
+           <div className="flex flex-col items-center">
+             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-100 mb-2 group-hover:border-emerald-100">
+                <img src={node.avatar} alt={node.firstName} className="w-full h-full object-cover" />
+             </div>
+             <div className="text-center w-full">
+                <h4 className="font-bold text-slate-800 text-sm truncate px-1" title={`${node.firstName} ${node.lastName}`}>
+                  {node.firstName} {node.lastName}
+                </h4>
+                <p className="text-xs text-emerald-600 font-medium truncate mb-1" title={node.jobTitle || node.role}>
+                  {node.jobTitle || node.role}
+                </p>
+                {node.department && (
+                  <span className="inline-block text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                    {node.department}
+                  </span>
+                )}
+             </div>
+           </div>
+        </div>
+        
+        {/* Toggle Button */}
+        {hasChildren && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="absolute -bottom-3 z-20 bg-white border border-slate-300 text-slate-400 hover:text-emerald-600 hover:border-emerald-400 rounded-full w-6 h-6 flex items-center justify-center shadow-sm transition-all"
+            title={expanded ? "Collapse" : "Expand"}
+          >
+            {expanded ? <Minus size={12} /> : <Plus size={12} />}
+          </button>
+        )}
+      </div>
+
+      {hasChildren && expanded && (
+        <ul className="animate-in fade-in slide-in-from-top-2 duration-300">
+          {node.children.map(child => (
+            <OrgChartNode key={child.id} node={child} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+};
 
 const Organization = () => {
   const { 
@@ -14,7 +97,7 @@ const Organization = () => {
     employees, addEmployee, updateEmployee, deleteEmployee 
   } = useAppContext();
   
-  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations'>('departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations' | 'chart'>('departments');
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
@@ -41,6 +124,9 @@ const Organization = () => {
 
   const isHR = currentUser?.role === UserRole.HR;
   const showEmployeesTab = currentUser?.role !== UserRole.EMPLOYEE;
+
+  // Memoized Tree Data
+  const orgTreeData = useMemo(() => buildOrgTree(users), [users]);
 
   // -- Handlers --
 
@@ -249,7 +335,64 @@ const Organization = () => {
 
   return (
     <div className="space-y-6 animate-fade-in relative">
-       
+       {/* CSS for Org Tree */}
+       <style>{`
+         .org-tree ul {
+            padding-top: 20px; 
+            position: relative;
+            transition: all 0.5s;
+            display: flex;
+            justify-content: center;
+         }
+         .org-tree li {
+            float: left; text-align: center;
+            list-style-type: none;
+            position: relative;
+            padding: 20px 5px 0 5px;
+            transition: all 0.5s;
+         }
+         /* We will use ::before and ::after to draw the connectors */
+         .org-tree li::before, .org-tree li::after {
+            content: '';
+            position: absolute; top: 0; right: 50%;
+            border-top: 1px solid #cbd5e1; /* slate-300 */
+            width: 50%; height: 20px;
+         }
+         .org-tree li::after {
+            right: auto; left: 50%;
+            border-left: 1px solid #cbd5e1;
+         }
+         /* Remove left-connector from first child and right-connector from last child */
+         .org-tree li:first-child::before {
+            border: 0 none;
+         }
+         .org-tree li:last-child::after {
+            border: 0 none;
+         }
+         /* Adding back the vertical line to the nodes */
+         .org-tree li:first-child::after {
+            border-radius: 5px 0 0 0;
+         }
+         .org-tree li:last-child::before {
+            border-right: 1px solid #cbd5e1;
+            border-radius: 0 5px 0 0;
+         }
+         /* Single child case */
+         .org-tree li:only-child::after, .org-tree li:only-child::before {
+            display: none;
+         }
+         .org-tree li:only-child { 
+            padding-top: 0;
+         }
+         /* Connector from parent to children */
+         .org-tree ul ul::before {
+            content: '';
+            position: absolute; top: 0; left: 50%;
+            border-left: 1px solid #cbd5e1;
+            width: 0; height: 20px;
+         }
+       `}</style>
+
        {/* Confirmation Modal for Allocation */}
        {showConfirmAlloc && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
@@ -290,6 +433,12 @@ const Organization = () => {
                Projects
              </button>
              <button 
+               onClick={() => setActiveTab('chart')}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'chart' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               Org Chart
+             </button>
+             <button 
                onClick={() => setActiveTab('allocations')}
                className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'allocations' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
@@ -315,6 +464,36 @@ const Organization = () => {
               onUpdateEmployee={updateEmployee}
               onDeleteEmployee={deleteEmployee}
             />
+         </div>
+       )}
+
+       {/* --- ORG CHART TAB --- */}
+       {activeTab === 'chart' && (
+         <div className="bg-slate-50 rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
+            <div className="p-6 border-b border-slate-200 bg-white flex justify-between items-center">
+               <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                  <Network size={20} className="text-emerald-600"/>
+                  Organizational Hierarchy
+               </h3>
+               <span className="text-xs text-gray-400">Drag to scroll</span>
+            </div>
+            
+            <div className="p-8 overflow-auto cursor-grab active:cursor-grabbing min-h-[600px] flex justify-center bg-slate-50 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
+               {orgTreeData.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center text-slate-400">
+                    <Network size={48} className="mb-2 opacity-50" />
+                    <p>No organization data available.</p>
+                 </div>
+               ) : (
+                 <div className="org-tree">
+                    <ul>
+                      {orgTreeData.map(node => (
+                        <OrgChartNode key={node.id} node={node} />
+                      ))}
+                    </ul>
+                 </div>
+               )}
+            </div>
          </div>
        )}
 
