@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole } from '../types';
 import { useAppContext } from '../contexts/AppContext';
+import DraggableModal from './DraggableModal';
 
 interface EmployeeListProps {
   employees: Employee[];
@@ -24,7 +25,7 @@ const COUNTRY_CODES = [
   { code: '+65', country: 'SG' },
 ];
 
-// Inline Map Component for Employee Modals
+// Inline Map Component for Employee Modals (unchanged)
 const LocationMap: React.FC<{ 
   location: { latitude: number; longitude: number; address: string } | undefined, 
   onChange?: (loc: { latitude: number; longitude: number; address: string }) => void, 
@@ -79,7 +80,6 @@ const LocationMap: React.FC<{
           const layer = new GraphicsLayer();
           map.add(layer);
 
-          // Default center or user location
           const center = location && location.longitude ? [location.longitude, location.latitude] : [-118.2437, 34.0522];
           const zoom = location && location.longitude ? 13 : 3;
 
@@ -91,7 +91,7 @@ const LocationMap: React.FC<{
              };
              const markerSymbol = {
                 type: "simple-marker",
-                color: [5, 150, 105], // Emerald
+                color: [5, 150, 105],
                 size: "14px",
                 outline: { color: [255, 255, 255], width: 2 }
              };
@@ -103,44 +103,26 @@ const LocationMap: React.FC<{
             map: map,
             center: center,
             zoom: zoom,
-            ui: { components: ["zoom"] } // Minimal UI
+            ui: { components: ["zoom"] }
           });
 
-          // Add Basemap Gallery inside Expand widget
-          const basemapGallery = new BasemapGallery({
-            view: view
-          });
-          const bgExpand = new Expand({
-            view: view,
-            content: basemapGallery,
-            expandIconClass: "esri-icon-basemap"
-          });
+          const basemapGallery = new BasemapGallery({ view: view });
+          const bgExpand = new Expand({ view: view, content: basemapGallery, expandIconClass: "esri-icon-basemap" });
           view.ui.add(bgExpand, "top-right");
 
           if (!readOnly && onChange) {
              view.on("click", (event: any) => {
                 const lat = event.mapPoint.latitude;
                 const lng = event.mapPoint.longitude;
-                
                 layer.removeAll();
                 const point = { type: "point", longitude: lng, latitude: lat };
-                const markerSymbol = {
-                   type: "simple-marker",
-                   color: [220, 38, 38], // Red for new selection
-                   size: "14px",
-                   outline: { color: [255, 255, 255], width: 2 }
-                };
+                const markerSymbol = { type: "simple-marker", color: [220, 38, 38], size: "14px", outline: { color: [255, 255, 255], width: 2 } };
                 layer.add(new Graphic({ geometry: point, symbol: markerSymbol }));
 
-                // Reverse Geocode
                 const serviceUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
                 locator.locationToAddress(serviceUrl, { location: event.mapPoint })
-                  .then((res: any) => {
-                      onChange({ latitude: lat, longitude: lng, address: res.address || "Pinned Location" });
-                  })
-                  .catch(() => {
-                      onChange({ latitude: lat, longitude: lng, address: "Pinned Location" });
-                  });
+                  .then((res: any) => { onChange({ latitude: lat, longitude: lng, address: res.address || "Pinned Location" }); })
+                  .catch(() => { onChange({ latitude: lat, longitude: lng, address: "Pinned Location" }); });
              });
           }
 
@@ -151,7 +133,7 @@ const LocationMap: React.FC<{
 
     initMap();
     return () => { cleanup = true; if (view) { view.destroy(); view = null; } };
-  }, [location?.latitude, location?.longitude, readOnly]); // Dependency mostly on mount or mode change
+  }, [location?.latitude, location?.longitude, readOnly]);
 
   return (
     <div className="relative w-full h-full bg-slate-100 rounded-lg overflow-hidden">
@@ -175,9 +157,13 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   
+  // Modal States
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // Delete popup state
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
   const [generatedCreds, setGeneratedCreds] = useState<{email: string, password: string} | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -194,32 +180,16 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   // Form State
   const [formData, setFormData] = useState<Partial<Employee>>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    role: '',
-    department: DepartmentType.IT,
-    status: EmployeeStatus.ACTIVE,
-    salary: 0,
-    phone: '',
-    location: { latitude: 0, longitude: 0, address: '' }
+    firstName: '', lastName: '', email: '', role: '', department: DepartmentType.IT,
+    status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: { latitude: 0, longitude: 0, address: '' }
   });
 
-  // Helper for Phone Input
   const getPhoneParts = (fullPhone: string | undefined) => {
-    if (!fullPhone) return { code: '+91', number: '' }; // Default
-    
-    // Sort codes by length desc to match longest prefix first
+    if (!fullPhone) return { code: '+91', number: '' };
     const sortedCodes = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
     const matched = sortedCodes.find(c => fullPhone.startsWith(c.code));
-    
-    if (matched) {
-      return { 
-        code: matched.code, 
-        number: fullPhone.slice(matched.code.length).trim() 
-      };
-    }
-    return { code: '+91', number: fullPhone }; // Fallback
+    if (matched) return { code: matched.code, number: fullPhone.slice(matched.code.length).trim() };
+    return { code: '+91', number: fullPhone };
   };
 
   const handlePhoneChange = (code: string, number: string) => {
@@ -232,31 +202,20 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.role.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesDept = filterDept === 'All' || emp.department === filterDept;
     const matchesStatus = filterStatus === 'All' || emp.status === filterStatus;
-
     return matchesSearch && matchesDept && matchesStatus;
   });
 
-  // Reset pagination when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterDept, filterStatus, itemsPerPage]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterDept, filterStatus, itemsPerPage]);
 
-  // Pagination Logic
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-  const paginatedEmployees = filteredEmployees.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const generatePassword = () => {
       const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
       let password = "";
-      for (let i = 0; i < 10; i++) {
-          password += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      for (let i = 0; i < 10; i++) password += chars.charAt(Math.floor(Math.random() * chars.length));
       return password;
   };
 
@@ -275,7 +234,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         password: newPassword, 
         ...formData
       } as Employee;
-      
       onAddEmployee(newEmployee);
       setGeneratedCreds({ email: newEmployee.email, password: newPassword });
       setShowModal(false);
@@ -296,15 +254,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const openAddModal = () => {
     setEditingEmployee(null);
     setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      role: '',
-      department: DepartmentType.IT,
-      status: EmployeeStatus.ACTIVE,
-      salary: 0,
-      phone: '',
-      location: undefined
+      firstName: '', lastName: '', email: '', role: '', department: DepartmentType.IT,
+      status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: undefined
     });
     setShowModal(true);
   };
@@ -318,6 +269,19 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const openViewModal = (emp: Employee) => {
     setViewingEmployee(emp);
     setShowViewModal(true);
+  };
+
+  const openDeleteConfirm = (id: string) => {
+    setDeleteTargetId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTargetId) {
+      onDeleteEmployee(deleteTargetId);
+      setShowDeleteConfirm(false);
+      setDeleteTargetId(null);
+    }
   };
 
   const closeModal = () => {
@@ -355,7 +319,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Filters ... (Keep existing layout) */}
+        {/* Filters ... */}
         <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-slate-500 mr-2">
@@ -456,7 +420,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                           <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 p-1">
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={() => onDeleteEmployee(emp.id)} className="text-slate-400 hover:text-red-600 p-1">
+                          <button onClick={() => openDeleteConfirm(emp.id)} className="text-slate-400 hover:text-red-600 p-1">
                             <Trash2 size={16} />
                           </button>
                         </>
@@ -475,6 +439,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
         <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50/50">
            <div className="flex items-center gap-2 text-xs text-slate-500">
              <span>Show</span>
@@ -503,192 +468,222 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </div>
 
       {/* VIEW DETAILS MODAL */}
-      {showViewModal && viewingEmployee && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in duration-200">
-              <div className="relative h-24 bg-gradient-to-r from-teal-600 to-emerald-600">
-                 <button onClick={() => setShowViewModal(false)} className="absolute top-4 right-4 text-white/80 hover:text-white"><span className="text-2xl">&times;</span></button>
-              </div>
-              <div className="px-8 pb-8">
-                 <div className="relative -top-10 mb-[-20px] flex items-end justify-between">
-                    <img src={viewingEmployee.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-white object-cover" />
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 ${viewingEmployee.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>{viewingEmployee.status}</span>
-                 </div>
-                 
-                 <div className="mt-4">
-                    <h3 className="text-2xl font-bold text-slate-800">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
-                    <p className="text-slate-500 font-medium">{viewingEmployee.role} • {viewingEmployee.department}</p>
-                 </div>
-
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                    <div className="space-y-4">
-                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Contact Info</h4>
-                       <div className="flex items-center gap-3 text-sm text-slate-700"><Mail size={16} className="text-slate-400"/> {viewingEmployee.email}</div>
-                       <div className="flex items-center gap-3 text-sm text-slate-700"><Phone size={16} className="text-slate-400"/> {viewingEmployee.phone || 'N/A'}</div>
-                       <div className="flex items-center gap-3 text-sm text-slate-700"><Building2 size={16} className="text-slate-400"/> HQ Office</div>
-                    </div>
-                    <div className="space-y-4">
-                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Location</h4>
-                       <div className="h-40 rounded-lg overflow-hidden border border-slate-200 relative">
-                          <LocationMap location={viewingEmployee.location} readOnly={true} />
-                       </div>
-                       <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0"/> {viewingEmployee.location?.address || 'No address set'}</p>
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
+      <DraggableModal 
+        isOpen={showViewModal} 
+        onClose={() => setShowViewModal(false)} 
+        title="Employee Details" 
+        width="max-w-2xl"
+      >
+        {viewingEmployee && (
+          <div className="px-2 pb-4">
+             <div className="relative flex items-center gap-4 mb-6">
+                <img src={viewingEmployee.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-slate-100 shadow-sm object-cover" />
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+                  <p className="text-slate-500 font-medium">{viewingEmployee.role} • {viewingEmployee.department}</p>
+                  <span className={`mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${viewingEmployee.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>{viewingEmployee.status}</span>
+                </div>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="space-y-4">
+                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Contact Info</h4>
+                   <div className="flex items-center gap-3 text-sm text-slate-700"><Mail size={16} className="text-slate-400"/> {viewingEmployee.email}</div>
+                   <div className="flex items-center gap-3 text-sm text-slate-700"><Phone size={16} className="text-slate-400"/> {viewingEmployee.phone || 'N/A'}</div>
+                   <div className="flex items-center gap-3 text-sm text-slate-700"><Building2 size={16} className="text-slate-400"/> HQ Office</div>
+                </div>
+                <div className="space-y-4">
+                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Location</h4>
+                   <div className="h-40 rounded-lg overflow-hidden border border-slate-200 relative">
+                      <LocationMap location={viewingEmployee.location} readOnly={true} />
+                   </div>
+                   <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0"/> {viewingEmployee.location?.address || 'No address set'}</p>
+                </div>
+             </div>
+          </div>
+        )}
+      </DraggableModal>
 
       {/* CREATE/EDIT MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-800">{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</h3>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600"><span className="text-2xl">&times;</span></button>
+      <DraggableModal 
+        isOpen={showModal} 
+        onClose={closeModal} 
+        title={editingEmployee ? 'Edit Employee' : 'Add New Employee'} 
+        width="max-w-2xl"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+              <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
-                  <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
-                  <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-                  <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
-                </div>
-                {!editingEmployee && <p className="text-xs text-slate-500 mt-1">A secure password will be generated automatically.</p>}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Role/Title</label>
-                  {isSuperAdmin ? (
-                       <select 
-                          value={formData.role} 
-                          onChange={(e) => setFormData({...formData, role: e.target.value})} 
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
-                       >
-                         {roles.length > 0 ? (
-                            roles.map(r => (
-                                <option key={r.id} value={r.name}>{r.name}</option>
-                            ))
-                         ) : (
-                            // Fallback options if no roles are defined
-                            <>
-                                <option value="Employee">Employee</option>
-                                <option value="Team Manager">Team Manager</option>
-                                <option value="HR Manager">HR Manager</option>
-                                <option value="Software Engineer">Software Engineer</option>
-                            </>
-                         )}
-                       </select>
-                  ) : (
-                      <input required type="text" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. Software Engineer" />
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
-                  <select value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
-                    {Object.values(DepartmentType).map(dept => (<option key={dept} value={dept}>{dept}</option>))}
-                  </select>
-                </div>
-              </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                   <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                   <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as EmployeeStatus})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
-                    {Object.values(EmployeeStatus).map(status => (<option key={status} value={status}>{status}</option>))}
-                  </select>
-                </div>
-                <div>
-                   <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                   <div className="flex">
-                       <select 
-                          className="px-2 py-2 border border-r-0 border-slate-300 rounded-l-lg bg-slate-50 text-sm focus:ring-2 focus:ring-teal-500 outline-none min-w-[80px]"
-                          value={getPhoneParts(formData.phone).code}
-                          onChange={(e) => handlePhoneChange(e.target.value, getPhoneParts(formData.phone).number)}
-                       >
-                          {COUNTRY_CODES.map(c => (
-                              <option key={c.code} value={c.code}>{c.code} {c.country}</option>
-                          ))}
-                       </select>
-                       <input 
-                          type="text" 
-                          value={getPhoneParts(formData.phone).number} 
-                          onChange={(e) => handlePhoneChange(getPhoneParts(formData.phone).code, e.target.value)} 
-                          className="w-full px-3 py-2 border border-slate-300 rounded-r-lg focus:ring-2 focus:ring-teal-500 outline-none" 
-                          placeholder="98765 43210" 
-                       />
-                   </div>
-                </div>
-               </div>
-
-               {/* Map for HR Location Editing */}
-               <div className="pt-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Work Location (Click map to update)</label>
-                  <div className="h-48 w-full border border-slate-300 rounded-lg overflow-hidden relative">
-                     <LocationMap 
-                       location={formData.location} 
-                       readOnly={!isHR} 
-                       onChange={(loc) => setFormData({...formData, location: loc})}
-                     />
-                  </div>
-                  <div className="mt-1 flex justify-between items-center text-xs text-slate-500">
-                     <span>{formData.location?.address || 'No location set'}</span>
-                     {isHR && <span className="text-emerald-600 font-medium">Editable by HR</span>}
-                  </div>
-               </div>
-
-              <div className="pt-4 flex justify-end space-x-3">
-                <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors">{editingEmployee ? 'Save Changes' : 'Create Employee'}</button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
+              <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Generated Credentials Modal (Keep as is) */}
-      {showSuccessModal && generatedCreds && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in fade-in zoom-in duration-300 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400 to-teal-700"></div>
-              <div className="flex flex-col items-center text-center mb-6">
-                 <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4"><Key size={32} className="text-teal-700" /></div>
-                 <h3 className="text-2xl font-bold text-slate-800">Employee Created</h3>
-                 <p className="text-slate-500 mt-2">A unique password has been generated.</p>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+              <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" />
+            </div>
+            {!editingEmployee && <p className="text-xs text-slate-500 mt-1">A secure password will be generated automatically.</p>}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Role/Title</label>
+              {isSuperAdmin ? (
+                   <select 
+                      value={formData.role} 
+                      onChange={(e) => setFormData({...formData, role: e.target.value})} 
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+                   >
+                     {roles.length > 0 ? (
+                        roles.map(r => (
+                            <option key={r.id} value={r.name}>{r.name}</option>
+                        ))
+                     ) : (
+                        <>
+                            <option value="Employee">Employee</option>
+                            <option value="Team Manager">Team Manager</option>
+                            <option value="HR Manager">HR Manager</option>
+                            <option value="Software Engineer">Software Engineer</option>
+                        </>
+                     )}
+                   </select>
+              ) : (
+                  <input required type="text" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. Software Engineer" />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+              <select value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                {Object.values(DepartmentType).map(dept => (<option key={dept} value={dept}>{dept}</option>))}
+              </select>
+            </div>
+          </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+               <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as EmployeeStatus})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                {Object.values(EmployeeStatus).map(status => (<option key={status} value={status}>{status}</option>))}
+              </select>
+            </div>
+            <div>
+               <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+               <div className="flex">
+                   <select 
+                      className="px-2 py-2 border border-r-0 border-slate-300 rounded-l-lg bg-slate-50 text-sm focus:ring-2 focus:ring-teal-500 outline-none min-w-[80px]"
+                      value={getPhoneParts(formData.phone).code}
+                      onChange={(e) => handlePhoneChange(e.target.value, getPhoneParts(formData.phone).number)}
+                   >
+                      {COUNTRY_CODES.map(c => (
+                          <option key={c.code} value={c.code}>{c.code} {c.country}</option>
+                      ))}
+                   </select>
+                   <input 
+                      type="text" 
+                      value={getPhoneParts(formData.phone).number} 
+                      onChange={(e) => handlePhoneChange(getPhoneParts(formData.phone).code, e.target.value)} 
+                      className="w-full px-3 py-2 border border-slate-300 rounded-r-lg focus:ring-2 focus:ring-teal-500 outline-none" 
+                      placeholder="98765 43210" 
+                   />
+               </div>
+            </div>
+           </div>
+
+           <div className="pt-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">Work Location (Click map to update)</label>
+              <div className="h-48 w-full border border-slate-300 rounded-lg overflow-hidden relative">
+                 <LocationMap 
+                   location={formData.location} 
+                   readOnly={!isHR} 
+                   onChange={(loc) => setFormData({...formData, location: loc})}
+                 />
               </div>
-              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mb-6 relative">
-                 <div className="mb-4">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Username / Email</p>
-                    <p className="font-mono text-slate-800 font-medium select-all">{generatedCreds.email}</p>
-                 </div>
-                 <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">One-Time Password</p>
-                    <p className="font-mono text-xl text-slate-800 font-bold select-all tracking-wide">{generatedCreds.password}</p>
-                 </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                 <button onClick={copyToClipboard} className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all shadow-md">
-                    {copied ? <Check size={18} /> : <Copy size={18} />}
-                    <span>{copied ? 'Copied to Clipboard' : 'Copy Credentials'}</span>
-                 </button>
-                 <button onClick={() => setShowSuccessModal(false)} className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 py-3 rounded-lg font-medium transition-colors">Close</button>
+              <div className="mt-1 flex justify-between items-center text-xs text-slate-500">
+                 <span>{formData.location?.address || 'No location set'}</span>
+                 {isHR && <span className="text-emerald-600 font-medium">Editable by HR</span>}
               </div>
            </div>
+
+          <div className="pt-4 flex justify-end space-x-3">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="submit" className="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors">{editingEmployee ? 'Save Changes' : 'Create Employee'}</button>
+          </div>
+        </form>
+      </DraggableModal>
+
+      {/* Delete Confirmation Modal */}
+      <DraggableModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Confirm Deletion"
+        width="max-w-sm"
+      >
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={32} className="text-red-600" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Employee?</h3>
+          <p className="text-slate-500 mb-6">
+            Are you sure you want to delete this employee? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button 
+              onClick={() => setShowDeleteConfirm(false)}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={confirmDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium shadow-sm"
+            >
+              Delete
+            </button>
+          </div>
         </div>
-      )}
+      </DraggableModal>
+
+      {/* Generated Credentials Modal */}
+      <DraggableModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title="Employee Created"
+        width="max-w-md"
+      >
+        {generatedCreds && (
+          <div>
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400 to-teal-700 rounded-t-lg"></div>
+            <div className="flex flex-col items-center text-center mb-6">
+               <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4"><Key size={32} className="text-teal-700" /></div>
+               <p className="text-slate-500 mt-2">A unique password has been generated.</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mb-6 relative">
+               <div className="mb-4">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Username / Email</p>
+                  <p className="font-mono text-slate-800 font-medium select-all">{generatedCreds.email}</p>
+               </div>
+               <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">One-Time Password</p>
+                  <p className="font-mono text-xl text-slate-800 font-bold select-all tracking-wide">{generatedCreds.password}</p>
+               </div>
+            </div>
+            <div className="flex flex-col gap-3">
+               <button onClick={copyToClipboard} className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all shadow-md">
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                  <span>{copied ? 'Copied to Clipboard' : 'Copy Credentials'}</span>
+               </button>
+               <button onClick={() => setShowSuccessModal(false)} className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 py-3 rounded-lg font-medium transition-colors">Close</button>
+            </div>
+          </div>
+        )}
+      </DraggableModal>
     </div>
   );
 };
