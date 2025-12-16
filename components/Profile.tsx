@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, User } from '../types';
-import { Save, MapPin, User as UserIcon, Mail, Phone, Briefcase, Camera, Calendar, AlertTriangle, Lock, Building2, CheckCircle2 } from 'lucide-react';
+import { Save, MapPin, User as UserIcon, Mail, Phone, Briefcase, Camera, Calendar, AlertTriangle, Lock, Building2, CheckCircle2, ChevronDown } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -19,7 +19,7 @@ const WORK_LOCATIONS = [
 ];
 
 const Profile = () => {
-  const { currentUser, users, updateUser, departments, projects } = useAppContext();
+  const { currentUser, users, updateUser, departments, projects, roles } = useAppContext();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   
   // Form State
@@ -427,14 +427,29 @@ const Profile = () => {
                      <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Job Title</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <Briefcase size={16} className="text-gray-400 dark:text-slate-500" />
-                        <input 
-                          disabled={!canEditDetails}
-                          type="text" 
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500" 
-                          value={formData.jobTitle} 
-                          onChange={e => setFormData({...formData, jobTitle: e.target.value})}
-                          placeholder="e.g. Senior Developer"
-                        />
+                        <div className="relative w-full">
+                          <select 
+                            disabled={!canEditDetails}
+                            className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none relative z-10"
+                            value={formData.jobTitle} 
+                            onChange={e => setFormData({...formData, jobTitle: e.target.value})}
+                          >
+                             <option value="" className="bg-white dark:bg-slate-800">Select Job Title...</option>
+                             {roles.length > 0 ? (
+                                roles.map(role => (
+                                  <option key={role.id} value={role.name} className="bg-white dark:bg-slate-800">{role.name}</option>
+                                ))
+                             ) : (
+                                <>
+                                    <option className="bg-white dark:bg-slate-800" value="Employee">Employee</option>
+                                    <option className="bg-white dark:bg-slate-800" value="Team Manager">Team Manager</option>
+                                    <option className="bg-white dark:bg-slate-800" value="HR Manager">HR Manager</option>
+                                    <option className="bg-white dark:bg-slate-800" value="Software Engineer">Software Engineer</option>
+                                </>
+                             )}
+                          </select>
+                          {canEditDetails && <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 z-0" />}
+                        </div>
                      </div>
                    </div>
 
@@ -442,17 +457,20 @@ const Profile = () => {
                      <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Department</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <Building2 size={16} className="text-gray-400 dark:text-slate-500" />
-                        <select 
-                          disabled={!canEditAllocations}
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none"
-                          value={formData.departmentId}
-                          onChange={e => setFormData({...formData, departmentId: e.target.value})}
-                        >
-                           <option value="">Select Department...</option>
-                           {departments.map(dept => (
-                             <option key={dept.id} value={dept.id}>{dept.name}</option>
-                           ))}
-                        </select>
+                        <div className="relative w-full">
+                          <select 
+                            disabled={!canEditAllocations}
+                            className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none relative z-10"
+                            value={formData.departmentId}
+                            onChange={e => setFormData({...formData, departmentId: e.target.value})}
+                          >
+                            <option value="" className="bg-white dark:bg-slate-800">Select Department...</option>
+                            {departments.map(dept => (
+                              <option key={dept.id} value={dept.id} className="bg-white dark:bg-slate-800">{dept.name}</option>
+                            ))}
+                          </select>
+                          {canEditAllocations && <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 z-0" />}
+                        </div>
                      </div>
                      {!canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                    </div>
@@ -461,17 +479,20 @@ const Profile = () => {
                      <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Work Location</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <MapPin size={16} className="text-gray-400 dark:text-slate-500" />
-                        <select 
-                          disabled={!canEditAllocations}
-                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none"
-                          value={formData.workLocation}
-                          onChange={e => setFormData({...formData, workLocation: e.target.value})}
-                        >
-                           <option value="">Select Location...</option>
-                           {WORK_LOCATIONS.map(loc => (
-                             <option key={loc} value={loc}>{loc}</option>
-                           ))}
-                        </select>
+                        <div className="relative w-full">
+                          <select 
+                            disabled={!canEditAllocations}
+                            className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none relative z-10"
+                            value={formData.workLocation}
+                            onChange={e => setFormData({...formData, workLocation: e.target.value})}
+                          >
+                            <option value="" className="bg-white dark:bg-slate-800">Select Location...</option>
+                            {WORK_LOCATIONS.map(loc => (
+                              <option key={loc} value={loc} className="bg-white dark:bg-slate-800">{loc}</option>
+                            ))}
+                          </select>
+                          {canEditAllocations && <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 z-0" />}
+                        </div>
                      </div>
                      {!canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
                    </div>
