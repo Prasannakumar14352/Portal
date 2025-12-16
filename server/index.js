@@ -96,9 +96,20 @@ const initDb = async () => {
                 managerId NVARCHAR(50),
                 location NVARCHAR(MAX),
                 phone NVARCHAR(50),
-                jobTitle NVARCHAR(100)
+                jobTitle NVARCHAR(100),
+                workLocation NVARCHAR(100)
             )
         `);
+        
+        // Migration: Add workLocation if it doesn't exist in existing table
+        try {
+            await request.query(`
+                IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'employees'))
+                BEGIN
+                    ALTER TABLE employees ADD workLocation NVARCHAR(100)
+                END
+            `);
+        } catch (e) { console.log("Migration check skipped/failed", e.message); }
 
         // 2. Departments
         await request.query(`
@@ -288,12 +299,13 @@ app.post('/api/employees', async (req, res) => {
         reqSql.input('avatar', sql.NVarChar, e.avatar);
         reqSql.input('managerId', sql.NVarChar, e.managerId);
         reqSql.input('location', sql.NVarChar, JSON.stringify(e.location));
+        reqSql.input('workLocation', sql.NVarChar, e.workLocation);
         reqSql.input('phone', sql.NVarChar, e.phone);
         reqSql.input('jobTitle', sql.NVarChar, e.jobTitle);
 
         await reqSql.query(`INSERT INTO employees 
-            (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, phone, jobTitle) 
-            VALUES (@id, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @phone, @jobTitle)`);
+            (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, workLocation, phone, jobTitle) 
+            VALUES (@id, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @workLocation, @phone, @jobTitle)`);
         
         res.json(e);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -318,13 +330,14 @@ app.put('/api/employees/:id', async (req, res) => {
         reqSql.input('avatar', sql.NVarChar, e.avatar);
         reqSql.input('managerId', sql.NVarChar, e.managerId);
         reqSql.input('location', sql.NVarChar, JSON.stringify(e.location));
+        reqSql.input('workLocation', sql.NVarChar, e.workLocation);
         reqSql.input('phone', sql.NVarChar, e.phone);
         reqSql.input('jobTitle', sql.NVarChar, e.jobTitle);
 
         await reqSql.query(`UPDATE employees SET 
             firstName=@firstName, lastName=@lastName, email=@email, password=@password, role=@role, 
             department=@department, departmentId=@departmentId, projectIds=@projectIds, joinDate=@joinDate, 
-            status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, 
+            status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, workLocation=@workLocation,
             phone=@phone, jobTitle=@jobTitle WHERE id=@id`);
         
         res.json(e);

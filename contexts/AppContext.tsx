@@ -75,7 +75,7 @@ interface AppContextType {
   deleteTimeEntry: (id: string) => Promise<void>;
   
   // Attendance Actions
-  checkIn: (workLocation?: string) => Promise<void>;
+  checkIn: () => Promise<void>;
   checkOut: (reason?: string) => Promise<void>;
   getTodayAttendance: () => AttendanceRecord | undefined;
 
@@ -239,6 +239,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             departmentId: user.departmentId,
             projectIds: user.projectIds,
             location: user.location,
+            workLocation: user.workLocation,
             hireDate: user.joinDate
         });
         showToast(`Welcome back, ${user.firstName}!`, 'success');
@@ -266,6 +267,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               departmentId: existingUser.departmentId,
               projectIds: existingUser.projectIds,
               location: existingUser.location,
+              workLocation: existingUser.workLocation,
               hireDate: existingUser.joinDate
           });
           showToast(`Welcome back, ${existingUser.firstName}!`, 'success');
@@ -613,28 +615,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
-    const today = new Date().toISOString().split('T')[0];
+    
+    // Prioritize active session (no checkout) regardless of date
+    // This handles overnight shifts where current time is next day but session started previous day.
+    const activeSession = attendance.find(a => a.employeeId === currentUser.id && !a.checkOut);
+    if (activeSession) return activeSession;
+
+    // Fallback: If no active session, find completed session for "today" (local date)
+    const today = new Date().toLocaleDateString('en-CA');
     return attendance.find(a => a.employeeId === currentUser.id && a.date === today);
   };
 
-  const checkIn = async (workLocation?: string) => {
+  const checkIn = async () => {
     if (!currentUser) return;
     const now = new Date();
     const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30);
+    const assignedLocation = currentUser.workLocation || 'Office HQ India';
+    const localDate = now.toLocaleDateString('en-CA'); // Ensure consistent YYYY-MM-DD
+    
     const record: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9),
       employeeId: currentUser.id,
       employeeName: currentUser.name,
-      date: now.toISOString().split('T')[0],
+      date: localDate,
       checkIn: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       checkInTime: now.toISOString(),
       checkOut: '',
       status: isLate ? 'Late' : 'Present',
-      workLocation: workLocation || 'Office HQ India' // Default
+      workLocation: assignedLocation
     };
     await db.addAttendance(record);
     setAttendance(await db.getAttendance());
-    notify(`Checked in successfully at ${record.checkIn}`);
+    notify(`Checked in successfully at ${record.checkIn} (${assignedLocation})`);
   };
 
   const checkOut = async (reason?: string) => {

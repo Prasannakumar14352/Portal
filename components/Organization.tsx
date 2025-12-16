@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Shield } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Shield, AlertTriangle } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -120,6 +120,9 @@ const Organization = () => {
   const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [showConfirmAlloc, setShowConfirmAlloc] = useState(false);
+  
+  // Role Deletion State
+  const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
 
   // Filters
   const [projFilter, setProjFilter] = useState<'All' | 'Active' | 'Completed' | 'On Hold'>('All');
@@ -174,6 +177,13 @@ const Organization = () => {
   const openRoleView = (role: Role) => {
     setRoleForm({ id: role.id, name: role.name, description: role.description });
     setShowRoleModal(true);
+  };
+
+  const handleDeleteRoleConfirm = () => {
+    if (roleToDelete) {
+        deleteRole(roleToDelete);
+        setRoleToDelete(null);
+    }
   };
 
   const handleProjSubmit = (e: React.FormEvent) => {
@@ -372,7 +382,7 @@ const Organization = () => {
        {activeTab === 'roles' && (
          <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-gray-700 dark:text-white flex items-center gap-2"><BadgeCheck size={20} className="text-emerald-600"/><span>Job Roles</span></h3>{isHR && <button onClick={() => { setRoleForm({ name: '', description: '' }); setShowRoleModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 shadow-sm flex items-center gap-2"><Plus size={16} /> Add Role</button>}</div>
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider border-b border-slate-200 dark:border-slate-700"><tr><th className="px-6 py-4 font-medium">Role Name</th><th className="px-6 py-4 font-medium">Description</th>{isHR && <th className="px-6 py-4 font-medium text-right">Actions</th>}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{paginatedRoles.map(role => (<tr key={role.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 group"><td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{role.name}</td><td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{role.description}</td>{isHR && (<td className="px-6 py-4 text-right"><div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => openRoleView(role)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded"><Edit2 size={16} /></button><button onClick={() => { if(confirm('Delete role?')) deleteRole(role.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"><Trash2 size={16} /></button></div></td>)}</tr>))}{paginatedRoles.length === 0 && (<tr><td colSpan={isHR ? 3 : 2} className="px-6 py-10 text-center text-slate-400 italic">No roles defined.</td></tr>)}</tbody></table></div><PaginationControls total={totalRoles} /></div>
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider border-b border-slate-200 dark:border-slate-700"><tr><th className="px-6 py-4 font-medium">Role Name</th><th className="px-6 py-4 font-medium">Description</th>{isHR && <th className="px-6 py-4 font-medium text-right">Actions</th>}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{paginatedRoles.map(role => (<tr key={role.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 group"><td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{role.name}</td><td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{role.description}</td>{isHR && (<td className="px-6 py-4 text-right"><div className="flex justify-end gap-2"><button onClick={() => openRoleView(role)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded"><Edit2 size={16} /></button><button onClick={() => setRoleToDelete(role.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"><Trash2 size={16} /></button></div></td>)}</tr>))}{paginatedRoles.length === 0 && (<tr><td colSpan={isHR ? 3 : 2} className="px-6 py-10 text-center text-slate-400 italic">No roles defined.</td></tr>)}</tbody></table></div><PaginationControls total={totalRoles} /></div>
          </div>
        )}
 
@@ -683,6 +693,27 @@ const Organization = () => {
                   </div>
                </div>
        </DraggableModal>
+
+       {/* --- ROLE DELETION CONFIRMATION MODAL --- */}
+       <DraggableModal
+            isOpen={!!roleToDelete}
+            onClose={() => setRoleToDelete(null)}
+            title="Confirm Deletion"
+            width="max-w-sm"
+        >
+            <div className="text-center">
+                <div className="flex items-center justify-center space-x-3 text-red-600 mb-4">
+                    <AlertTriangle size={32} />
+                </div>
+                <p className="text-gray-600 dark:text-slate-300 mb-6">
+                    Are you sure you want to delete this role? This action cannot be undone.
+                </p>
+                <div className="flex justify-end space-x-3">
+                    <button onClick={() => setRoleToDelete(null)} className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium">Cancel</button>
+                    <button onClick={handleDeleteRoleConfirm} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg text-sm font-medium shadow-sm">Delete</button>
+                </div>
+            </div>
+        </DraggableModal>
     </div>
   );
 };

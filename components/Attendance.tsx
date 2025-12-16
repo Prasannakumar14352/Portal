@@ -1,27 +1,18 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
 interface AttendanceProps {
   records: AttendanceRecord[];
 }
 
-const LOCATIONS = [
-  'Office HQ India',
-  'WFH India',
-  'UAE Office',
-  'UAE Client Location',
-  'USA'
-];
-
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const { checkIn, checkOut, getTodayAttendance, timeEntries, addTimeEntry, projects, currentUser } = useAppContext();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchName, setSearchName] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,6 +57,25 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const elapsedMs = checkInTimeObj ? currentTime.getTime() - checkInTimeObj.getTime() : 0;
   const elapsedHours = elapsedMs / (1000 * 60 * 60);
   const isEarlyLogout = elapsedHours < 9;
+
+  // Helper to calculate total duration from record
+  const calculateDuration = (record: AttendanceRecord) => {
+    if (!record.checkInTime || !record.checkOutTime) return '--';
+    
+    const start = new Date(record.checkInTime);
+    const end = new Date(record.checkOutTime);
+    
+    // Ensure valid dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '--';
+
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs < 0) return '--'; // Should not happen ideally
+
+    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${diffHrs}h ${diffMins}m`;
+  };
 
   const handleCheckOutClick = () => {
     if (!currentUser) return;
@@ -187,19 +197,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
          <div className="flex flex-col items-center gap-3">
              {!todayRecord ? (
                 <div className="flex flex-col items-center">
-                  <div className="mb-3 w-full">
-                    <select
-                      value={selectedLocation}
-                      onChange={(e) => setSelectedLocation(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                    >
-                      {LOCATIONS.map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
-                      ))}
-                    </select>
-                  </div>
                   <button 
-                    onClick={() => checkIn(selectedLocation)}
+                    onClick={() => checkIn()}
                     className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-emerald-50 dark:bg-emerald-900/30 rounded-full border-4 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:scale-105 transition-all group cursor-pointer shadow-sm"
                   >
                      <PlayCircle size={48} className="text-emerald-600 dark:text-emerald-400 mb-2 group-hover:text-emerald-700 dark:group-hover:text-emerald-300" />
@@ -248,8 +247,16 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                </div>
                <div className="flex justify-between border-t border-slate-200 dark:border-slate-600 pt-2 mt-2">
                  <span className="text-slate-500 dark:text-slate-400">Status:</span>
-                 <span className={`font-bold ${todayRecord?.status === 'Late' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                    {todayRecord?.status || 'Pending'}
+                 <span className={`font-bold ${
+                    todayRecord?.checkOut 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : todayRecord?.status === 'Late' 
+                            ? 'text-amber-600 dark:text-amber-400' 
+                            : 'text-emerald-600 dark:text-emerald-400'
+                 }`}>
+                    {todayRecord?.checkOut 
+                        ? 'Completed' 
+                        : (todayRecord?.status || 'Pending')}
                  </span>
                </div>
             </div>
@@ -448,6 +455,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Check In</th>
                 <th className="px-6 py-4">Check Out</th>
+                <th className="px-6 py-4">Total Hours</th>
                 <th className="px-6 py-4">Work Location</th>
                 <th className="px-6 py-4">Status</th>
               </tr>
@@ -480,6 +488,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                     </div>
                     {record.notes && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 max-w-[150px] truncate" title={record.notes}>{record.notes}</p>}
                   </td>
+                  <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">
+                    {calculateDuration(record)}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-1 text-slate-500 dark:text-slate-400 text-sm">
                       <MapPin size={14} />
@@ -498,7 +509,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               ))}
               {paginatedRecords.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                     {isHR ? "No attendance records found matching your filters." : "You have no attendance records matching the criteria."}
                   </td>
                 </tr>

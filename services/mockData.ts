@@ -1,6 +1,26 @@
 
 import { Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, Role, DepartmentType, EmployeeStatus, LeaveStatus } from '../types';
 
+// Helper to generate consistent dates
+const getMockDate = () => {
+    const now = new Date();
+    // Set check-in to 9 AM
+    const checkIn = new Date(now);
+    checkIn.setHours(9, 0, 0, 0);
+    
+    // If 9 AM is in the future (e.g., currently 2 AM), assume the session started yesterday at 9 AM
+    if (checkIn > now) {
+        checkIn.setDate(checkIn.getDate() - 1);
+    }
+    
+    return {
+        dateStr: checkIn.toLocaleDateString('en-CA'), // YYYY-MM-DD local
+        checkInIso: checkIn.toISOString()
+    };
+};
+
+const { dateStr: todayStr, checkInIso } = getMockDate();
+
 // Mock Departments
 export const mockDepartments: Department[] = [
   { id: 'd1', name: 'Engineering', description: 'Software Development and DevOps', managerId: 'u3' },
@@ -62,6 +82,7 @@ export const mockEmployees: Employee[] = [
     salary: 95000,
     avatar: 'https://i.pravatar.cc/150?u=super1',
     location: { latitude: 40.7128, longitude: -74.0060, address: 'New York, NY' },
+    workLocation: 'USA',
     phone: '+1 (555) 010-1010',
     jobTitle: 'Head of HR',
     projectIds: []
@@ -81,6 +102,7 @@ export const mockEmployees: Employee[] = [
     avatar: 'https://i.pravatar.cc/150?u=u2',
     managerId: 'u3',
     location: { latitude: 37.7749, longitude: -122.4194, address: 'San Francisco, CA' },
+    workLocation: 'WFH India',
     phone: '+1 (555) 020-2020',
     jobTitle: 'Frontend Developer',
     projectIds: ['p1', 'p3']
@@ -99,6 +121,7 @@ export const mockEmployees: Employee[] = [
     salary: 110000,
     avatar: 'https://i.pravatar.cc/150?u=u3',
     location: { latitude: 34.0522, longitude: -118.2437, address: 'Los Angeles, CA' },
+    workLocation: 'Office HQ India',
     phone: '+1 (555) 030-3030',
     jobTitle: 'Engineering Manager',
     projectIds: ['p1', 'p2']
@@ -117,6 +140,7 @@ export const mockEmployees: Employee[] = [
     salary: 90000,
     avatar: 'https://i.pravatar.cc/150?u=u4',
     location: { latitude: 41.8781, longitude: -87.6298, address: 'Chicago, IL' },
+    workLocation: 'UAE Office',
     phone: '+1 (555) 040-4040',
     jobTitle: 'Sales Lead',
     projectIds: []
@@ -172,27 +196,28 @@ export const mockLeaves: LeaveRequest[] = [
 ];
 
 // Mock Attendance
-const today = new Date().toISOString().split('T')[0];
 export const mockAttendance: AttendanceRecord[] = [
   {
     id: 'a1',
     employeeId: 'u2',
     employeeName: 'Alice Johnson',
-    date: today,
+    date: todayStr,
     checkIn: '09:00 AM',
-    checkInTime: new Date(new Date().setHours(9, 0, 0)).toISOString(),
+    checkInTime: checkInIso,
     checkOut: '',
-    status: 'Present'
+    status: 'Present',
+    workLocation: 'WFH India'
   },
   {
     id: 'a2',
     employeeId: 'u3',
     employeeName: 'Bob Smith',
-    date: today,
+    date: todayStr,
     checkIn: '08:30 AM',
-    checkInTime: new Date(new Date().setHours(8, 30, 0)).toISOString(),
+    checkInTime: checkInIso, // Using same logic for simplicity, or could offset slightly
     checkOut: '05:30 PM',
-    status: 'Present'
+    status: 'Present',
+    workLocation: 'Office HQ India'
   }
 ];
 
@@ -203,7 +228,7 @@ export const mockTimeEntries: TimeEntry[] = [
     userId: 'u2',
     projectId: 'p1',
     task: 'Frontend Dev',
-    date: today,
+    date: todayStr,
     durationMinutes: 240,
     description: 'Working on React components',
     status: 'Pending',
@@ -214,7 +239,7 @@ export const mockTimeEntries: TimeEntry[] = [
     userId: 'u3',
     projectId: 'p1',
     task: 'Backend API',
-    date: today,
+    date: todayStr,
     durationMinutes: 120,
     description: 'API endpoint optimization',
     status: 'Approved',

@@ -58,6 +58,7 @@ export interface Employee {
   avatar: string;
   managerId?: string; 
   location?: { latitude: number; longitude: number; address: string };
+  workLocation?: string; // Added workLocation field
   phone?: string;
   jobTitle?: string;
 }
@@ -151,6 +152,7 @@ export interface User {
   projectIds?: string[]; 
   phone?: string;
   location?: { latitude: number; longitude: number; address: string };
+  workLocation?: string;
   hireDate?: string;
   email?: string; 
 }

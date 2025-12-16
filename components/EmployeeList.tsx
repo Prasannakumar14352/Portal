@@ -25,19 +25,32 @@ const COUNTRY_CODES = [
   { code: '+65', country: 'SG' },
 ];
 
-// Inline Map Component for Employee Modals (unchanged)
+const WORK_LOCATIONS = [
+  'Office HQ India',
+  'WFH India',
+  'UAE Office',
+  'UAE Client Location',
+  'USA'
+];
+
+// Optimized Location Map Component
 const LocationMap: React.FC<{ 
   location: { latitude: number; longitude: number; address: string } | undefined, 
   onChange?: (loc: { latitude: number; longitude: number; address: string }) => void, 
   readOnly?: boolean 
 }> = ({ location, onChange, readOnly = true }) => {
   const mapDiv = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<any>(null);
+  const graphicsLayerRef = useRef<any>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
+  // 1. Initialize Map (Run Once)
   useEffect(() => {
     if (!mapDiv.current) return;
+    
+    // Prevent re-initialization if view exists
+    if (viewRef.current) return;
 
-    let view: any = null;
     let cleanup = false;
 
     const loadArcGIS = () => {
@@ -69,21 +82,58 @@ const LocationMap: React.FC<{
           "esri/views/MapView",
           "esri/Graphic",
           "esri/layers/GraphicsLayer",
-          "esri/rest/locator",
           "esri/widgets/BasemapGallery",
           "esri/widgets/Expand"
-        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, locator: any, BasemapGallery: any, Expand: any) => {
+        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, BasemapGallery: any, Expand: any) => {
           
           if (cleanup) return;
 
           const map = new EsriMap({ basemap: "topo-vector" });
           const layer = new GraphicsLayer();
           map.add(layer);
+          graphicsLayerRef.current = layer;
 
+          // Default Center
           const center = location && location.longitude ? [location.longitude, location.latitude] : [-118.2437, 34.0522];
-          const zoom = location && location.longitude ? 13 : 3;
+          const zoom = location && location.longitude ? 12 : 3;
 
-          if (location && location.longitude) {
+          const view = new MapView({
+            container: mapDiv.current,
+            map: map,
+            center: center,
+            zoom: zoom,
+            ui: { components: ["zoom"] }
+          });
+
+          const basemapGallery = new BasemapGallery({ view: view });
+          const bgExpand = new Expand({ view: view, content: basemapGallery, expandIconClass: "esri-icon-basemap" });
+          view.ui.add(bgExpand, "top-right");
+
+          viewRef.current = view;
+
+          view.when(() => { if (!cleanup) setIsMapLoaded(true); });
+        });
+      } catch (e) { console.error("Map Error", e); }
+    };
+
+    initMap();
+    return () => { 
+        cleanup = true; 
+        if (viewRef.current) { viewRef.current.destroy(); viewRef.current = null; }
+    };
+  }, []); 
+
+  // 2. Update Graphic when location prop changes
+  useEffect(() => {
+      if (!isMapLoaded || !viewRef.current || !graphicsLayerRef.current) return;
+      
+      const layer = graphicsLayerRef.current;
+      const view = viewRef.current;
+      
+      layer.removeAll();
+
+      if (location && location.longitude && location.latitude) {
+          window.require(["esri/Graphic"], (Graphic: any) => {
              const point = {
                 type: "point",
                 longitude: location.longitude,
@@ -96,44 +146,37 @@ const LocationMap: React.FC<{
                 outline: { color: [255, 255, 255], width: 2 }
              };
              layer.add(new Graphic({ geometry: point, symbol: markerSymbol }));
-          }
-
-          view = new MapView({
-            container: mapDiv.current,
-            map: map,
-            center: center,
-            zoom: zoom,
-            ui: { components: ["zoom"] }
+             // Smoothly pan to new location
+             view.goTo({ target: point }, { duration: 600 });
           });
+      }
+  }, [location, isMapLoaded]);
 
-          const basemapGallery = new BasemapGallery({ view: view });
-          const bgExpand = new Expand({ view: view, content: basemapGallery, expandIconClass: "esri-icon-basemap" });
-          view.ui.add(bgExpand, "top-right");
+  // 3. Handle Clicks
+  useEffect(() => {
+      if (!isMapLoaded || !viewRef.current || readOnly) return;
 
-          if (!readOnly && onChange) {
-             view.on("click", (event: any) => {
-                const lat = event.mapPoint.latitude;
-                const lng = event.mapPoint.longitude;
-                layer.removeAll();
-                const point = { type: "point", longitude: lng, latitude: lat };
-                const markerSymbol = { type: "simple-marker", color: [220, 38, 38], size: "14px", outline: { color: [255, 255, 255], width: 2 } };
-                layer.add(new Graphic({ geometry: point, symbol: markerSymbol }));
+      const handleMapClick = (event: any) => {
+          if (!onChange) return;
+          
+          const lat = event.mapPoint.latitude;
+          const lng = event.mapPoint.longitude;
+          
+          window.require(["esri/rest/locator"], (locator: any) => {
+              const serviceUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+              locator.locationToAddress(serviceUrl, { location: event.mapPoint })
+                .then((res: any) => { 
+                    onChange({ latitude: lat, longitude: lng, address: res.address || "Pinned Location" }); 
+                })
+                .catch(() => { 
+                    onChange({ latitude: lat, longitude: lng, address: "Pinned Location" }); 
+                });
+          });
+      };
 
-                const serviceUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
-                locator.locationToAddress(serviceUrl, { location: event.mapPoint })
-                  .then((res: any) => { onChange({ latitude: lat, longitude: lng, address: res.address || "Pinned Location" }); })
-                  .catch(() => { onChange({ latitude: lat, longitude: lng, address: "Pinned Location" }); });
-             });
-          }
-
-          view.when(() => { if (!cleanup) setIsMapLoaded(true); });
-        });
-      } catch (e) { console.error("Map Error", e); }
-    };
-
-    initMap();
-    return () => { cleanup = true; if (view) { view.destroy(); view = null; } };
-  }, [location?.latitude, location?.longitude, readOnly]);
+      const handle = viewRef.current.on("click", handleMapClick);
+      return () => handle.remove();
+  }, [isMapLoaded, readOnly, onChange]);
 
   return (
     <div className="relative w-full h-full bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden">
@@ -148,7 +191,7 @@ const LocationMap: React.FC<{
 };
 
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
-  const { currentUser, showToast, roles } = useAppContext();
+  const { currentUser, showToast, roles, departments } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -180,8 +223,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   // Form State
   const [formData, setFormData] = useState<Partial<Employee>>({
-    firstName: '', lastName: '', email: '', role: '', department: DepartmentType.IT,
-    status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: { latitude: 0, longitude: 0, address: '' }
+    firstName: '', lastName: '', email: '', role: '', department: '',
+    status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: { latitude: 0, longitude: 0, address: '' }, workLocation: ''
   });
 
   const getPhoneParts = (fullPhone: string | undefined) => {
@@ -254,8 +297,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const openAddModal = () => {
     setEditingEmployee(null);
     setFormData({
-      firstName: '', lastName: '', email: '', role: '', department: DepartmentType.IT,
-      status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: undefined
+      firstName: '', lastName: '', email: '', 
+      role: roles.length > 0 ? roles[0].name : '', 
+      department: departments.length > 0 ? departments[0].name : '',
+      status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: undefined,
+      workLocation: WORK_LOCATIONS[0]
     });
     setShowModal(true);
   };
@@ -319,35 +365,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        {/* Filters ... */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mr-2">
-                  <Filter size={16} />
-                  <span className="text-sm font-medium">Filters:</span>
-              </div>
-              <select 
-                value={filterDept}
-                onChange={(e) => setFilterDept(e.target.value)}
-                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
-              >
-                <option className="bg-white dark:bg-slate-800" value="All">All Departments</option>
-                {Object.values(DepartmentType).map(dept => (
-                  <option className="bg-white dark:bg-slate-800" key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-              <select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
-              >
-                <option className="bg-white dark:bg-slate-800" value="All">All Status</option>
-                {Object.values(EmployeeStatus).map(status => (
-                  <option className="bg-white dark:bg-slate-800" key={status} value={status}>{status}</option>
-                ))}
-              </select>
-          </div>
+        {/* Filters and Search - Unified Row */}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            
+            {/* Search - Left Aligned */}
             <div className="relative w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -358,9 +380,41 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-sm bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-slate-900 placeholder-slate-400"
               />
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap self-end md:self-auto">
-               Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{filteredEmployees.length}</span> employees
+
+            {/* Filters - Right Aligned */}
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                    <Filter size={16} />
+                    <span className="text-sm font-medium hidden sm:inline">Filters:</span>
+                </div>
+                <select 
+                  value={filterDept}
+                  onChange={(e) => setFilterDept(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+                >
+                  <option className="bg-white dark:bg-slate-800" value="All">All Departments</option>
+                  {departments.length > 0 ? (
+                      departments.map(dept => (
+                        <option className="bg-white dark:bg-slate-800" key={dept.id} value={dept.name}>{dept.name}</option>
+                      ))
+                  ) : (
+                      Object.values(DepartmentType).map(dept => (
+                        <option className="bg-white dark:bg-slate-800" key={dept} value={dept}>{dept}</option>
+                      ))
+                  )}
+                </select>
+                <select 
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+                >
+                  <option className="bg-white dark:bg-slate-800" value="All">All Status</option>
+                  {Object.values(EmployeeStatus).map(status => (
+                    <option className="bg-white dark:bg-slate-800" key={status} value={status}>{status}</option>
+                  ))}
+                </select>
             </div>
+
           </div>
         </div>
 
@@ -448,10 +502,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                onChange={(e) => setItemsPerPage(Number(e.target.value))}
                className="border border-slate-300 dark:border-slate-600 rounded p-1 outline-none bg-white dark:bg-slate-800 focus:ring-2 focus:ring-teal-500"
              >
-                <option className="bg-white dark:bg-slate-800" value={5}>5</option>
-                <option className="bg-white dark:bg-slate-800" value={10}>10</option>
-                <option className="bg-white dark:bg-slate-800" value={20}>20</option>
-                <option className="bg-white dark:bg-slate-800" value={50}>50</option>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
              </select>
              <span>per page</span>
              <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
@@ -490,10 +544,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2">Contact Info</h4>
                    <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Mail size={16} className="text-slate-400"/> {viewingEmployee.email}</div>
                    <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Phone size={16} className="text-slate-400"/> {viewingEmployee.phone || 'N/A'}</div>
-                   <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Building2 size={16} className="text-slate-400"/> HQ Office</div>
+                   <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300"><Building2 size={16} className="text-slate-400"/> {viewingEmployee.workLocation || 'Office HQ India'}</div>
                 </div>
                 <div className="space-y-4">
-                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2">Location</h4>
+                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 pb-2">Home Location</h4>
                    <div className="h-40 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 relative">
                       <LocationMap location={viewingEmployee.location} readOnly={true} />
                    </div>
@@ -535,33 +589,52 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role/Title</label>
-              {isSuperAdmin ? (
-                   <select 
-                      value={formData.role} 
-                      onChange={(e) => setFormData({...formData, role: e.target.value})} 
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                   >
-                     {roles.length > 0 ? (
-                        roles.map(r => (
-                            <option className="bg-white dark:bg-slate-800" key={r.id} value={r.name}>{r.name}</option>
-                        ))
-                     ) : (
-                        <>
-                            <option className="bg-white dark:bg-slate-800" value="Employee">Employee</option>
-                            <option className="bg-white dark:bg-slate-800" value="Team Manager">Team Manager</option>
-                            <option className="bg-white dark:bg-slate-800" value="HR Manager">HR Manager</option>
-                            <option className="bg-white dark:bg-slate-800" value="Software Engineer">Software Engineer</option>
-                        </>
-                     )}
-                   </select>
-              ) : (
-                  <input required type="text" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" placeholder="e.g. Software Engineer" />
-              )}
+              <select 
+                  required
+                  value={formData.role} 
+                  onChange={(e) => setFormData({...formData, role: e.target.value})} 
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+              >
+                 <option value="" disabled>Select Role</option>
+                 {roles.length > 0 ? (
+                    roles.map(r => (
+                        <option className="bg-white dark:bg-slate-800" key={r.id} value={r.name}>{r.name}</option>
+                    ))
+                 ) : (
+                    <>
+                        <option className="bg-white dark:bg-slate-800" value="Employee">Employee</option>
+                        <option className="bg-white dark:bg-slate-800" value="Team Manager">Team Manager</option>
+                        <option className="bg-white dark:bg-slate-800" value="HR Manager">HR Manager</option>
+                        <option className="bg-white dark:bg-slate-800" value="Software Engineer">Software Engineer</option>
+                    </>
+                 )}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
-              <select value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
-                {Object.values(DepartmentType).map(dept => (<option className="bg-white dark:bg-slate-800" key={dept} value={dept}>{dept}</option>))}
+              <select 
+                required
+                value={formData.department} 
+                onChange={(e) => {
+                    const selectedDept = departments.find(d => d.name === e.target.value);
+                    setFormData({
+                        ...formData, 
+                        department: e.target.value,
+                        departmentId: selectedDept?.id || ''
+                    })
+                }} 
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+              >
+                <option value="" disabled>Select Department</option>
+                {departments.length > 0 ? (
+                    departments.map(dept => (
+                        <option className="bg-white dark:bg-slate-800" key={dept.id} value={dept.name}>{dept.name}</option>
+                    ))
+                ) : (
+                    Object.values(DepartmentType).map(dept => (
+                        <option className="bg-white dark:bg-slate-800" key={dept} value={dept}>{dept}</option>
+                    ))
+                )}
               </select>
             </div>
           </div>
@@ -597,18 +670,48 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
            </div>
 
            <div className="pt-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Work Location (Click map to update)</label>
-              <div className="h-48 w-full border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden relative">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Work Location</label>
+              <select 
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white mb-4"
+                  value={formData.workLocation || ''}
+                  onChange={(e) => setFormData({...formData, workLocation: e.target.value})}
+              >
+                  <option value="" disabled>Select Work Location</option>
+                  {WORK_LOCATIONS.map(loc => (
+                      <option className="bg-white dark:bg-slate-800" key={loc} value={loc}>{loc}</option>
+                  ))}
+              </select>
+
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Home Location (Click map to update)</label>
+              <div className="h-48 w-full border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden relative mb-2">
                  <LocationMap 
                    location={formData.location} 
                    readOnly={!isHR} 
                    onChange={(loc) => setFormData({...formData, location: loc})}
                  />
               </div>
-              <div className="mt-1 flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
-                 <span>{formData.location?.address || 'No location set'}</span>
-                 {isHR && <span className="text-emerald-600 dark:text-emerald-400 font-medium">Editable by HR</span>}
+              <div className="flex items-center gap-2">
+                 <MapPin size={16} className="text-slate-400 shrink-0" />
+                 {isHR ? (
+                    <input 
+                      type="text" 
+                      className="flex-1 text-xs border-b border-slate-300 dark:border-slate-600 bg-transparent py-1 outline-none focus:border-emerald-500 dark:text-slate-300 dark:focus:border-emerald-400 placeholder-slate-400"
+                      value={formData.location?.address || ''}
+                      placeholder="No home location set (Click map or type address)"
+                      onChange={(e) => setFormData({
+                          ...formData, 
+                          location: { 
+                              latitude: formData.location?.latitude || 0, 
+                              longitude: formData.location?.longitude || 0, 
+                              address: e.target.value 
+                          }
+                      })}
+                    />
+                 ) : (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{formData.location?.address || 'No home location set'}</span>
+                 )}
               </div>
+              {isHR && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 pl-6">Click map to pin employee's home address.</p>}
            </div>
 
           <div className="pt-4 flex justify-end space-x-3">
