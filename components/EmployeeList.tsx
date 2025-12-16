@@ -11,6 +11,19 @@ interface EmployeeListProps {
   onDeleteEmployee: (id: string) => void;
 }
 
+const COUNTRY_CODES = [
+  { code: '+91', country: 'IN' },
+  { code: '+1', country: 'US' },
+  { code: '+44', country: 'UK' },
+  { code: '+971', country: 'UAE' },
+  { code: '+61', country: 'AU' },
+  { code: '+49', country: 'DE' },
+  { code: '+33', country: 'FR' },
+  { code: '+81', country: 'JP' },
+  { code: '+86', country: 'CN' },
+  { code: '+65', country: 'SG' },
+];
+
 // Inline Map Component for Employee Modals
 const LocationMap: React.FC<{ 
   location: { latitude: number; longitude: number; address: string } | undefined, 
@@ -168,7 +181,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const [generatedCreds, setGeneratedCreds] = useState<{email: string, password: string} | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Super Admin Password Visibility
+  // Super Admin / HR Password Visibility
   const [showPasswords, setShowPasswords] = useState(false);
 
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -176,6 +189,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   const isHR = currentUser?.role === UserRole.HR;
   const isSuperAdmin = currentUser?.id === 'super1' || currentUser?.email === 'superadmin@empower.com';
+  
+  const canViewPasswords = isSuperAdmin || isHR;
 
   // Form State
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -189,6 +204,27 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
     phone: '',
     location: { latitude: 0, longitude: 0, address: '' }
   });
+
+  // Helper for Phone Input
+  const getPhoneParts = (fullPhone: string | undefined) => {
+    if (!fullPhone) return { code: '+91', number: '' }; // Default
+    
+    // Sort codes by length desc to match longest prefix first
+    const sortedCodes = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+    const matched = sortedCodes.find(c => fullPhone.startsWith(c.code));
+    
+    if (matched) {
+      return { 
+        code: matched.code, 
+        number: fullPhone.slice(matched.code.length).trim() 
+      };
+    }
+    return { code: '+91', number: fullPhone }; // Fallback
+  };
+
+  const handlePhoneChange = (code: string, number: string) => {
+      setFormData(prev => ({ ...prev, phone: `${code} ${number}`.trim() }));
+  };
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = 
@@ -297,7 +333,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           <p className="text-slate-500">Manage your team members and their account details.</p>
         </div>
         <div className="flex gap-2">
-            {isSuperAdmin && (
+            {canViewPasswords && (
                 <button 
                   onClick={() => setShowPasswords(!showPasswords)}
                   className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
@@ -370,7 +406,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider font-semibold">
                 <th className="px-6 py-4">Employee</th>
                 <th className="px-6 py-4">Role & Dept</th>
-                {isSuperAdmin && showPasswords && <th className="px-6 py-4 text-red-600">Password</th>}
+                {canViewPasswords && showPasswords && <th className="px-6 py-4 text-red-600">Password</th>}
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Join Date</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -392,7 +428,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                     <div className="text-sm text-slate-900 font-medium">{emp.role}</div>
                     <div className="text-xs text-slate-500">{emp.department}</div>
                   </td>
-                  {isSuperAdmin && showPasswords && (
+                  {canViewPasswords && showPasswords && (
                       <td className="px-6 py-4 text-sm font-mono text-red-600 bg-red-50/50">
                           {emp.password}
                       </td>
@@ -431,7 +467,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               ))}
               {paginatedEmployees.length === 0 && (
                 <tr>
-                  <td colSpan={isHR ? (isSuperAdmin && showPasswords ? 6 : 5) : 4} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={isHR ? (canViewPasswords && showPasswords ? 6 : 5) : 4} className="px-6 py-8 text-center text-slate-500">
                     No employees found matching your filters.
                   </td>
                 </tr>
@@ -566,7 +602,24 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                   <input type="text" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="+1..." />
+                   <div className="flex">
+                       <select 
+                          className="px-2 py-2 border border-r-0 border-slate-300 rounded-l-lg bg-slate-50 text-sm focus:ring-2 focus:ring-teal-500 outline-none min-w-[80px]"
+                          value={getPhoneParts(formData.phone).code}
+                          onChange={(e) => handlePhoneChange(e.target.value, getPhoneParts(formData.phone).number)}
+                       >
+                          {COUNTRY_CODES.map(c => (
+                              <option key={c.code} value={c.code}>{c.code} {c.country}</option>
+                          ))}
+                       </select>
+                       <input 
+                          type="text" 
+                          value={getPhoneParts(formData.phone).number} 
+                          onChange={(e) => handlePhoneChange(getPhoneParts(formData.phone).code, e.target.value)} 
+                          className="w-full px-3 py-2 border border-slate-300 rounded-r-lg focus:ring-2 focus:ring-teal-500 outline-none" 
+                          placeholder="98765 43210" 
+                       />
+                   </div>
                 </div>
                </div>
 

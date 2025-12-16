@@ -1,12 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Calendar, Trash2, Plus, Edit2 } from 'lucide-react';
+import { Calendar, Trash2, Plus, Edit2, UploadCloud, FileSpreadsheet, Info, Sun, Moon } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
+import { read, utils } from 'xlsx';
 
 const getDateParts = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
+    // Attempt to handle different date formats gracefully
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+         return { day: '?', month: '???', full: 'Invalid Date', dayName: '' };
+    }
     
     return {
         day: date.getDate(),
@@ -17,8 +21,7 @@ const getDateParts = (dateStr: string) => {
 };
 
 const isUpcoming = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const hDate = new Date(year, month - 1, day);
+    const hDate = new Date(dateStr);
     const today = new Date();
     today.setHours(0,0,0,0);
     return hDate >= today;
@@ -72,9 +75,10 @@ const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean, isHR: boolean
 };
 
 const Holidays = () => {
-  const { holidays, addHoliday, deleteHoliday, currentUser } = useAppContext();
+  const { holidays, addHoliday, addHolidays, deleteHoliday, currentUser, showToast } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '', type: 'Public' as 'Public' | 'Company' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isHR = currentUser?.role === UserRole.HR;
   const currentYear = new Date().getFullYear();
@@ -86,17 +90,106 @@ const Holidays = () => {
       setNewHoliday({ name: '', date: '', type: 'Public' });
   };
 
+  // Excel Import Handler
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files || !e.target.files[0]) return;
+      
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = async (evt) => {
+          try {
+              const bstr = evt.target?.result;
+              const wb = read(bstr, { type: 'binary' });
+              const wsname = wb.SheetNames[0];
+              const ws = wb.Sheets[wsname];
+              const data = utils.sheet_to_json(ws); // returns array of objects
+              
+              const validHolidays: Omit<Holiday, 'id'>[] = [];
+              let skippedCount = 0;
+
+              for (const row of (data as any[])) {
+                  // Mapped to columns: HolidayName, HolidayDate, Type
+                  // Also supports legacy Name/Date for backward compatibility
+                  const holidayName = row.HolidayName || row.Name;
+                  const holidayDateRaw = row.HolidayDate || row.Date;
+                  const holidayType = row.Type;
+
+                  if (holidayName && holidayDateRaw) {
+                      let dateStr = holidayDateRaw;
+                      
+                      // Handle Excel Serial Date (e.g. 45678)
+                      if (typeof holidayDateRaw === 'number') {
+                          const excelDate = new Date(Math.round((holidayDateRaw - 25569) * 86400 * 1000));
+                          dateStr = excelDate.toISOString().split('T')[0];
+                      }
+
+                      const d = new Date(dateStr);
+                      if (!isNaN(d.getTime())) {
+                          const formattedDate = d.toISOString().split('T')[0]; // Store as YYYY-MM-DD
+                          
+                          // Avoid duplicates within current state
+                          const exists = holidays.some(h => h.date === formattedDate && h.name === holidayName);
+                          // Also check against potentially newly added holidays in this batch to avoid dupes in the file itself
+                          const duplicateInBatch = validHolidays.some(h => h.date === formattedDate && h.name === holidayName);
+
+                          if (!exists && !duplicateInBatch) {
+                              validHolidays.push({
+                                  name: holidayName,
+                                  date: formattedDate,
+                                  type: (holidayType && String(holidayType).toLowerCase().includes('company')) ? 'Company' : 'Public'
+                              });
+                          } else {
+                              skippedCount++;
+                          }
+                      }
+                  }
+              }
+              
+              if (validHolidays.length > 0) {
+                  await addHolidays(validHolidays); // This triggers a single toast
+              } 
+              
+              if (skippedCount > 0 && validHolidays.length === 0) {
+                  showToast(`No new holidays imported. ${skippedCount} duplicates found.`, "info");
+              } else if (skippedCount > 0) {
+                  // Optional: Show warning about duplicates if some were imported
+                  // showToast(`${skippedCount} duplicates were skipped.`, "warning"); 
+              } else if (validHolidays.length === 0 && skippedCount === 0) {
+                  showToast("No valid holiday data found in file. Check columns.", "warning");
+              }
+
+          } catch (error) {
+              console.error(error);
+              showToast("Failed to parse Excel file.", "error");
+          }
+      };
+      
+      reader.readAsBinaryString(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // Sort holidays by date
   const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  // Categorize by Day
+  const weekendHolidaysList = sortedHolidays.filter(h => {
+      const day = new Date(h.date).getDay();
+      return day === 0 || day === 6; // 0=Sun, 6=Sat
+  });
+
+  const weekdayHolidaysList = sortedHolidays.filter(h => {
+      const day = new Date(h.date).getDay();
+      return day >= 1 && day <= 5; // Mon-Fri
+  });
   
   // Stats Logic
   const today = new Date();
   today.setHours(0,0,0,0);
   
   const upcomingHolidays = sortedHolidays.filter(h => {
-      // Parse date in local time to avoid timezone issues with simple yyyy-mm-dd strings
-      const [year, month, day] = h.date.split('-').map(Number);
-      const hDate = new Date(year, month - 1, day);
+      // Parse date in local time
+      const hDate = new Date(h.date);
       return hDate >= today;
   });
   
@@ -106,10 +199,31 @@ const Holidays = () => {
       total: holidays.length,
       upcoming: upcomingHolidays.length,
       thisMonth: holidays.filter(h => {
-          const [year, month] = h.date.split('-').map(Number);
-          return month - 1 === today.getMonth() && year === today.getFullYear();
+          const hDate = new Date(h.date);
+          return hDate.getMonth() === today.getMonth() && hDate.getFullYear() === today.getFullYear();
       }).length
   };
+
+  const MiniList = ({ items, emptyText }: { items: Holiday[], emptyText: string }) => (
+      <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+          {items.map(h => {
+              const { month, day, dayName } = getDateParts(h.date);
+              return (
+                  <div key={h.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded px-1 transition-colors">
+                      <div className="text-center w-8 shrink-0">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase leading-none mb-0.5">{month}</span>
+                          <span className="text-sm font-bold text-slate-700 leading-none">{day}</span>
+                      </div>
+                      <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate" title={h.name}>{h.name}</p>
+                          <p className="text-[10px] text-slate-400">{dayName}</p>
+                      </div>
+                  </div>
+              );
+          })}
+          {items.length === 0 && <p className="text-xs text-slate-400 py-2 italic">{emptyText}</p>}
+      </div>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -120,14 +234,64 @@ const Holidays = () => {
             <p className="text-slate-500 text-sm">View company holidays and plan your time off</p>
           </div>
           {isHR && (
-            <button 
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm font-medium text-sm w-full md:w-auto justify-center"
-            >
-                <Plus size={16} /> Add Holiday
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                <input 
+                    type="file" 
+                    accept=".xlsx, .xls, .csv" 
+                    ref={fileInputRef} 
+                    onChange={handleExcelImport} 
+                    className="hidden" 
+                />
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50 transition shadow-sm font-medium text-sm w-full md:w-auto justify-center"
+                >
+                    <UploadCloud size={16} /> Import Excel
+                </button>
+                <button 
+                    onClick={() => setShowModal(true)}
+                    className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm font-medium text-sm w-full md:w-auto justify-center"
+                >
+                    <Plus size={16} /> Add Holiday
+                </button>
+            </div>
           )}
        </div>
+
+        {/* HR Note for Excel Format */}
+        {isHR && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 text-sm text-blue-800">
+                <Info size={18} className="mt-0.5 text-blue-600 flex-shrink-0" />
+                <div>
+                    <span className="font-semibold block mb-1">Excel Import Format</span>
+                    <p className="text-blue-700/80 mb-2">
+                        Ensure your Excel file has the following column headers (case-sensitive):
+                    </p>
+                    <div className="flex gap-4 overflow-x-auto">
+                        <div className="bg-white px-3 py-2 rounded border border-blue-200 shadow-sm min-w-[120px]">
+                            <span className="text-xs text-slate-400 block uppercase font-bold">Column A</span>
+                            <span className="font-mono text-slate-700 font-bold">HolidayName</span>
+                            <span className="text-xs text-slate-500 block mt-1">e.g. New Year</span>
+                        </div>
+                        <div className="bg-white px-3 py-2 rounded border border-blue-200 shadow-sm min-w-[120px]">
+                            <span className="text-xs text-slate-400 block uppercase font-bold">Column B</span>
+                            <span className="font-mono text-slate-700 font-bold">HolidayDate</span>
+                            <span className="text-xs text-slate-500 block mt-1">YYYY-MM-DD</span>
+                        </div>
+                        <div className="bg-white px-3 py-2 rounded border border-blue-200 shadow-sm min-w-[120px]">
+                            <span className="text-xs text-slate-400 block uppercase font-bold">Column C</span>
+                            <span className="font-mono text-slate-700 font-bold">Type</span>
+                            <span className="text-xs text-slate-500 block mt-1">Public / Company</span>
+                        </div>
+                        <div className="bg-white px-3 py-2 rounded border border-blue-200 shadow-sm min-w-[120px]">
+                            <span className="text-xs text-slate-400 block uppercase font-bold">Column D</span>
+                            <span className="font-mono text-slate-700 font-bold">Day</span>
+                            <span className="text-xs text-slate-500 block mt-1">(Optional)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
            
@@ -135,7 +299,7 @@ const Holidays = () => {
            <div className="lg:col-span-2 space-y-6">
                <h3 className="font-bold text-xl text-slate-800">All Holidays ({currentYear})</h3>
                
-               <div className="space-y-4">
+               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                    {sortedHolidays.map(holiday => (
                        <HolidayCard key={holiday.id} holiday={holiday} isHR={isHR} onDelete={deleteHoliday} />
                    ))}
@@ -196,6 +360,28 @@ const Holidays = () => {
                            <span className="font-bold text-slate-800 text-lg">{stats.thisMonth}</span>
                        </div>
                    </div>
+               </div>
+
+               {/* Weekday Holidays Card */}
+               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                   <div className="flex justify-between items-center mb-4">
+                       <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                           <Sun size={18} className="text-blue-500"/> Weekday Holidays
+                       </h3>
+                       <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">{weekdayHolidaysList.length}</span>
+                   </div>
+                   <MiniList items={weekdayHolidaysList} emptyText="No weekday holidays." />
+               </div>
+
+               {/* Weekend Holidays Card */}
+               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                   <div className="flex justify-between items-center mb-4">
+                       <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                           <Moon size={18} className="text-orange-500"/> Weekend Holidays
+                       </h3>
+                       <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full">{weekendHolidaysList.length}</span>
+                   </div>
+                   <MiniList items={weekendHolidaysList} emptyText="No weekend holidays." />
                </div>
 
            </div>

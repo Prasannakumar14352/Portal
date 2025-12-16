@@ -1,11 +1,9 @@
 
-// ... existing imports ...
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
 import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, DepartmentType } from '../types';
 
-// ... existing interface ...
 interface AppContextType {
   // Data State
   employees: Employee[];
@@ -83,6 +81,7 @@ interface AppContextType {
 
   // Holiday & Payslip Actions
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
+  addHolidays: (holidays: Omit<Holiday, 'id'>[]) => Promise<void>;
   deleteHoliday: (id: string) => Promise<void>;
   generatePayslips: (month: string) => Promise<void>;
   manualAddPayslip: (payslip: Payslip) => Promise<void>;
@@ -641,6 +640,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast('Holiday added', 'success');
   };
 
+  // Bulk add holidays to prevent multiple toast messages
+  const addHolidays = async (newHolidays: Omit<Holiday, 'id'>[]) => {
+      for (const h of newHolidays) {
+          const holidayWithId = { ...h, id: Math.random().toString(36).substr(2, 9) };
+          await db.addHoliday(holidayWithId);
+      }
+      setHolidays(await db.getHolidays());
+      showToast(`Successfully imported ${newHolidays.length} holidays`, 'success');
+  };
+
   const deleteHoliday = async (id: string) => {
       await db.deleteHoliday(id);
       setHolidays(await db.getHolidays());
@@ -693,7 +702,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTimeEntry, updateTimeEntry, deleteTimeEntry,
     checkIn, checkOut, getTodayAttendance,
     notify, markNotificationRead, markAllRead,
-    addHoliday, deleteHoliday, generatePayslips, manualAddPayslip
+    addHoliday, addHolidays, deleteHoliday, generatePayslips, manualAddPayslip
   };
 
   return (

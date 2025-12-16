@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Lock, Mail, ChevronRight, Loader2, CheckCircle2, Layout, User as UserIcon, Building2, Users, Clock, Sparkles, X, ShieldCheck, FileText } from 'lucide-react';
+import { Lock, Mail, ChevronRight, Loader2, CheckCircle2, Layout, User as UserIcon, Building2, Users, Clock, Sparkles, X, ShieldCheck, FileText, ArrowLeft } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
 interface LoginProps {
@@ -14,6 +14,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showFeaturesModal, setShowFeaturesModal] = useState(false);
+  
+  // Forgot Password State
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetUsername, setResetUsername] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
 
   // Check if Mock Data is enabled (default true unless explicitly set to 'false')
   const showDemoAccess = process.env.VITE_USE_MOCK_DATA !== 'false';
@@ -34,6 +40,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setIsLoading(true);
       await loginWithMicrosoft();
       setIsLoading(false);
+  };
+  
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsResetting(true);
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing
+      
+      // In a real scenario, we would validate username matches email here
+      await forgotPassword(resetEmail);
+      
+      setIsResetting(false);
+      setShowForgotPasswordModal(false);
+      setResetEmail('');
+      setResetUsername('');
+  };
+
+  const openForgotPassword = () => {
+      setResetEmail(email); // Pre-fill if user typed it in login
+      setShowForgotPasswordModal(true);
   };
 
   // Fill credentials for demo purposes
@@ -57,7 +82,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div className="bg-teal-700 p-1.5 rounded-lg">
                     <Layout className="text-white w-6 h-6" />
                 </div>
-                <span className="text-xl font-bold text-teal-800">EMP HR Portal</span>
+                <span className="text-xl font-bold text-teal-800">EmpowerCorp HR</span>
             </div>
 
             <div>
@@ -105,7 +130,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500" />
                         <span className="text-sm text-slate-600">Remember me</span>
                     </label>
-                    <button type="button" onClick={() => forgotPassword(email)} className="text-sm font-medium text-teal-700 hover:text-teal-800">
+                    <button type="button" onClick={openForgotPassword} className="text-sm font-medium text-teal-700 hover:text-teal-800">
                         Forgot your password?
                     </button>
                 </div>
@@ -139,7 +164,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <path fill="#f35325" d="M1 1h10v10H1z"/>
                     <path fill="#81bc06" d="M12 1h10v10H12z"/>
                     <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-                    <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                    <path fill="#ffba08" d="M12 12h10v10H1z"/>
                 </svg>
                 Sign in with Microsoft
             </button>
@@ -170,7 +195,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
          <div className="relative z-10 max-w-lg">
             <h1 className="text-4xl font-bold mb-6 leading-tight">Enterprise HR Management</h1>
             <p className="text-teal-100 text-lg mb-10 leading-relaxed">
-                EMP HR Portal helps teams organize employees, track attendance, and manage HR operations in a collaborative environment.
+                EmpowerCorp HR Portal helps teams organize employees, track attendance, and manage HR operations in a collaborative environment.
             </p>
 
             <div className="space-y-8">
@@ -217,7 +242,108 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
          </div>
       </div>
 
-      {/* Features Modal */}
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
+                
+                {/* Left Side - Reset Form */}
+                <div className="w-full md:w-1/2 p-8 md:p-12 relative flex flex-col justify-center">
+                    <div className="flex items-center gap-2 mb-6">
+                        <button onClick={() => setShowForgotPasswordModal(false)} className="text-slate-400 hover:text-slate-600 transition">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h3 className="text-xl font-bold text-slate-800">Forgot Password</h3>
+                    </div>
+                    
+                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                        Enter your username and email to request a password reset. For security reasons, an administrator must review and process your request before a new password is issued.
+                    </p>
+
+                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Username</label>
+                            <div className="relative">
+                                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input 
+                                    type="text"
+                                    required
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                                    placeholder="Your username"
+                                    value={resetUsername}
+                                    onChange={(e) => setResetUsername(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input 
+                                    type="email"
+                                    required
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                                    placeholder="Your email"
+                                    value={resetEmail}
+                                    onChange={(e) => setResetEmail(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-2 flex gap-3 justify-end">
+                            <button 
+                                type="button" 
+                                onClick={() => setShowForgotPasswordModal(false)}
+                                className="px-4 py-3 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit" 
+                                disabled={isResetting}
+                                className="px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg transition-all shadow-md flex items-center justify-center min-w-[140px]"
+                            >
+                                {isResetting ? <Loader2 className="animate-spin" size={20} /> : 'Submit Request'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {/* Right Side - Information */}
+                <div className="w-full md:w-1/2 bg-teal-700 p-8 md:p-12 text-white flex flex-col justify-center">
+                    <h3 className="text-2xl font-bold mb-4">Reset Your Password</h3>
+                    <p className="text-teal-100 text-sm mb-8 leading-relaxed">
+                        We understand you might need to reset your password sometimes. Please provide your username and email address. For security reasons, an administrator must review and process your request.
+                    </p>
+                    
+                    <ul className="space-y-6">
+                        <li className="flex items-start gap-3">
+                            <ShieldCheck className="text-teal-300 flex-shrink-0" size={24} />
+                            <div>
+                                <h4 className="font-semibold text-sm">Security-focused reset process</h4>
+                            </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <Users className="text-teal-300 flex-shrink-0" size={24} />
+                            <div>
+                                <h4 className="font-semibold text-sm">Administrator approval required</h4>
+                            </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <Mail className="text-teal-300 flex-shrink-0" size={24} />
+                            <div>
+                                <h4 className="font-semibold text-sm">Email notification when new password is issued</h4>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+      )}
+
+      {/* Features Modal (Existing) */}
       {showFeaturesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row">
@@ -233,7 +359,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="absolute top-0 left-0 w-64 h-64 bg-teal-700 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -translate-x-1/2 -translate-y-1/2"></div>
                   <div className="relative z-10">
                     <Layout className="w-12 h-12 mb-4 text-teal-300" />
-                    <h3 className="text-2xl font-bold mb-2">EMP Portal</h3>
+                    <h3 className="text-2xl font-bold mb-2">EmpowerCorp</h3>
                     <p className="text-teal-100 text-sm">Comprehensive Human Resource Management Solution.</p>
                   </div>
                </div>
