@@ -230,10 +230,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       }
 
       // 2. Determine target user list for generating rows
-      let employeesToDisplay: { id: string, name: string }[] = [];
+      // We store the full employee object to access workLocation later
+      let employeesToDisplay: { id: string, name: string, workLocation?: string }[] = [];
 
       if (!isHR) {
-          if (currentUser) employeesToDisplay = [{ id: currentUser.id, name: currentUser.name }];
+          if (currentUser) {
+              const emp = employees.find(e => e.id === currentUser.id);
+              employeesToDisplay = [emp ? { id: emp.id, name: `${emp.firstName} ${emp.lastName}`, workLocation: emp.workLocation } : { id: currentUser.id, name: currentUser.name, workLocation: currentUser.workLocation }];
+          }
       } else {
           // HR View: Get target employees based on search or all
           let sourceEmployees = employees;
@@ -244,7 +248,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           }
           employeesToDisplay = sourceEmployees.map(e => ({ 
               id: e.id, 
-              name: `${e.firstName} ${e.lastName}` 
+              name: `${e.firstName} ${e.lastName}`,
+              workLocation: e.workLocation 
           }));
       }
 
@@ -285,7 +290,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                           checkIn: '--:--',
                           checkOut: '--:--',
                           status: 'Absent',
-                          workLocation: 'Office HQ India', // Default or fetch from profile
+                          workLocation: emp.workLocation || 'Office HQ India', // Use employee's current work location
                           isGhost: true // Flag for UI
                       } as AttendanceRecord);
                   }
@@ -648,6 +653,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 let displayStatus = record.status;
                 if (!isGhost && durationHrs >= 9) displayStatus = 'Present';
 
+                // Look up the current employee object to get the latest work location
+                const employee = employees.find(e => e.id === record.employeeId);
+                // Use employee's current workLocation if available, otherwise fall back to record's stored location
+                const displayLocation = employee?.workLocation || record.workLocation || 'Office HQ India';
+
                 return (
                 <tr key={record.id || index} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isGhost ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
@@ -683,7 +693,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-1 text-slate-500 dark:text-slate-400 text-sm">
                       <MapPin size={14} />
-                      <span>{record.workLocation || 'Office HQ India'}</span>
+                      <span>{displayLocation}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
