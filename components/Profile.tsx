@@ -10,6 +10,14 @@ declare global {
   }
 }
 
+const WORK_LOCATIONS = [
+  'Office HQ India',
+  'WFH India',
+  'UAE Office',
+  'UAE Client Location',
+  'USA'
+];
+
 const Profile = () => {
   const { currentUser, users, updateUser, departments, projects } = useAppContext();
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -23,6 +31,7 @@ const Profile = () => {
     hireDate: '',
     address: '',
     avatar: '',
+    workLocation: '',
     projectIds: [] as string[]
   });
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -44,6 +53,7 @@ const Profile = () => {
         hireDate: currentUser.hireDate || '',
         address: currentUser.location?.address || '',
         avatar: currentUser.avatar,
+        workLocation: currentUser.workLocation || '',
         projectIds: currentUser.projectIds || []
       });
       if (currentUser.location) {
@@ -61,7 +71,7 @@ const Profile = () => {
   const canEditLocation = isHR || isSuperAdmin; 
   const canEditAvatar = isHR || isSelf;
   const canEditDetails = isHR; // Name, Phone, Job, Hire
-  const canEditAllocations = isHR; // Department, Projects
+  const canEditAllocations = isHR; // Department, Projects, Work Location
 
   // Load and Initialize ArcGIS Map
   useEffect(() => {
@@ -309,6 +319,7 @@ const Profile = () => {
     if (canEditAllocations) {
       updates.departmentId = formData.departmentId;
       updates.projectIds = formData.projectIds;
+      updates.workLocation = formData.workLocation;
     }
 
     if (canEditAvatar) {
@@ -447,6 +458,25 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
+                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Work Location</label>
+                     <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
+                        <MapPin size={16} className="text-gray-400 dark:text-slate-500" />
+                        <select 
+                          disabled={!canEditAllocations}
+                          className="bg-transparent w-full text-sm outline-none text-gray-700 dark:text-white disabled:text-gray-500 dark:disabled:text-slate-500 appearance-none"
+                          value={formData.workLocation}
+                          onChange={e => setFormData({...formData, workLocation: e.target.value})}
+                        >
+                           <option value="">Select Location...</option>
+                           {WORK_LOCATIONS.map(loc => (
+                             <option key={loc} value={loc}>{loc}</option>
+                           ))}
+                        </select>
+                     </div>
+                     {!canEditAllocations && <Lock size={12} className="absolute top-1 right-1 text-gray-400 dark:text-slate-600" />}
+                   </div>
+
+                   <div className="relative">
                      <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Assigned Projects</label>
                      <div className={`border border-gray-200 dark:border-slate-600 rounded-lg max-h-40 overflow-y-auto p-2 space-y-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700' : 'bg-white dark:bg-slate-800'}`}>
                         {projects.map(proj => {
@@ -537,7 +567,7 @@ const Profile = () => {
                 <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
                    <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                       <MapPin size={18} className="text-emerald-600 dark:text-emerald-400" />
-                      Work Location
+                      Home Location
                    </h3>
                    {canEditLocation && <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-900 font-medium">Click map to update</span>}
                 </div>
