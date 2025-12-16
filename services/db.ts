@@ -1,8 +1,8 @@
 
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role } from '../types';
 import { 
   mockEmployees, mockDepartments, mockProjects, mockLeaves, mockLeaveTypes, 
-  mockAttendance, mockTimeEntries, mockNotifications, mockHolidays, mockPayslips 
+  mockAttendance, mockTimeEntries, mockNotifications, mockHolidays, mockPayslips, mockRoles
 } from './mockData';
 
 // --- CONFIGURATION ---
@@ -49,6 +49,7 @@ const api = {
 const store = {
     employees: [...mockEmployees],
     departments: [...mockDepartments],
+    roles: [...mockRoles],
     projects: [...mockProjects],
     leaves: [...mockLeaves],
     leaveTypes: [...mockLeaveTypes],
@@ -84,6 +85,19 @@ const mockDb = {
     },
     deleteDepartment: async (id: string) => {
         store.departments = store.departments.filter(d => d.id !== id);
+        return Promise.resolve();
+    },
+
+    // ROLES
+    getRoles: async (): Promise<Role[]> => Promise.resolve([...store.roles]),
+    addRole: async (role: Role) => { store.roles.push(role); return Promise.resolve(role); },
+    updateRole: async (role: Role) => {
+        const idx = store.roles.findIndex(r => r.id === role.id);
+        if(idx !== -1) store.roles[idx] = role;
+        return Promise.resolve(role);
+    },
+    deleteRole: async (id: string) => {
+        store.roles = store.roles.filter(r => r.id !== id);
         return Promise.resolve();
     },
 
@@ -184,6 +198,11 @@ const apiDb = {
   updateDepartment: (dept: Department) => api.put(`/departments/${dept.id}`, dept),
   deleteDepartment: (id: string) => api.delete(`/departments/${id}`),
 
+  getRoles: () => api.get('/roles'),
+  addRole: (role: Role) => api.post('/roles', role),
+  updateRole: (role: Role) => api.put(`/roles/${role.id}`, role),
+  deleteRole: (id: string) => api.delete(`/roles/${id}`),
+
   getProjects: () => api.get('/projects'),
   addProject: (proj: Project) => api.post('/projects', proj),
   updateProject: (proj: Project) => api.put(`/projects/${proj.id}`, proj),
@@ -233,7 +252,10 @@ const createHybridDb = () => {
                 
                 try {
                     // Try real API
-                    return await (apiDb[prop] as Function)(...args);
+                    if (apiDb[prop as keyof typeof apiDb]) {
+                        return await (apiDb[prop as keyof typeof apiDb] as Function)(...args);
+                    }
+                    return (mockDb[prop] as Function)(...args);
                 } catch (error) {
                     console.warn(`[DB] API call failed for ${String(prop)}, falling back to Mock Data.`);
                     // Fallback

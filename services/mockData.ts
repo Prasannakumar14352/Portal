@@ -1,11 +1,21 @@
 
-import { Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, UserRole, DepartmentType, EmployeeStatus, LeaveStatus } from '../types';
+import { Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, Role, DepartmentType, EmployeeStatus, LeaveStatus } from '../types';
 
 // Mock Departments
 export const mockDepartments: Department[] = [
   { id: 'd1', name: 'Engineering', description: 'Software Development and DevOps', managerId: 'u3' },
   { id: 'd2', name: 'Human Resources', description: 'People Operations and Recruitment', managerId: 'super1' },
   { id: 'd3', name: 'Sales', description: 'Global Sales and Partnerships', managerId: 'u4' }
+];
+
+// Mock Roles
+export const mockRoles: Role[] = [
+  { id: 'r1', name: 'HR Manager', description: 'Manages human resources, recruitment, and employee relations.' },
+  { id: 'r2', name: 'Team Manager', description: 'Leads a specific team or department unit.' },
+  { id: 'r3', name: 'Employee', description: 'Standard employee role with basic access.' },
+  { id: 'r4', name: 'Software Engineer', description: 'Develops and maintains software applications.' },
+  { id: 'r5', name: 'Sales Manager', description: 'Oversees sales strategies and client relationships.' },
+  { id: 'r6', name: 'Marketing Lead', description: 'Coordinates marketing campaigns and branding.' }
 ];
 
 // Mock Projects

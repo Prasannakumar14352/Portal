@@ -54,10 +54,11 @@ const Profile = () => {
 
   // Permission Logic
   const isHR = currentUser?.role === UserRole.HR;
+  const isSuperAdmin = currentUser?.id === 'super1' || currentUser?.email === 'superadmin@empower.com';
   const isSelf = true; // Currently only viewing own profile
   
-  // Permission: HR or Self can update location
-  const canEditLocation = isHR || isSelf; 
+  // Permission: HR or Admin only can update location
+  const canEditLocation = isHR || isSuperAdmin; 
   const canEditAvatar = isHR || isSelf;
   const canEditDetails = isHR; // Name, Phone, Job, Hire
   const canEditAllocations = isHR; // Department, Projects
@@ -405,7 +406,7 @@ const Profile = () => {
                           type="text" 
                           className="bg-transparent w-full text-sm outline-none text-gray-700 disabled:text-gray-500" 
                           value={formData.name} 
-                          onChange={e => setFormData({...formData, name: e.target.value})}
+                          onChange={e => setFormData({...formData,name: e.target.value})}
                         />
                      </div>
                      {!canEditDetails && <Lock size={12} className="absolute top-1 right-1 text-gray-400" />}

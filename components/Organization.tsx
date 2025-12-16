@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { UserRole, Department, Project, Employee } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network, MapPin } from 'lucide-react';
+import { UserRole, Department, Project, Employee, Role } from '../types';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Shield } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 
 // --- Org Chart Helper Types & Logic ---
@@ -233,13 +233,15 @@ const Organization = () => {
   const { 
     currentUser, 
     departments, addDepartment, updateDepartment, deleteDepartment, 
-    projects, addProject, updateProject, deleteProject, 
+    projects, addProject, updateProject, deleteProject,
+    roles, addRole, updateRole, deleteRole,
     users, updateUser, notify,
     employees, addEmployee, updateEmployee, deleteEmployee 
   } = useAppContext();
   
-  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'roles' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [showDeptModal, setShowDeptModal] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
   const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [showConfirmAlloc, setShowConfirmAlloc] = useState(false);
@@ -253,6 +255,7 @@ const Organization = () => {
 
   // Form States
   const [deptForm, setDeptForm] = useState<{ id?: string, name: string, description: string, managerId: string }>({ name: '', description: '', managerId: '' });
+  const [roleForm, setRoleForm] = useState<{ id?: string, name: string, description: string }>({ name: '', description: '' });
   const [projForm, setProjForm] = useState<{ id?: string, name: string, description: string, status: string, tasks: string[] }>({ name: '', description: '', status: 'Active', tasks: [] });
   
   // Task Management State (Local to modal)
@@ -292,6 +295,23 @@ const Organization = () => {
   const openDeptView = (dept: Department) => {
     setDeptForm({ id: dept.id, name: dept.name, description: dept.description || '', managerId: dept.managerId || '' });
     setShowDeptModal(true);
+  };
+
+  const handleRoleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isHR) return;
+    if (roleForm.id) {
+        updateRole(roleForm.id, { name: roleForm.name, description: roleForm.description });
+    } else {
+        addRole({ name: roleForm.name, description: roleForm.description });
+    }
+    setShowRoleModal(false);
+    setRoleForm({ name: '', description: '' });
+  };
+
+  const openRoleView = (role: Role) => {
+    setRoleForm({ id: role.id, name: role.name, description: role.description });
+    setShowRoleModal(true);
   };
 
   const handleProjSubmit = (e: React.FormEvent) => {
@@ -419,6 +439,9 @@ const Organization = () => {
 
   const totalDepartments = departments.length;
   const paginatedDepartments = departments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const totalRoles = roles.length;
+  const paginatedRoles = roles.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Derived lists for modals
   const employeesInCurrentDept = users.filter(u => u.departmentId === deptForm.id);
@@ -558,7 +581,7 @@ const Organization = () => {
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Organization Settings</h2>
-            <p className="text-sm text-gray-500">Manage company departments, projects, and people allocations.</p>
+            <p className="text-sm text-gray-500">Manage company departments, roles, projects, and people allocations.</p>
           </div>
           
           <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto w-full xl:w-auto max-w-full no-scrollbar">
@@ -567,6 +590,12 @@ const Organization = () => {
                className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'departments' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
              >
                Departments
+             </button>
+             <button 
+               onClick={() => setActiveTab('roles')}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'roles' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               Roles
              </button>
              <button 
                onClick={() => setActiveTab('projects')}
@@ -659,7 +688,6 @@ const Organization = () => {
          </div>
        )}
 
-       {/* ... Departments, Projects, Allocations tabs (No changes needed, kept for context in full file if needed but XML only needs diff) ... */}
        {/* --- DEPARTMENTS TAB --- */}
        {activeTab === 'departments' && (
          <div className="space-y-4 animate-fade-in">
@@ -733,6 +761,63 @@ const Organization = () => {
             </div>
             
             <PaginationControls total={totalDepartments} />
+         </div>
+       )}
+
+       {/* --- ROLES TAB --- */}
+       {activeTab === 'roles' && (
+         <div className="space-y-4 animate-fade-in">
+            <div className="flex justify-between items-center">
+               <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
+                 <BadgeCheck size={20} className="text-emerald-600"/>
+                 <span>Job Roles</span>
+               </h3>
+               {isHR && (
+                 <button onClick={() => { setRoleForm({ name: '', description: '' }); setShowRoleModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 shadow-sm flex items-center gap-2">
+                   <Plus size={16} /> Add Role
+                 </button>
+               )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-4 font-medium">Role Name</th>
+                                <th className="px-6 py-4 font-medium">Description</th>
+                                {isHR && <th className="px-6 py-4 font-medium text-right">Actions</th>}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {paginatedRoles.map(role => (
+                                <tr key={role.id} className="hover:bg-slate-50/50 group">
+                                    <td className="px-6 py-4 font-medium text-slate-800">{role.name}</td>
+                                    <td className="px-6 py-4 text-sm text-slate-500">{role.description}</td>
+                                    {isHR && (
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => openRoleView(role)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded">
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button onClick={() => { if(confirm('Delete role?')) deleteRole(role.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                            {paginatedRoles.length === 0 && (
+                                <tr>
+                                    <td colSpan={isHR ? 3 : 2} className="px-6 py-10 text-center text-slate-400 italic">No roles defined.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <PaginationControls total={totalRoles} />
+            </div>
          </div>
        )}
 
@@ -914,8 +999,6 @@ const Organization = () => {
          </div>
        )}
 
-       {/* ... Modals (kept as is, showing logic is correct above) ... */}
-       {/* (DEPT, PROJ, ALLOC modals logic is included in the full component) */}
        {/* --- DEPARTMENT MODAL --- */}
        {showDeptModal && (
          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -982,6 +1065,29 @@ const Organization = () => {
                <div className="flex justify-end gap-2 pt-2">
                  <button type="button" onClick={() => setShowDeptModal(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded text-sm">{isHR ? 'Cancel' : 'Close'}</button>
                  {isHR && <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded text-sm">{deptForm.id ? 'Save Changes' : 'Create'}</button>}
+               </div>
+             </form>
+           </div>
+         </div>
+       )}
+
+       {/* --- ROLE MODAL --- */}
+       {showRoleModal && (
+         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+             <h3 className="text-lg font-bold text-gray-800 mb-4">{roleForm.id ? 'Edit Role' : 'Create New Role'}</h3>
+             <form onSubmit={handleRoleSubmit} className="space-y-4">
+               <div>
+                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role Title</label>
+                 <input required type="text" className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={roleForm.name} onChange={e => setRoleForm({...roleForm, name: e.target.value})} placeholder="e.g. Software Engineer" />
+               </div>
+               <div>
+                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                 <textarea className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={roleForm.description} onChange={e => setRoleForm({...roleForm, description: e.target.value})} rows={3} placeholder="Role responsibilities..." />
+               </div>
+               <div className="flex justify-end gap-2 pt-2">
+                 <button type="button" onClick={() => setShowRoleModal(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded text-sm">Cancel</button>
+                 <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700">{roleForm.id ? 'Save' : 'Create'}</button>
                </div>
              </form>
            </div>

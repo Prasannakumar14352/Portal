@@ -27,6 +27,12 @@ export interface Department {
   managerId: string;
 }
 
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface Project {
   id: string;
   name: string;

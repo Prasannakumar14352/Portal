@@ -179,7 +179,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             <h2 className="text-2xl font-bold text-slate-800">Attendance Tracker</h2>
             <p className="text-slate-500">Manage your daily work hours.</p>
             <div className="mt-2 text-3xl font-mono text-slate-700 font-semibold tracking-wider">
-               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
             </div>
             <p className="text-sm text-slate-400">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
          </div>

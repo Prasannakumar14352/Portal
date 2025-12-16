@@ -238,6 +238,16 @@ const initDb = async () => {
             )
         `);
 
+        // 11. Roles (New Table)
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U')
+            CREATE TABLE roles (
+                id NVARCHAR(50) PRIMARY KEY,
+                name NVARCHAR(100),
+                description NVARCHAR(MAX)
+            )
+        `);
+
         console.log("Database schema checked/initialized.");
     } catch (err) {
         console.error("Error creating/checking tables:", err);
@@ -369,6 +379,47 @@ app.delete('/api/departments/:id', async (req, res) => {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, req.params.id);
         await reqSql.query("DELETE FROM departments WHERE id = @id");
+        res.json({ message: "Deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Roles
+app.get('/api/roles', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM roles");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/roles', async (req, res) => {
+    const r = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, r.id);
+        reqSql.input('name', sql.NVarChar, r.name);
+        reqSql.input('description', sql.NVarChar, r.description);
+        await reqSql.query("INSERT INTO roles (id, name, description) VALUES (@id, @name, @description)");
+        res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/roles/:id', async (req, res) => {
+    const r = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        reqSql.input('name', sql.NVarChar, r.name);
+        reqSql.input('description', sql.NVarChar, r.description);
+        await reqSql.query("UPDATE roles SET name=@name, description=@description WHERE id=@id");
+        res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/roles/:id', async (req, res) => {
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, req.params.id);
+        await reqSql.query("DELETE FROM roles WHERE id = @id");
         res.json({ message: "Deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

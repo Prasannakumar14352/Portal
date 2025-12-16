@@ -166,7 +166,7 @@ const LocationMap: React.FC<{
 };
 
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
-  const { currentUser, showToast } = useAppContext();
+  const { currentUser, showToast, roles } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -573,13 +573,24 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Role/Title</label>
                   {isSuperAdmin ? (
-                       <select value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white">
-                         <option value="Employee">Employee</option>
-                         <option value="Team Manager">Team Manager</option>
-                         <option value="HR Manager">HR Manager</option>
-                         <option value="Software Engineer">Software Engineer</option>
-                         <option value="Sales Manager">Sales Manager</option>
-                         <option value="Marketing Lead">Marketing Lead</option>
+                       <select 
+                          value={formData.role} 
+                          onChange={(e) => setFormData({...formData, role: e.target.value})} 
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+                       >
+                         {roles.length > 0 ? (
+                            roles.map(r => (
+                                <option key={r.id} value={r.name}>{r.name}</option>
+                            ))
+                         ) : (
+                            // Fallback options if no roles are defined
+                            <>
+                                <option value="Employee">Employee</option>
+                                <option value="Team Manager">Team Manager</option>
+                                <option value="HR Manager">HR Manager</option>
+                                <option value="Software Engineer">Software Engineer</option>
+                            </>
+                         )}
                        </select>
                   ) : (
                       <input required type="text" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. Software Engineer" />

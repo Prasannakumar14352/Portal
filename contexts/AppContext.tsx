@@ -2,13 +2,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, DepartmentType } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, DepartmentType, Role } from '../types';
 
 interface AppContextType {
   // Data State
   employees: Employee[];
   users: Employee[]; // Alias for Organization component compatibility
   departments: Department[];
+  roles: Role[];
   projects: Project[];
   leaves: LeaveRequest[];
   leaveTypes: LeaveTypeConfig[];
@@ -48,6 +49,10 @@ interface AppContextType {
   addDepartment: (dept: Omit<Department, 'id'>) => Promise<void>;
   updateDepartment: (id: string, data: Partial<Department>) => Promise<void>;
   deleteDepartment: (id: string) => Promise<void>;
+
+  addRole: (role: Omit<Role, 'id'>) => Promise<void>;
+  updateRole: (id: string, data: Partial<Role>) => Promise<void>;
+  deleteRole: (id: string) => Promise<void>;
 
   addProject: (proj: Omit<Project, 'id'>) => Promise<void>;
   updateProject: (id: string, data: Partial<Project>) => Promise<void>;
@@ -93,6 +98,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeConfig[]>([]);
@@ -111,9 +117,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Initial Load
   const refreshData = async () => {
     try {
-      const [empData, deptData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
+      const [empData, deptData, roleData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
         db.getEmployees(),
         db.getDepartments(),
+        db.getRoles(),
         db.getProjects(),
         db.getLeaves(),
         db.getLeaveTypes(),
@@ -125,6 +132,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ]);
       setEmployees(empData);
       setDepartments(deptData);
+      setRoles(roleData);
       setProjects(projData);
       setLeaves(leaveData);
       setLeaveTypes(typeData);
@@ -468,6 +476,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Department deleted', 'info');
   };
 
+  // --- Roles Actions ---
+  const addRole = async (role: Omit<Role, 'id'>) => {
+    const newRole = { ...role, id: Math.random().toString(36).substr(2, 9) };
+    await db.addRole(newRole);
+    setRoles(await db.getRoles());
+    showToast('Role created', 'success');
+  };
+
+  const updateRole = async (id: string, data: Partial<Role>) => {
+    const existing = roles.find(r => r.id === id);
+    if (existing) {
+       await db.updateRole({ ...existing, ...data });
+       setRoles(await db.getRoles());
+       showToast('Role updated', 'success');
+    }
+  };
+
+  const deleteRole = async (id: string) => {
+    await db.deleteRole(id);
+    setRoles(await db.getRoles());
+    showToast('Role deleted', 'info');
+  };
+
   const addProject = async (proj: Omit<Project, 'id'>) => {
     const newProj = { ...proj, id: Math.random().toString(36).substr(2, 9) };
     await db.addProject(newProj);
@@ -691,11 +722,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const value = {
-    employees, users: employees, departments, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
+    employees, users: employees, departments, roles, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
     login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     addEmployee, updateEmployee, updateUser, deleteEmployee,
     addDepartment, updateDepartment, deleteDepartment,
+    addRole, updateRole, deleteRole,
     addProject, updateProject, deleteProject,
     addLeave, addLeaves, updateLeave, updateLeaveStatus,
     addLeaveType, updateLeaveType, deleteLeaveType,
