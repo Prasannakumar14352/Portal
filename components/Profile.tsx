@@ -56,8 +56,8 @@ const Profile = () => {
   const isHR = currentUser?.role === UserRole.HR;
   const isSelf = true; // Currently only viewing own profile
   
-  // HR ONLY can update location as per request
-  const canEditLocation = isHR; 
+  // Permission: HR or Self can update location
+  const canEditLocation = isHR || isSelf; 
   const canEditAvatar = isHR || isSelf;
   const canEditDetails = isHR; // Name, Phone, Job, Hire
   const canEditAllocations = isHR; // Department, Projects
@@ -101,8 +101,10 @@ const Profile = () => {
           "esri/views/MapView",
           "esri/Graphic",
           "esri/layers/GraphicsLayer",
-          "esri/rest/locator"
-        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, locator: any) => {
+          "esri/rest/locator",
+          "esri/widgets/BasemapGallery",
+          "esri/widgets/Expand"
+        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, locator: any, BasemapGallery: any, Expand: any) => {
           
           if (cleanup) return;
           if (!EsriMap || !MapView) {
@@ -168,6 +170,17 @@ const Profile = () => {
                dockOptions: { buttonEnabled: true, breakpoint: false }
             }
           });
+
+          // Add Basemap Gallery inside Expand widget
+          const basemapGallery = new BasemapGallery({
+            view: view
+          });
+          const bgExpand = new Expand({
+            view: view,
+            content: basemapGallery,
+            expandIconClass: "esri-icon-basemap"
+          });
+          view.ui.add(bgExpand, "top-right");
 
           // Add existing user pin for the profile being viewed
           if (location) {
@@ -522,7 +535,7 @@ const Profile = () => {
                         <span className="w-2 h-2 rounded-full bg-gray-400"></span>
                         <span className="text-gray-600">Colleagues</span>
                      </div>
-                     {canEditLocation && <span className="text-green-600 font-medium border-l pl-3 ml-1">Editable: Click to update (HR Only)</span>}
+                     {canEditLocation && <span className="text-green-600 font-medium border-l pl-3 ml-1">Editable: Click to update</span>}
                    </div>
                 </div>
                 

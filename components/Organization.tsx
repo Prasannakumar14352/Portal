@@ -125,8 +125,10 @@ const AllEmployeesMap: React.FC<{ users: Employee[] }> = ({ users }) => {
           "esri/Map",
           "esri/views/MapView",
           "esri/Graphic",
-          "esri/layers/GraphicsLayer"
-        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
+          "esri/layers/GraphicsLayer",
+          "esri/widgets/BasemapGallery",
+          "esri/widgets/Expand"
+        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, BasemapGallery: any, Expand: any) => {
           if (cleanup) return;
 
           const map = new EsriMap({
@@ -181,6 +183,16 @@ const AllEmployeesMap: React.FC<{ users: Employee[] }> = ({ users }) => {
                dockOptions: { buttonEnabled: true, breakpoint: false }
             }
           });
+
+          const basemapGallery = new BasemapGallery({
+            view: view
+          });
+          const bgExpand = new Expand({
+            view: view,
+            content: basemapGallery,
+            expandIconClass: "esri-icon-basemap"
+          });
+          view.ui.add(bgExpand, "top-right");
 
           view.when(() => {
              if (!cleanup) setIsMapLoaded(true);

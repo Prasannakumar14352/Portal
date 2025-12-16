@@ -55,8 +55,10 @@ const LocationMap: React.FC<{
           "esri/views/MapView",
           "esri/Graphic",
           "esri/layers/GraphicsLayer",
-          "esri/rest/locator"
-        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, locator: any) => {
+          "esri/rest/locator",
+          "esri/widgets/BasemapGallery",
+          "esri/widgets/Expand"
+        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, locator: any, BasemapGallery: any, Expand: any) => {
           
           if (cleanup) return;
 
@@ -90,6 +92,17 @@ const LocationMap: React.FC<{
             zoom: zoom,
             ui: { components: ["zoom"] } // Minimal UI
           });
+
+          // Add Basemap Gallery inside Expand widget
+          const basemapGallery = new BasemapGallery({
+            view: view
+          });
+          const bgExpand = new Expand({
+            view: view,
+            content: basemapGallery,
+            expandIconClass: "esri-icon-basemap"
+          });
+          view.ui.add(bgExpand, "top-right");
 
           if (!readOnly && onChange) {
              view.on("click", (event: any) => {
