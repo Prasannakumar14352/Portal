@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveRequest, LeaveTypeConfig, User } from '../types';
 import { 
   Upload, Paperclip, CheckSquare, Search, Edit2, Calendar as CalendarIcon, 
-  List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers
+  List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers, Filter
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -115,7 +115,9 @@ const LeaveTypeCard: React.FC<{
   <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative">
     <div className="flex justify-between items-start mb-2">
       <div className="flex items-center space-x-2">
-        <Calendar className={`w-5 h-5 ${config.color || 'text-slate-600'}`} />
+        <div className={`p-2 rounded-lg ${config.color ? config.color.replace('text-', 'bg-').replace('600', '100') : 'bg-slate-100'}`}>
+            <Calendar className={`w-5 h-5 ${config.color || 'text-slate-600'}`} />
+        </div>
         <h3 className="font-bold text-slate-800 text-lg">{config.name}</h3>
       </div>
       <span className={`text-xs px-2 py-1 rounded-full ${config.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -123,7 +125,7 @@ const LeaveTypeCard: React.FC<{
       </span>
     </div>
     
-    <div className="mb-4">
+    <div className="mb-4 mt-2">
       <h4 className={`text-2xl font-bold ${config.color || 'text-slate-800'}`}>{config.days} Days</h4>
       <p className="text-xs text-slate-500">Default allocation per year</p>
     </div>
@@ -176,6 +178,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [editingType, setEditingType] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar' | 'team'>('requests');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
   const [reviewComment, setReviewComment] = useState('');
   
   // Pagination State
@@ -218,7 +221,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     days: number;
     description: string;
     isActive: boolean;
-  }>({ name: '', days: 10, description: '', isActive: true });
+    color: string;
+  }>({ name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600' });
+
+  // Predefined Colors for Leave Types
+  const colorOptions = [
+    'text-slate-600', 'text-red-600', 'text-orange-600', 'text-amber-600', 
+    'text-green-600', 'text-emerald-600', 'text-teal-600', 'text-cyan-600',
+    'text-blue-600', 'text-indigo-600', 'text-violet-600', 'text-purple-600', 
+    'text-fuchsia-600', 'text-pink-600', 'text-rose-600'
+  ];
 
   const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.HR;
   const isHR = currentUser?.role === UserRole.HR;
@@ -266,17 +278,21 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   const searchedLeaves = useMemo(() => {
     const lowerQ = searchQuery.toLowerCase();
-    return visibleLeaves.filter(l => 
-      l.userName.toLowerCase().includes(lowerQ) ||
-      l.type.toLowerCase().includes(lowerQ) ||
-      l.status.toLowerCase().includes(lowerQ)
-    );
-  }, [visibleLeaves, searchQuery]);
+    
+    return visibleLeaves.filter(l => {
+      const matchesSearch = l.userName.toLowerCase().includes(lowerQ) ||
+                            l.type.toLowerCase().includes(lowerQ) ||
+                            l.status.toLowerCase().includes(lowerQ);
+      const matchesStatus = statusFilter === 'All' || 
+                            (statusFilter === 'Pending' ? l.status.includes('Pending') : l.status === statusFilter);
+      return matchesSearch && matchesStatus;
+    });
+  }, [visibleLeaves, searchQuery, statusFilter]);
 
   // Reset pagination on search or itemsPerPage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, itemsPerPage]);
+  }, [searchQuery, statusFilter, itemsPerPage]);
 
   // Pagination Logic
   const totalPages = Math.ceil(searchedLeaves.length / itemsPerPage);
@@ -285,11 +301,13 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     currentPage * itemsPerPage
   );
 
-  // Pending Actions Logic
-  const pendingApprovals = searchedLeaves.filter(l => 
-    (currentUser?.role === UserRole.MANAGER && l.status === LeaveStatus.PENDING_MANAGER && l.userId !== currentUser.id) ||
-    (currentUser?.role === UserRole.HR && l.status === LeaveStatus.PENDING_HR)
-  );
+  // Pending Approvals for current user context (HR or Manager)
+  const pendingApprovals = useMemo(() => {
+    return visibleLeaves.filter(l => 
+      (currentUser?.role === UserRole.MANAGER && l.status === LeaveStatus.PENDING_MANAGER && l.userId !== currentUser.id && l.approverId === currentUser.id) ||
+      (currentUser?.role === UserRole.HR && l.status === LeaveStatus.PENDING_HR)
+    );
+  }, [visibleLeaves, currentUser]);
 
   // Balance Calculation Logic (Generic per type)
   const getBalance = (typeName: string, limit: number, userId?: string) => {
@@ -412,10 +430,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     for (let i = 0; i < firstDayOfWeek; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(new Date(calMonth.getFullYear(), calMonth.getMonth(), i));
 
-    const teamLeaves = visibleLeaves.filter(l => l.userId !== currentUser?.id); 
+    // Show team leaves + my leaves
+    const calendarLeaves = visibleLeaves; 
 
     const getLeavesForDate = (date: Date) => {
-        return teamLeaves.filter(l => isDateInRange(date, l.startDate, l.endDate));
+        return calendarLeaves.filter(l => isDateInRange(date, l.startDate, l.endDate));
     };
 
     return (
@@ -435,31 +454,36 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             
             <div className="grid grid-cols-7 gap-2">
                 {days.map((date, i) => {
-                    if (!date) return <div key={i} className="h-24 bg-slate-50/50 rounded-lg"></div>;
+                    if (!date) return <div key={i} className="h-28 bg-slate-50/50 rounded-lg"></div>;
                     const dateLeaves = getLeavesForDate(date);
-                    const pendingCount = dateLeaves.filter(l => l.status.includes('Pending')).length;
-                    const approvedCount = dateLeaves.filter(l => l.status === LeaveStatus.APPROVED).length;
-
+                    
                     return (
                         <div 
                             key={i} 
                             onClick={() => setSelectedCalDate(date)}
-                            className={`h-24 border rounded-lg p-2 cursor-pointer transition hover:shadow-md relative ${
+                            className={`h-28 border rounded-lg p-2 cursor-pointer transition hover:shadow-md relative overflow-hidden ${
                                 dateLeaves.length > 0 ? 'bg-white border-emerald-100' : 'bg-white border-slate-100'
                             }`}
                         >
-                            <span className={`text-sm font-semibold ${date.getDate() === new Date().getDate() && date.getMonth() === new Date().getMonth() ? 'text-emerald-600' : 'text-slate-700'}`}>{date.getDate()}</span>
+                            <span className={`text-sm font-semibold ${date.getDate() === new Date().getDate() && date.getMonth() === new Date().getMonth() ? 'text-white bg-emerald-600 w-6 h-6 flex items-center justify-center rounded-full' : 'text-slate-700'}`}>
+                                {date.getDate()}
+                            </span>
                             
-                            <div className="flex gap-1 mt-2 flex-wrap">
-                                {pendingCount > 0 && (
-                                    <span className="bg-yellow-100 text-yellow-700 text-[10px] px-1.5 py-0.5 rounded font-bold" title={`${pendingCount} Pending`}>
-                                        {pendingCount} P
-                                    </span>
-                                )}
-                                {approvedCount > 0 && (
-                                    <span className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded font-bold" title={`${approvedCount} Approved`}>
-                                        {approvedCount} A
-                                    </span>
+                            <div className="flex flex-col gap-1 mt-1">
+                                {dateLeaves.slice(0, 3).map((leave, idx) => {
+                                    const lType = leaveTypes.find(t => t.name === leave.type);
+                                    // Use type color or fallback to gray
+                                    const colorClass = lType?.color ? lType.color.replace('text-', 'bg-').replace('600', '100') : 'bg-slate-100';
+                                    const textColor = lType?.color ? lType.color.replace('600', '700') : 'text-slate-700';
+                                    
+                                    return (
+                                        <div key={idx} className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium ${colorClass} ${textColor}`}>
+                                            {leave.userName.split(' ')[0]}
+                                        </div>
+                                    );
+                                })}
+                                {dateLeaves.length > 3 && (
+                                    <span className="text-[10px] text-slate-400 pl-1">+{dateLeaves.length - 3} more</span>
                                 )}
                             </div>
                         </div>
@@ -471,19 +495,25 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedCalDate(null)}>
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
                         <h3 className="font-bold text-lg mb-4 text-slate-800">{selectedCalDate.toLocaleDateString()} Leaves</h3>
-                        <div className="space-y-3">
+                        <div className="space-y-3 max-h-80 overflow-y-auto">
                             {getLeavesForDate(selectedCalDate).length === 0 ? (
                                 <p className="text-slate-500 text-sm">No leaves for this date.</p>
                             ) : (
-                                getLeavesForDate(selectedCalDate).map(l => (
-                                    <div key={l.id} className="border border-slate-100 p-3 rounded-lg bg-slate-50">
-                                        <div className="flex justify-between">
-                                            <span className="font-bold text-slate-800">{l.userName}</span>
-                                            <StatusBadge status={l.status} />
+                                getLeavesForDate(selectedCalDate).map(l => {
+                                    const lType = leaveTypes.find(t => t.name === l.type);
+                                    return (
+                                        <div key={l.id} className="border border-slate-100 p-3 rounded-lg bg-slate-50">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <span className="font-bold text-slate-800 block">{l.userName}</span>
+                                                    <span className={`text-xs font-semibold ${lType?.color || 'text-slate-500'}`}>{l.type}</span>
+                                                </div>
+                                                <StatusBadge status={l.status} />
+                                            </div>
+                                            {l.reason && <p className="text-xs text-slate-500 mt-2 bg-white p-2 rounded border border-slate-100 italic">"{l.reason}"</p>}
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-1">{l.type}</p>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                         <button onClick={() => setSelectedCalDate(null)} className="mt-4 w-full bg-slate-100 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-slate-200">Close</button>
@@ -524,11 +554,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                      return (
                        <div key={type.id}>
                          <div className="flex justify-between text-xs mb-1">
-                           <span className="text-slate-600">{type.name}</span>
+                           <span className={`font-medium ${type.color || 'text-slate-600'}`}>{type.name}</span>
                            <span className="font-medium text-slate-800">{balance} / {type.days}</span>
                          </div>
                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                           <div className={`h-1.5 rounded-full transition-all duration-500 ${balance < 3 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${percent}%` }}></div>
+                           <div className={`h-1.5 rounded-full transition-all duration-500 ${balance < 3 ? 'bg-red-500' : (type.color ? type.color.replace('text-', 'bg-') : 'bg-emerald-500')}`} style={{ width: `${percent}%` }}></div>
                          </div>
                        </div>
                      );
@@ -578,16 +608,32 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto">
           {viewMode !== 'types' && viewMode !== 'balances' && (
-            <div className="relative flex-1 md:w-64">
-               <input 
-                 type="text" 
-                 placeholder="Search leaves..." 
-                 className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-full"
-                 value={searchQuery}
-                 onChange={(e) => setSearchQuery(e.target.value)}
-               />
-               <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
-            </div>
+            <>
+                <div className="relative flex-1 md:w-48">
+                    <input 
+                        type="text" 
+                        placeholder="Search..." 
+                        className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-full"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                </div>
+                <div className="relative flex-1 md:w-40">
+                    <select
+                        className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none bg-white"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="All">All Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value={LeaveStatus.APPROVED}>Approved</option>
+                        <option value={LeaveStatus.REJECTED}>Rejected</option>
+                    </select>
+                    <Filter size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                    <ChevronDown size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none" />
+                </div>
+            </>
           )}
 
           {/* Toggle Views (Tabs) */}
@@ -616,25 +662,25 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               <span className="hidden sm:inline">Types</span>
               <span className="sm:hidden">Type</span>
             </button>
+            {(isManager || isHR) && (
+              <button 
+                onClick={() => setViewMode('calendar')}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'calendar' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <CalendarIcon size={16} />
+                <span className="hidden sm:inline">Calendar</span>
+                <span className="sm:hidden">Cal</span>
+              </button>
+            )}
             {isManager && (
-              <>
-                <button 
-                  onClick={() => setViewMode('team')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'team' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  <Users size={16} />
-                  <span className="hidden sm:inline">Team</span>
-                  <span className="sm:hidden">Team</span>
-                </button>
-                <button 
-                  onClick={() => setViewMode('calendar')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'calendar' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  <CalendarIcon size={16} />
-                  <span className="hidden sm:inline">Calendar</span>
-                  <span className="sm:hidden">Cal</span>
-                </button>
-              </>
+              <button 
+                onClick={() => setViewMode('team')}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap ${viewMode === 'team' ? 'bg-white shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <Users size={16} />
+                <span className="hidden sm:inline">Team</span>
+                <span className="sm:hidden">Team</span>
+              </button>
             )}
           </div>
 
@@ -644,7 +690,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               <button 
                 onClick={() => {
                   setEditingType(null);
-                  setTypeData({ name: '', days: 12, description: '', isActive: true });
+                  setTypeData({ name: '', days: 12, description: '', isActive: true, color: 'text-emerald-600' });
                   setShowTypeModal(true);
                 }}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition flex items-center space-x-2 text-sm whitespace-nowrap shadow-sm"
@@ -729,7 +775,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     {/* Progress Bar */}
                     <div className="w-full bg-slate-100 rounded-full h-2 mt-4">
                        <div 
-                         className={`h-2 rounded-full transition-all duration-500 ${isLow ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                         className={`h-2 rounded-full transition-all duration-500 ${isLow ? 'bg-amber-500' : (t.color ? t.color.replace('text-', 'bg-') : 'bg-emerald-500')}`} 
                          style={{ width: `${percentage}%` }}
                        ></div>
                     </div>
@@ -747,14 +793,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-slate-800 flex items-center">
-                     <div className="w-2 h-2 rounded-full bg-orange-500 mr-2"></div> Requires Attention
+                     <div className="w-2 h-2 rounded-full bg-orange-500 mr-2"></div> Pending Approvals
                   </h3>
                   {pendingApprovals.length > 1 && (
                       <button 
                         onClick={handleApproveAll}
                         className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-lg transition"
                       >
-                          <CheckCheck size={16} /> Approve All Pending
+                          <CheckCheck size={16} /> Approve All
                       </button>
                   )}
               </div>
@@ -769,7 +815,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     <div className="flex justify-between items-start mb-2 mt-2">
                        <div>
                          <p className="font-bold text-slate-900">{leave.userName}</p>
-                         <span className="text-xs font-semibold text-orange-700 uppercase tracking-wide">{leave.type}</span>
+                         <span className={`text-xs font-semibold uppercase tracking-wide ${leaveTypes.find(t => t.name === leave.type)?.color || 'text-orange-700'}`}>{leave.type}</span>
                        </div>
                        <div className="text-right">
                          <p className="text-xs text-slate-500">Duration</p>
@@ -785,11 +831,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                          className="flex-1 text-xs border border-orange-200 rounded px-2 py-1 focus:ring-1 focus:ring-orange-500 outline-none"
                          onChange={(e) => setReviewComment(e.target.value)}
                        />
-                       <button onClick={() => updateLeaveStatus(leave.id, currentUser.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED, reviewComment)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200"><CheckCircle size={18}/></button>
+                       <button onClick={() => updateLeaveStatus(leave.id, currentUser.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED, reviewComment)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200" title="Approve"><CheckCircle size={18}/></button>
                        <button onClick={() => {
                            const reason = prompt("Reason for rejection:");
                            if(reason) updateLeaveStatus(leave.id, LeaveStatus.REJECTED, reason);
-                       }} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"><XCircle size={18}/></button>
+                       }} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200" title="Reject"><XCircle size={18}/></button>
                     </div>
                   </div>
                 ))}
@@ -810,11 +856,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {paginatedLeaves.map(leave => (
+                  {paginatedLeaves.map(leave => {
+                    const lType = leaveTypes.find(t => t.name === leave.type);
+                    const canApprove = (currentUser?.role === UserRole.HR && leave.status === LeaveStatus.PENDING_HR) || 
+                                     (currentUser?.role === UserRole.MANAGER && leave.status === LeaveStatus.PENDING_MANAGER);
+                    
+                    return (
                     <tr key={leave.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
-                           <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
+                           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
                              {leave.userName.charAt(0)}
                            </div>
                            <span className="font-medium text-slate-700">{leave.userName}</span>
@@ -822,7 +873,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-slate-800">{leave.type}</p>
+                            <p className={`text-sm font-medium ${lType?.color || 'text-slate-800'}`}>{leave.type}</p>
                             {leave.isUrgent && (
                                 <span title="Urgent Request" className="flex items-center">
                                     <Flame size={14} className="text-red-500" fill="currentColor" />
@@ -841,8 +892,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                             <Edit2 size={12} className="mr-1"/> Edit
                           </button>
                         ) : (
-                          ((currentUser?.role === UserRole.HR && leave.status === LeaveStatus.PENDING_HR) || 
-                           (currentUser?.role === UserRole.MANAGER && leave.status === LeaveStatus.PENDING_MANAGER)) ? (
+                          canApprove ? (
                             <div className="flex gap-2">
                                 <button 
                                   onClick={() => updateLeaveStatus(leave.id, currentUser.role === UserRole.MANAGER ? LeaveStatus.PENDING_HR : LeaveStatus.APPROVED, "Approved from list")} 
@@ -868,7 +918,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )})}
                   {paginatedLeaves.length === 0 && (
                      <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400 text-sm">No records found.</td></tr>
                   )}
@@ -921,13 +971,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       )}
 
       {/* VIEW: CALENDAR */}
-      {viewMode === 'calendar' && isManager && <ManagerCalendar />}
+      {viewMode === 'calendar' && (isManager || isHR) && <ManagerCalendar />}
 
       {/* VIEW: TEAM */}
       {viewMode === 'team' && isManager && <TeamView />}
 
       {/* ... MODALS ... */}
-      {/* (Modals code remains identical, just rendering logic wrapper) */}
+      
+      {/* Create/Edit Request Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
@@ -1044,6 +1095,22 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Default Days per Year</label>
                 <input required type="number" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} />
               </div>
+              
+              {/* Color Picker */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Color Label</label>
+                <div className="flex flex-wrap gap-2">
+                    {colorOptions.map((colorClass) => (
+                        <button
+                            key={colorClass}
+                            type="button"
+                            onClick={() => setTypeData({...typeData, color: colorClass})}
+                            className={`w-6 h-6 rounded-full cursor-pointer transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-400 ${colorClass.replace('text-', 'bg-').replace('600', '500')} ${typeData.color === colorClass ? 'ring-2 ring-offset-2 ring-slate-800 scale-110' : ''}`}
+                        />
+                    ))}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
                 <textarea required rows={2} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Short description..."></textarea>

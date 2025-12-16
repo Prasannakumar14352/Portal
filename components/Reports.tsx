@@ -2,18 +2,25 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend, LineChart, Line
 } from 'recharts';
 import { useAppContext } from '../contexts/AppContext';
-import { Filter, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { UserRole } from '../types';
 
 const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1'];
+const STATUS_COLORS: Record<string, string> = {
+  'Present': '#10b981', // Emerald
+  'Late': '#f59e0b',    // Amber
+  'Absent': '#ef4444',  // Red
+  'Half Day': '#8b5cf6' // Violet
+};
 
 const Reports = () => {
-  const { timeEntries, projects, users, showToast } = useAppContext();
+  const { timeEntries, projects, users, attendance, currentUser, showToast } = useAppContext();
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [filterPeriod, setFilterPeriod] = useState('This Month');
   const [filterProject, setFilterProject] = useState('All');
@@ -21,6 +28,8 @@ const Reports = () => {
   // Export State
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  const isHR = currentUser?.role === UserRole.HR;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -33,6 +42,12 @@ const Reports = () => {
   }, []);
 
   // --- Data Aggregation Helpers ---
+
+  // 0. Filtered Attendance (Based on Role)
+  const filteredAttendance = useMemo(() => {
+      if (isHR) return attendance;
+      return attendance.filter(a => a.employeeId === currentUser?.id);
+  }, [attendance, currentUser, isHR]);
 
   // 1. Project Status Overview (Pie)
   const projectStatusData = useMemo(() => {
@@ -99,24 +114,55 @@ const Reports = () => {
       return data;
   }, [timeEntries]);
 
-  // 6. Project Progress (Bar - Mocked as % of tasks completed if available, else random for demo visualization matching image)
+  // 6. Project Progress (Bar - Mocked)
   const projectProgressData = useMemo(() => {
       return projects.map(p => {
-          // In a real app, calculate based on closed tasks / total tasks
-          // Mocking completion for visualization as we don't track individual task status in db yet
           const completion = p.status === 'Completed' ? 100 : Math.floor(Math.random() * 80) + 10; 
           return { name: p.name, progress: completion };
       });
   }, [projects]);
 
-  // 7. Task Status Distribution (Pie - Mocked)
+  // 7. Attendance Status Distribution (Pie)
+  const attendanceStatusData = useMemo(() => {
+      const counts: Record<string, number> = { 'Present': 0, 'Late': 0, 'Absent': 0 };
+      filteredAttendance.forEach(a => {
+          const status = a.status || 'Present';
+          counts[status] = (counts[status] || 0) + 1;
+      });
+      return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
+  }, [filteredAttendance]);
+
+  // 8. Attendance Punctuality (Bar)
+  const attendancePunctualityData = useMemo(() => {
+      const onTime = filteredAttendance.filter(a => a.status === 'Present').length;
+      const late = filteredAttendance.filter(a => a.status === 'Late').length;
+      return [
+          { name: 'On Time', count: onTime },
+          { name: 'Late', count: late }
+      ];
+  }, [filteredAttendance]);
+
+  // 9. Daily Attendance Count (Line - HR Only)
+  const dailyAttendanceData = useMemo(() => {
+      if (!isHR) return [];
+      const last7Days = Array.from({length: 7}, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+      });
+
+      return last7Days.map(date => {
+          const count = attendance.filter(a => a.date === date).length;
+          return { date: new Date(date).toLocaleDateString('en-US', {weekday: 'short'}), count };
+      });
+  }, [attendance, isHR]);
+
+  // Mocked Task Data
   const taskStatusData = [
       { name: 'Todo', value: 45 },
       { name: 'In Progress', value: 30 },
       { name: 'Completed', value: 25 },
   ];
-
-  // 8. Task Priority (Bar - Mocked)
   const taskPriorityData = [
       { name: 'High', count: 12 },
       { name: 'Medium', count: 24 },
@@ -144,9 +190,9 @@ const Reports = () => {
                 Tasks: p.tasks.join('; ')
             }));
             break;
-        case 'Time Tracking':
-            title = 'Time Tracking Report';
-            filename = 'time_tracking_report';
+        case 'Time Logs':
+            title = 'Time Logs Report';
+            filename = 'time_logs_report';
             dataToExport = timeEntries.map(t => ({ 
                 Date: t.date, 
                 Project: projects.find(p => p.id === t.projectId)?.name || 'N/A', 
@@ -154,6 +200,18 @@ const Reports = () => {
                 Task: t.task,
                 Hours: (t.durationMinutes/60).toFixed(2),
                 Billable: t.isBillable ? 'Yes' : 'No'
+            }));
+            break;
+        case 'Attendance':
+            title = `Attendance Report (${isHR ? 'All Employees' : 'My Records'})`;
+            filename = 'attendance_report';
+            dataToExport = filteredAttendance.map(a => ({
+                Date: a.date,
+                Employee: a.employeeName,
+                CheckIn: a.checkIn,
+                CheckOut: a.checkOut || 'N/A',
+                Status: a.status,
+                Notes: a.notes || ''
             }));
             break;
         case 'Team Performance':
@@ -201,12 +259,9 @@ const Reports = () => {
                     const canvas = await html2canvas(el, { scale: 1.5 });
                     const imgData = canvas.toDataURL('image/png');
                     
-                    // A4 Width is 210mm. 
-                    // Let's use 180mm max width for image, with 15mm margins.
                     const imgWidth = 180; 
                     const imgHeight = (canvas.height * imgWidth) / canvas.width;
                     
-                    // If image doesn't fit on current page, add new page
                     if (yPos + imgHeight > 280) {
                         doc.addPage();
                         yPos = 20;
@@ -223,7 +278,6 @@ const Reports = () => {
         const headers = Object.keys(dataToExport[0]);
         const body = dataToExport.map(row => Object.values(row));
 
-        // Start table on new page if space is tight
         if (yPos > 240) {
             doc.addPage();
             yPos = 20;
@@ -268,7 +322,7 @@ const Reports = () => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Reports & Analytics</h2>
-          <p className="text-slate-500 text-sm">Analyze project performance and team productivity.</p>
+          <p className="text-slate-500 text-sm">Analyze project performance, time logs, and attendance.</p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
@@ -325,7 +379,7 @@ const Reports = () => {
       {/* Tabs */}
       <div className="border-b border-slate-200 print:hidden overflow-x-auto">
         <nav className="flex space-x-8 min-w-max pb-1">
-          {['Dashboard', 'Projects', 'Tasks', 'Time Tracking', 'Team Performance'].map((tab) => (
+          {['Dashboard', 'Projects', 'Tasks', 'Time Logs', 'Attendance', 'Team Performance'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -344,7 +398,80 @@ const Reports = () => {
       {/* Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:block print:space-y-6">
         
-        {/* Row 1 */}
+        {/* Row 1 - Attendance Specific */}
+        {(activeTab === 'Dashboard' || activeTab === 'Attendance') && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-slate-800">Attendance Status</h3>
+                    <CalendarCheck size={18} className="text-slate-400"/>
+                </div>
+                <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={attendanceStatusData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                paddingAngle={5}
+                                dataKey="value"
+                            >
+                                {attendanceStatusData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                            <Legend verticalAlign="bottom" height={36}/>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        )}
+
+        {(activeTab === 'Dashboard' || activeTab === 'Attendance') && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-slate-800">Punctuality Overview</h3>
+                    <Clock size={18} className="text-slate-400"/>
+                </div>
+                <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={attendancePunctualityData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                            <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={50}>
+                                {attendancePunctualityData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.name === 'Late' ? '#f59e0b' : '#10b981'} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        )}
+
+        {/* HR Only Attendance Trend */}
+        {isHR && activeTab === 'Attendance' && (
+             <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Daily Attendance Count (Last 7 Days)</h3>
+                <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={dailyAttendanceData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                            <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={3} dot={{r: 4}} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        )}
+
+        {/* Row 2 - Project Status (Dashboard/Projects) */}
         {(activeTab === 'Dashboard' || activeTab === 'Projects') && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Project Status Overview</h3>
@@ -399,7 +526,7 @@ const Reports = () => {
             </div>
         )}
 
-        {/* Row 2 - Full Width */}
+        {/* Row 3 - Full Width Charts */}
         {(activeTab === 'Dashboard' || activeTab === 'Projects') && (
             <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Project Progress (%)</h3>
@@ -417,7 +544,6 @@ const Reports = () => {
             </div>
         )}
 
-        {/* Row 3 */}
         {(activeTab === 'Dashboard' || activeTab === 'Tasks') && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Task Priority Distribution</h3>
@@ -435,7 +561,7 @@ const Reports = () => {
             </div>
         )}
 
-        {(activeTab === 'Dashboard' || activeTab === 'Time Tracking') && (
+        {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Time Allocation by Project</h3>
                 <div className="h-64">
@@ -462,8 +588,8 @@ const Reports = () => {
             </div>
         )}
 
-        {/* Row 4 - Time Tracking Details */}
-        {(activeTab === 'Dashboard' || activeTab === 'Time Tracking') && (
+        {/* Row 4 - Time Logs Details */}
+        {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
             <div className="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Weekly Hours Logged</h3>
                 <div className="h-64">
@@ -498,7 +624,7 @@ const Reports = () => {
             </div>
         )}
 
-        {(activeTab === 'Dashboard' || activeTab === 'Time Tracking') && (
+        {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Billable vs Non-Billable</h3>
                 <div className="h-64">

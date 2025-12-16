@@ -43,10 +43,10 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
 
   const getIcon = (type: string | undefined) => {
     switch(type) {
-        case 'success': return <CheckCircle size={16} className="text-green-500" />;
+        case 'success': return <CheckCircle size={16} className="text-emerald-500" />;
         case 'error': return <XCircle size={16} className="text-red-500" />;
         case 'warning': return <AlertTriangle size={16} className="text-orange-500" />;
-        default: return <Info size={16} className="text-blue-500" />;
+        default: return <Info size={16} className="text-teal-500" />;
     }
   };
 
@@ -78,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
         <div className="relative" ref={notifRef}>
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`relative p-2 rounded-full transition-colors ${showNotifications ? 'bg-blue-50 text-blue-600 dark:bg-slate-700 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'}`}
+            className={`relative p-2 rounded-full transition-colors ${showNotifications ? 'bg-teal-50 text-teal-600 dark:bg-slate-700 dark:text-teal-400' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'}`}
           >
             <Bell size={20} />
             {unreadCount > 0 && (
@@ -91,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
               <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                 <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Notifications</h3>
                 {unreadCount > 0 && (
-                  <button onClick={() => markAllRead(user.id)} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium cursor-pointer">
+                  <button onClick={() => markAllRead(user.id)} className="text-xs text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 font-medium cursor-pointer">
                     Mark all read
                   </button>
                 )}
@@ -104,7 +104,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
                     <div 
                         key={notif.id} 
                         onClick={() => markNotificationRead(notif.id)}
-                        className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors ${!notif.read ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''}`}
+                        className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors ${!notif.read ? 'bg-teal-50/40 dark:bg-teal-900/10' : ''}`}
                     >
                         <div className="flex justify-between items-start mb-1 gap-2">
                         <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
                         <p className={`text-xs ${!notif.read ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'} line-clamp-2 pl-6`}>{notif.message}</p>
                         {!notif.read && (
                             <div className="flex justify-end mt-1">
-                                <span className="text-[10px] text-blue-500 font-medium">New</span>
+                                <span className="text-[10px] text-teal-500 font-medium">New</span>
                             </div>
                         )}
                     </div>

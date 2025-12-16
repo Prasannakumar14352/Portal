@@ -11,7 +11,8 @@ interface DashboardProps {
   employees: Employee[];
 }
 
-const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
+// Teal-based palette
+const COLORS = ['#0f766e', '#f59e0b', '#ef4444']; 
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string | number, icon: any, color: string, subtext?: string }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -58,7 +59,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
           <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
           <p className="text-slate-500">Welcome back, here's what's happening today.</p>
         </div>
-        <div className="mt-4 md:mt-0 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
+        <div className="mt-4 md:mt-0 bg-teal-50 text-teal-700 px-4 py-2 rounded-lg text-sm font-medium">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </div>
       </div>
@@ -68,7 +69,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
           title="Total Employees" 
           value={totalEmployees} 
           icon={Users} 
-          color="bg-blue-600"
+          color="bg-teal-600"
           subtext="+4 new this month"
         />
         <StatCard 
@@ -104,7 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="employees" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="employees" fill="#0f766e" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

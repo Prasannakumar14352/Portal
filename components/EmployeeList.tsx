@@ -163,7 +163,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             {isHR && (
             <button 
                 onClick={openAddModal}
-                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+                className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
             >
                 <Plus size={18} />
                 <span>Add Employee</span>
@@ -173,57 +173,55 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Filters and Search - Aligned in one line */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50">
+        {/* Filters and Search - Updated Layout: Filters Above Search */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-4">
+          
+          {/* Row 1: Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-slate-500 mr-2">
+                  <Filter size={16} />
+                  <span className="text-sm font-medium">Filters:</span>
+              </div>
+              
+              <select 
+                value={filterDept}
+                onChange={(e) => setFilterDept(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+              >
+                <option value="All">All Departments</option>
+                {Object.values(DepartmentType).map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+
+              <select 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+              >
+                <option value="All">All Status</option>
+                {Object.values(EmployeeStatus).map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+          </div>
+
+          {/* Row 2: Search and Count */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            
-            {/* Search - Left Aligned */}
-            <div className="relative w-full md:max-w-xs">
+            <div className="relative w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search employees..." 
+                placeholder="Search employees by name, email or role..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-sm"
               />
             </div>
-
-            {/* Filters - Right Aligned */}
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-                <div className="flex items-center gap-2 text-slate-500">
-                    <Filter size={16} />
-                    <span className="text-sm font-medium">Filters:</span>
-                </div>
-                
-                <select 
-                  value={filterDept}
-                  onChange={(e) => setFilterDept(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-400 transition-colors cursor-pointer shadow-sm"
-                >
-                  <option value="All">All Departments</option>
-                  {Object.values(DepartmentType).map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-
-                <select 
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-400 transition-colors cursor-pointer shadow-sm"
-                >
-                  <option value="All">All Status</option>
-                  {Object.values(EmployeeStatus).map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
+            
+            <div className="text-xs text-slate-500 whitespace-nowrap self-end md:self-auto">
+               Showing <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> employees
             </div>
-          </div>
-          
-          <div className="flex justify-end mt-2">
-             <div className="text-xs text-slate-500">
-                Showing <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> employees
-             </div>
           </div>
         </div>
 
@@ -276,7 +274,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   {isHR && (
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-blue-600 p-1">
+                        <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 p-1">
                           <Edit2 size={16} />
                         </button>
                         <button onClick={() => onDeleteEmployee(emp.id)} className="text-slate-400 hover:text-red-600 p-1">
@@ -305,7 +303,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
              <select 
                value={itemsPerPage}
                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-               className="border border-slate-300 rounded p-1 outline-none bg-white focus:ring-2 focus:ring-blue-500"
+               className="border border-slate-300 rounded p-1 outline-none bg-white focus:ring-2 focus:ring-teal-500"
              >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -361,7 +359,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                     type="text"
                     value={formData.firstName}
                     onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                   />
                 </div>
                 <div>
@@ -371,7 +369,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                     type="text"
                     value={formData.lastName}
                     onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                   />
                 </div>
               </div>
@@ -385,7 +383,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                   />
                 </div>
                 {!editingEmployee && <p className="text-xs text-slate-500 mt-1">A secure password will be generated automatically.</p>}
@@ -398,7 +396,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                        <select 
                          value={formData.role} 
                          onChange={(e) => setFormData({...formData, role: e.target.value})}
-                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
                        >
                          <option value="Employee">Employee</option>
                          <option value="Team Manager">Team Manager</option>
@@ -413,18 +411,18 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                         type="text"
                         value={formData.role}
                         onChange={(e) => setFormData({...formData, role: e.target.value})}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                         placeholder="e.g. Software Engineer"
                       />
                   )}
-                  {isSuperAdmin && <p className="text-[10px] text-emerald-600 mt-1">Super Admin Privileges Active</p>}
+                  {isSuperAdmin && <p className="text-[10px] text-teal-600 mt-1">Super Admin Privileges Active</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
                   <select
                     value={formData.department}
                     onChange={(e) => setFormData({...formData, department: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                   >
                     {Object.values(DepartmentType).map(dept => (
                       <option key={dept} value={dept}>{dept}</option>
@@ -439,7 +437,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                    <select
                     value={formData.status}
                     onChange={(e) => setFormData({...formData, status: e.target.value as EmployeeStatus})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
                   >
                     {Object.values(EmployeeStatus).map(status => (
                       <option key={status} value={status}>{status}</option>
@@ -458,7 +456,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 </button>
                 <button 
                   type="submit" 
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors"
                 >
                   {editingEmployee ? 'Save Changes' : 'Create Employee'}
                 </button>
@@ -472,15 +470,15 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       {showSuccessModal && generatedCreds && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in fade-in zoom-in duration-300 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-blue-500"></div>
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-teal-400 to-teal-700"></div>
               
               <div className="flex flex-col items-center text-center mb-6">
-                 <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
-                    <Key size={32} className="text-emerald-600" />
+                 <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+                    <Key size={32} className="text-teal-700" />
                  </div>
                  <h3 className="text-2xl font-bold text-slate-800">Employee Created</h3>
                  <p className="text-slate-500 mt-2">A unique password has been generated. Please share these credentials with the employee securely.</p>
-                 <p className="text-xs text-blue-500 mt-1">An email notification has also been sent.</p>
+                 <p className="text-xs text-teal-600 mt-1">An email notification has also been sent.</p>
               </div>
 
               <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mb-6 relative">

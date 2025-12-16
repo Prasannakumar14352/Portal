@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, XCircle } from 'lucide-react';
 import { getHRChatResponse, resetChatSession } from '../services/geminiService';
@@ -47,21 +46,30 @@ const HRAssistant: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
-    const responseText = await getHRChatResponse(userMessage.text);
-    
-    // Check if the response suggests an error based on the service's default error string
-    const isError = responseText.includes("Sorry, I encountered an issue") || responseText.includes("apologize");
+    try {
+      const responseText = await getHRChatResponse(userMessage.text);
+      
+      const botMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'model',
+        text: responseText,
+        timestamp: new Date(),
+        isError: false
+      };
 
-    const botMessage: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'model',
-      text: responseText,
-      timestamp: new Date(),
-      isError: isError
-    };
-
-    setMessages(prev => [...prev, botMessage]);
-    setIsLoading(false);
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'model',
+        text: 'Sorry, I encountered an issue. Please try again later.',
+        timestamp: new Date(),
+        isError: true
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
