@@ -8,11 +8,20 @@ interface AttendanceProps {
   records: AttendanceRecord[];
 }
 
+const LOCATIONS = [
+  'Office HQ India',
+  'WFH India',
+  'UAE Office',
+  'UAE Client Location',
+  'USA'
+];
+
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const { checkIn, checkOut, getTodayAttendance, timeEntries, addTimeEntry, projects, currentUser } = useAppContext();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchName, setSearchName] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -177,14 +186,27 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
          <div className="flex flex-col items-center gap-3">
              {!todayRecord ? (
-                <button 
-                  onClick={() => checkIn()}
-                  className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-emerald-50 rounded-full border-4 border-emerald-100 hover:bg-emerald-100 hover:scale-105 transition-all group cursor-pointer shadow-sm"
-                >
-                   <PlayCircle size={48} className="text-emerald-600 mb-2 group-hover:text-emerald-700" />
-                   <span className="font-bold text-emerald-700">Check In</span>
-                   <span className="text-xs text-emerald-500">Start your day</span>
-                </button>
+                <div className="flex flex-col items-center">
+                  <div className="mb-3 w-full">
+                    <select
+                      value={selectedLocation}
+                      onChange={(e) => setSelectedLocation(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      {LOCATIONS.map(loc => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button 
+                    onClick={() => checkIn(selectedLocation)}
+                    className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-emerald-50 rounded-full border-4 border-emerald-100 hover:bg-emerald-100 hover:scale-105 transition-all group cursor-pointer shadow-sm"
+                  >
+                     <PlayCircle size={48} className="text-emerald-600 mb-2 group-hover:text-emerald-700" />
+                     <span className="font-bold text-emerald-700">Check In</span>
+                     <span className="text-xs text-emerald-500">Start your day</span>
+                  </button>
+                </div>
              ) : todayRecord.checkOut ? (
                 <div className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-gray-50 rounded-full border-4 border-gray-100">
                    <CheckCircle2 size={48} className="text-gray-400 mb-2" />
@@ -219,6 +241,10 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                <div className="flex justify-between">
                  <span className="text-slate-500">Check Out:</span>
                  <span className="font-medium text-slate-800">{todayRecord?.checkOut || '--:--'}</span>
+               </div>
+               <div className="flex justify-between">
+                 <span className="text-slate-500">Location:</span>
+                 <span className="font-medium text-slate-800 truncate max-w-[100px]" title={todayRecord?.workLocation}>{todayRecord?.workLocation || '--'}</span>
                </div>
                <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
                  <span className="text-slate-500">Status:</span>
@@ -457,7 +483,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-1 text-slate-500 text-sm">
                       <MapPin size={14} />
-                      <span>Office HQ</span>
+                      <span>{record.workLocation || 'Office HQ India'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">

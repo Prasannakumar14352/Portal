@@ -175,7 +175,8 @@ const initDb = async () => {
                 checkInTime NVARCHAR(50),
                 checkOutTime NVARCHAR(50),
                 status NVARCHAR(50),
-                notes NVARCHAR(MAX)
+                notes NVARCHAR(MAX),
+                workLocation NVARCHAR(100)
             )
         `);
 
@@ -555,7 +556,8 @@ app.post('/api/attendance', async (req, res) => {
         reqSql.input('checkOutTime', sql.NVarChar, a.checkOutTime);
         reqSql.input('status', sql.NVarChar, a.status);
         reqSql.input('notes', sql.NVarChar, a.notes);
-        await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes)");
+        reqSql.input('workLocation', sql.NVarChar, a.workLocation); // Add workLocation input
+        await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
         res.json(a);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

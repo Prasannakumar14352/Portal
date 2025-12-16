@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ListTodo, GripVertical, Eye, ChevronLeft, ChevronRight, Network, MapPin } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 
 // --- Org Chart Helper Types & Logic ---
@@ -88,6 +88,135 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   );
 };
 
+// --- Map View Component ---
+const AllEmployeesMap: React.FC<{ users: Employee[] }> = ({ users }) => {
+  const mapDiv = useRef<HTMLDivElement>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+
+  useEffect(() => {
+    let view: any = null;
+    let cleanup = false;
+
+    const loadArcGIS = () => {
+      return new Promise<void>((resolve, reject) => {
+        if (window.require) {
+          resolve();
+          return;
+        }
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://js.arcgis.com/4.29/esri/themes/light/main.css';
+        document.head.appendChild(link);
+        const script = document.createElement('script');
+        script.src = 'https://js.arcgis.com/4.29/';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = (e) => reject(e);
+        document.body.appendChild(script);
+      });
+    };
+
+    const initMap = async () => {
+      try {
+        await loadArcGIS();
+        if (cleanup || !mapDiv.current) return;
+
+        window.require([
+          "esri/Map",
+          "esri/views/MapView",
+          "esri/Graphic",
+          "esri/layers/GraphicsLayer"
+        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
+          if (cleanup) return;
+
+          const map = new EsriMap({
+            basemap: "topo-vector"
+          });
+
+          const layer = new GraphicsLayer();
+          map.add(layer);
+
+          // Add graphics for each user with location
+          let pointsAdded = 0;
+          users.forEach(u => {
+            if (u.location && u.location.latitude && u.location.longitude) {
+              const point = {
+                type: "point",
+                longitude: u.location.longitude,
+                latitude: u.location.latitude
+              };
+              const markerSymbol = {
+                type: "simple-marker",
+                color: [16, 185, 129], // Emerald-500
+                size: "10px",
+                outline: { color: [255, 255, 255], width: 1 }
+              };
+              const popupTemplate = {
+                title: `${u.firstName} ${u.lastName}`,
+                content: `
+                  <div class="py-2">
+                    <p><strong>${u.jobTitle || u.role}</strong></p>
+                    <p>${u.department}</p>
+                    <p class="mt-1 text-xs text-gray-500">${u.location.address || ''}</p>
+                  </div>
+                `
+              };
+              const graphic = new Graphic({
+                geometry: point,
+                symbol: markerSymbol,
+                popupTemplate: popupTemplate
+              });
+              layer.add(graphic);
+              pointsAdded++;
+            }
+          });
+
+          const view = new MapView({
+            container: mapDiv.current,
+            map: map,
+            center: [-10, 30], // Generic center
+            zoom: 2,
+            popup: {
+               dockEnabled: true,
+               dockOptions: { buttonEnabled: true, breakpoint: false }
+            }
+          });
+
+          view.when(() => {
+             if (!cleanup) setIsMapLoaded(true);
+          });
+        });
+      } catch (e) {
+        console.error("Map Load Error", e);
+      }
+    };
+
+    initMap();
+
+    return () => {
+      cleanup = true;
+      if (view) {
+        view.destroy();
+        view = null;
+      }
+    };
+  }, [users]);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-[600px] relative">
+       <div ref={mapDiv} className="w-full h-full"></div>
+       {!isMapLoaded && (
+         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+            <div className="flex flex-col items-center">
+               <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+               <p className="text-gray-500 text-sm">Loading Employee Map...</p>
+            </div>
+         </div>
+       )}
+    </div>
+  );
+};
+
 const Organization = () => {
   const { 
     currentUser, 
@@ -97,7 +226,7 @@ const Organization = () => {
     employees, addEmployee, updateEmployee, deleteEmployee 
   } = useAppContext();
   
-  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations' | 'chart'>('departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
@@ -445,6 +574,12 @@ const Organization = () => {
              >
                Allocations
              </button>
+             <button 
+               onClick={() => setActiveTab('locations')}
+               className={`flex-1 xl:flex-none px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === 'locations' ? 'bg-white shadow text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               Map View
+             </button>
              {showEmployeesTab && (
                <button 
                  onClick={() => setActiveTab('employees')}
@@ -465,6 +600,20 @@ const Organization = () => {
               onUpdateEmployee={updateEmployee}
               onDeleteEmployee={deleteEmployee}
             />
+         </div>
+       )}
+
+       {/* --- MAP VIEW TAB --- */}
+       {activeTab === 'locations' && (
+         <div className="animate-fade-in">
+            <div className="mb-4">
+               <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
+                 <MapPin size={20} className="text-emerald-600"/>
+                 <span>All Employee Locations</span>
+               </h3>
+               <p className="text-sm text-gray-500">Geographical distribution of all active employees.</p>
+            </div>
+            <AllEmployeesMap users={users} />
          </div>
        )}
 
@@ -498,6 +647,7 @@ const Organization = () => {
          </div>
        )}
 
+       {/* ... Departments, Projects, Allocations tabs (No changes needed, kept for context in full file if needed but XML only needs diff) ... */}
        {/* --- DEPARTMENTS TAB --- */}
        {activeTab === 'departments' && (
          <div className="space-y-4 animate-fade-in">
@@ -752,6 +902,8 @@ const Organization = () => {
          </div>
        )}
 
+       {/* ... Modals (kept as is, showing logic is correct above) ... */}
+       {/* (DEPT, PROJ, ALLOC modals logic is included in the full component) */}
        {/* --- DEPARTMENT MODAL --- */}
        {showDeptModal && (
          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

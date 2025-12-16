@@ -72,7 +72,7 @@ interface AppContextType {
   deleteTimeEntry: (id: string) => Promise<void>;
   
   // Attendance Actions
-  checkIn: () => Promise<void>;
+  checkIn: (workLocation?: string) => Promise<void>;
   checkOut: (reason?: string) => Promise<void>;
   getTodayAttendance: () => AttendanceRecord | undefined;
 
@@ -191,25 +191,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Normal Login
     let user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
     
-    // SPECIAL DEMO HANDLER: 
-    // If the user uses the specific Microsoft email from the screenshot but we don't have them in DB or password differs,
-    // we allow it for demo continuity so they can see the app.
-    // Also handles the case where they used "Sign in with Microsoft" before but now use the form.
+    // SPECIAL DEMO HANDLER
     if (!user && email.toLowerCase().includes('onmicrosoft.com')) {
-        // Check if user exists but password mismatch
         const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
         
         if (existingUser) {
-            // Allow login anyway for this domain in this demo/template
             user = existingUser;
         } else {
-            // Auto-provision this user so they can get in
             const newUser: Employee = {
                 id: Math.random().toString(36).substr(2, 9),
                 firstName: 'Microsoft',
                 lastName: 'User',
                 email: email,
-                password: password, // Save the password they used
+                password: password,
                 role: UserRole.EMPLOYEE,
                 department: DepartmentType.IT,
                 departmentId: 'd1',
@@ -250,7 +244,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Helper to handle user registration/session creation
   const handleUserAuthSuccess = async (name: string, email: string) => {
-      // Re-fetch employees to ensure we have latest list
       const currentEmployees = await db.getEmployees();
       const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
       
@@ -270,7 +263,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
           showToast(`Welcome back, ${existingUser.firstName}!`, 'success');
       } else {
-          // Auto-Register new user
           const [firstName, ...lastNameParts] = name.split(' ');
           const lastName = lastNameParts.join(' ') || '';
           
@@ -279,8 +271,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               firstName: firstName || 'User',
               lastName: lastName,
               email: email,
-              password: 'ms-auth-user', // Placeholder
-              role: 'Employee', // Default role
+              password: 'ms-auth-user',
+              role: 'Employee',
               department: 'General',
               departmentId: '',
               joinDate: new Date().toISOString().split('T')[0],
@@ -303,7 +295,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               hireDate: newUser.joinDate
           });
           
-          // Notify the new employee (and HR via system log implicitly)
           await sendSystemNotification(newUser.id, 'Welcome to EmpowerCorp', `Your account has been created via Microsoft Login.`, 'success');
           showToast(`Account created for ${newUser.firstName}!`, 'success');
       }
@@ -326,27 +317,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return true;
         }
     } catch (error: any) {
-        // Log generic error
         console.error("Microsoft Login Error:", error);
         const errorMsg = error.message || error.toString();
 
-        // Handle User Cancellation gracefully
         if (error.errorCode === 'user_cancelled') {
             showToast("Login cancelled.", "info");
             return false;
         }
         
-        // Handle Popup Blocked
         if (error.errorCode === 'popup_window_error') {
             showToast("Login popup was blocked. Please allow popups for this site.", "warning");
             return false;
         }
 
-        // FALLBACK LOGIC
-        // Catch "400 Bad Request" (ServerError) which happens when Azure is configured as "Web" (requiring secret) 
-        // but we are connecting from "SPA".
-        // Also catch "9002326" (Config Mismatch).
-        
         let fallbackMessage = "Login failed. Falling back to Demo User.";
         if (errorMsg.includes("9002326") || errorMsg.includes("AADSTS9002326")) {
              fallbackMessage = "Azure Config Mismatch (Web vs SPA). Using Demo User.";
@@ -355,8 +338,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         showToast(fallbackMessage, "warning");
-        
-        // Simulate successful login with Demo User
         await handleUserAuthSuccess("Azure Demo User", "azure.demo@empower.com");
         return true;
     }
@@ -365,14 +346,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     if (msalInstance) {
-        // Optional: msalInstance.logoutPopup(); // If we want to logout from MS too
+        // Optional: msalInstance.logoutPopup(); 
     }
     setCurrentUser(null);
     showToast('Logged out successfully', 'info');
   };
 
   const forgotPassword = async (email: string): Promise<boolean> => {
-     // Simulate sending email
      await emailService.sendEmail({
          to: email,
          subject: 'Password Reset Request',
@@ -386,7 +366,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
     setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => removeToast(id), 5000); // Increased timeout for reading error messages
+    setTimeout(() => removeToast(id), 5000);
   };
 
   const removeToast = (id: string) => {
@@ -431,10 +411,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEmployee = async (emp: Employee) => {
     await db.addEmployee(emp);
     setEmployees(await db.getEmployees());
-    
-    // Notify the new employee
     await sendSystemNotification(emp.id, 'Welcome to EmpowerCorp', `Your account has been created. Your username is ${emp.email}.`, 'success');
-    
     showToast('Employee added and notified successfully', 'success');
   };
 
@@ -451,7 +428,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await db.updateEmployee(updated);
         setEmployees(await db.getEmployees());
         
-        // Notify on role/dept change if relevant
         if (data.departmentId && data.departmentId !== existing.departmentId) {
              const dept = departments.find(d => d.id === data.departmentId);
              await sendSystemNotification(id, 'Department Change', `You have been assigned to ${dept?.name || 'a new department'}.`, 'info');
@@ -611,7 +587,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return attendance.find(a => a.employeeId === currentUser.id && a.date === today);
   };
 
-  const checkIn = async () => {
+  const checkIn = async (workLocation?: string) => {
     if (!currentUser) return;
     const now = new Date();
     const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30);
@@ -623,7 +599,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       checkIn: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       checkInTime: now.toISOString(),
       checkOut: '',
-      status: isLate ? 'Late' : 'Present'
+      status: isLate ? 'Late' : 'Present',
+      workLocation: workLocation || 'Office HQ India' // Default
     };
     await db.addAttendance(record);
     setAttendance(await db.getAttendance());

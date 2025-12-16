@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, User } from '../types';
@@ -55,7 +56,8 @@ const Profile = () => {
   const isHR = currentUser?.role === UserRole.HR;
   const isSelf = true; // Currently only viewing own profile
   
-  const canEditLocation = isHR || isSelf; 
+  // HR ONLY can update location as per request
+  const canEditLocation = isHR; 
   const canEditAvatar = isHR || isSelf;
   const canEditDetails = isHR; // Name, Phone, Job, Hire
   const canEditAllocations = isHR; // Department, Projects
@@ -131,7 +133,7 @@ const Profile = () => {
                 const markerSymbol = {
                   type: "simple-marker",
                   color: [156, 163, 175], // Gray-400
-                  size: "10px",
+                  size: "8px",
                   outline: { color: [255, 255, 255], width: 1 }
                 };
                 const popupTemplate = {
@@ -189,12 +191,12 @@ const Profile = () => {
 
           // Handle Click
           view.on("click", async (event: any) => {
+            if (!canEditLocation) return; // Guard
+
             const response = await view.hitTest(event);
             const hitGraphic = response.results.find((r: any) => r.graphic.layer === colleaguesLayer);
             
             if (hitGraphic) return;
-
-            if (!canEditLocation) return;
 
             const lat = event.mapPoint.latitude;
             const lng = event.mapPoint.longitude;
@@ -250,7 +252,7 @@ const Profile = () => {
         view = null;
       }
     };
-  }, [profileUser, canEditLocation]); 
+  }, [profileUser, canEditLocation]); // Re-run if permissions change (though unlikely in session)
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -520,7 +522,7 @@ const Profile = () => {
                         <span className="w-2 h-2 rounded-full bg-gray-400"></span>
                         <span className="text-gray-600">Colleagues</span>
                      </div>
-                     {canEditLocation && <span className="text-green-600 font-medium border-l pl-3 ml-1">Editable: Click to update</span>}
+                     {canEditLocation && <span className="text-green-600 font-medium border-l pl-3 ml-1">Editable: Click to update (HR Only)</span>}
                    </div>
                 </div>
                 
@@ -530,7 +532,7 @@ const Profile = () => {
                      disabled={!canEditLocation}
                      type="text" 
                      className={`w-full border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${canEditLocation ? 'border-gray-300' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
-                     placeholder={canEditLocation ? "Enter address manually or click on map..." : "Location set by user"} 
+                     placeholder={canEditLocation ? "Enter address manually or click on map..." : "Location set by HR"} 
                      value={formData.address}
                      onChange={e => setFormData({...formData, address: e.target.value})}
                    />

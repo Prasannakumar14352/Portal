@@ -105,6 +105,7 @@ export interface AttendanceRecord {
   checkOutTime?: string; 
   status: 'Present' | 'Absent' | 'Late';
   notes?: string; 
+  workLocation?: string;
 }
 
 export interface TimeEntry {
