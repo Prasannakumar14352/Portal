@@ -343,7 +343,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateEmployee = async (emp: Employee) => {
     await db.updateEmployee(emp);
-    setEmployees(await db.getEmployees());
+    // Refresh both employees AND attendance because server cascades workLocation changes
+    const [empData, attendData] = await Promise.all([
+        db.getEmployees(),
+        db.getAttendance()
+    ]);
+    setEmployees(empData);
+    setAttendance(attendData);
     showToast('Employee updated', 'success');
   };
 
@@ -352,7 +358,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (existing) {
         const updated = { ...existing, ...data };
         await db.updateEmployee(updated);
-        setEmployees(await db.getEmployees());
+        // Refresh both employees AND attendance because server cascades workLocation changes
+        const [empData, attendData] = await Promise.all([
+            db.getEmployees(),
+            db.getAttendance()
+        ]);
+        setEmployees(empData);
+        setAttendance(attendData);
         showToast('Profile updated', 'success');
     }
   };

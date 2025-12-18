@@ -85,7 +85,6 @@ const initDb = async () => {
         const request = pool.request();
         console.log("[DB] Starting schema synchronization...");
 
-        // Table creation sequence with individual success logs
         const tables = [
             { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100))` },
             { name: 'departments', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U') CREATE TABLE departments (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), managerId NVARCHAR(50))` },
@@ -105,14 +104,13 @@ const initDb = async () => {
             console.log(`[DB] Checked table: ${table.name}`);
         }
         
-        // Run Migrations (Add missing columns to existing DBs)
         console.log("[DB] Checking for column updates/migrations...");
         try {
             await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'employees')) ALTER TABLE employees ADD workLocation NVARCHAR(100)`);
             await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'attendance')) ALTER TABLE attendance ADD workLocation NVARCHAR(100)`);
             console.log("✅ [DB] Migrations verified.");
         } catch (e) { 
-            console.warn("[DB] Migration check encountered issues (usually safe to ignore if columns exist):", e.message); 
+            console.warn("[DB] Migration check encountered issues:", e.message); 
         }
 
         console.log("✅ [DB] Schema synchronization complete.");
@@ -123,7 +121,6 @@ const initDb = async () => {
 
 // --- ROUTES ---
 
-// Employees
 app.get('/api/employees', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM employees");
@@ -132,7 +129,7 @@ app.get('/api/employees', async (req, res) => {
             projectIds: parseJSON(e.projectIds) || [],
             location: parseJSON(e.location),
         }));
-        console.log(`[GET /api/employees] Successfully retrieved ${employees.length} employees.`);
+        console.log(`[GET /api/employees] SUCCESS: Fetched ${employees.length} employees.`);
         res.json(employees);
     } catch (err) { 
         console.error("[GET /api/employees] ERROR:", err.message);
@@ -167,10 +164,10 @@ app.post('/api/employees', async (req, res) => {
             (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, workLocation, phone, jobTitle) 
             VALUES (@id, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @workLocation, @phone, @jobTitle)`);
         
-        console.log(`[POST /api/employees] SUCCESS: Created employee ID ${e.id} (${e.firstName} ${e.lastName})`);
+        console.log(`[POST /api/employees] SUCCESS: Created employee ${e.id}`);
         res.json(e);
     } catch (err) { 
-        console.error(`[POST /api/employees] FAILED for ID ${e.id}:`, err.message);
+        console.error(`[POST /api/employees] FAILED for ${e.id}:`, err.message);
         res.status(500).json({ error: err.message }); 
     }
 });
@@ -205,7 +202,21 @@ app.put('/api/employees/:id', async (req, res) => {
             status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, workLocation=@workLocation,
             phone=@phone, jobTitle=@jobTitle WHERE id=@id`);
         
-        console.log(`[PUT /api/employees/${id}] SUCCESS: Updated record.`);
+        console.log(`[PUT /api/employees/${id}] SUCCESS: Updated employee record.`);
+
+        // Cascade Work Location change to Attendance Table as requested
+        if (e.workLocation) {
+            try {
+                const attendReq = pool.request();
+                attendReq.input('eid', sql.NVarChar, id);
+                attendReq.input('loc', sql.NVarChar, e.workLocation);
+                await attendReq.query("UPDATE attendance SET workLocation = @loc WHERE employeeId = @eid");
+                console.log(`[CASCADE] SUCCESS: Synced workLocation to '${e.workLocation}' for all attendance records of employee ${id}`);
+            } catch (cascadeErr) {
+                console.error(`[CASCADE] FAILED to sync attendance for ${id}:`, cascadeErr.message);
+            }
+        }
+        
         res.json(e);
     } catch (err) { 
         console.error(`[PUT /api/employees/${id}] FAILED:`, err.message);
@@ -227,7 +238,6 @@ app.delete('/api/employees/:id', async (req, res) => {
     }
 });
 
-// Attendance
 app.get('/api/attendance', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM attendance");
@@ -285,13 +295,11 @@ app.put('/api/attendance/:id', async (req, res) => {
     }
 });
 
-// Time Entries
 app.get('/api/time_entries', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM time_entries");
-        const entries = result.recordset.map(r => ({ ...r, isBillable: !!r.isBillable }));
-        console.log(`[GET /api/time_entries] SUCCESS: Retrieved ${entries.length} entries.`);
-        res.json(entries);
+        console.log(`[GET /api/time_entries] SUCCESS: Retrieved ${result.recordset.length} entries.`);
+        res.json(result.recordset.map(r => ({ ...r, isBillable: !!r.isBillable })));
     } catch (err) { 
         console.error("[GET /api/time_entries] ERROR:", err.message);
         res.status(500).json({ error: err.message }); 
@@ -312,7 +320,7 @@ app.post('/api/time_entries', async (req, res) => {
         reqSql.input('status', sql.NVarChar, t.status);
         reqSql.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
         await reqSql.query("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, description, status, isBillable) VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @description, @status, @isBillable)");
-        console.log(`[POST /api/time_entries] SUCCESS: Task logged for user ${t.userId}`);
+        console.log(`[POST /api/time_entries] SUCCESS: Logged entry for ${t.userId}`);
         res.json(t);
     } catch (err) { 
         console.error("[POST /api/time_entries] FAILED:", err.message);
@@ -320,13 +328,11 @@ app.post('/api/time_entries', async (req, res) => {
     }
 });
 
-// Notifications
 app.get('/api/notifications', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM notifications");
-        const notifs = result.recordset.map(r => ({ ...r, read: !!r.read }));
-        console.log(`[GET /api/notifications] SUCCESS: Fetched ${notifs.length} records.`);
-        res.json(notifs);
+        console.log(`[GET /api/notifications] SUCCESS: Fetched ${result.recordset.length} items.`);
+        res.json(result.recordset.map(r => ({ ...r, read: !!r.read })));
     } catch (err) { 
         console.error("[GET /api/notifications] ERROR:", err.message);
         res.status(500).json({ error: err.message }); 
@@ -345,7 +351,7 @@ app.post('/api/notifications', async (req, res) => {
         reqSql.input('read', sql.Bit, n.read ? 1 : 0);
         reqSql.input('type', sql.NVarChar, n.type);
         await reqSql.query("INSERT INTO notifications (id, userId, title, message, time, [read], type) VALUES (@id, @userId, @title, @message, @time, @read, @type)");
-        console.log(`[POST /api/notifications] SUCCESS: Sent to user ${n.userId}`);
+        console.log(`[POST /api/notifications] SUCCESS: Sent to ${n.userId}`);
         res.json(n);
     } catch (err) { 
         console.error("[POST /api/notifications] ERROR:", err.message);
@@ -353,46 +359,33 @@ app.post('/api/notifications', async (req, res) => {
     }
 });
 
-// Organization structure routes (Departments, Roles, Projects)
 app.get('/api/departments', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM departments");
-        console.log(`[GET /api/departments] Retrieved ${result.recordset.length} records.`);
+        console.log(`[GET /api/departments] SUCCESS: Retrieved ${result.recordset.length} records.`);
         res.json(result.recordset);
-    } catch (err) { 
-        console.error("[GET /api/departments] ERROR:", err.message);
-        res.status(500).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/roles', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM roles");
-        console.log(`[GET /api/roles] Retrieved ${result.recordset.length} records.`);
+        console.log(`[GET /api/roles] SUCCESS: Retrieved ${result.recordset.length} records.`);
         res.json(result.recordset);
-    } catch (err) { 
-        console.error("[GET /api/roles] ERROR:", err.message);
-        res.status(500).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/projects', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM projects");
-        const projects = result.recordset.map(r => ({ ...r, tasks: parseJSON(r.tasks) || [] }));
-        console.log(`[GET /api/projects] Retrieved ${projects.length} records.`);
-        res.json(projects);
-    } catch (err) { 
-        console.error("[GET /api/projects] ERROR:", err.message);
-        res.status(500).json({ error: err.message }); 
-    }
+        console.log(`[GET /api/projects] SUCCESS: Retrieved ${result.recordset.length} records.`);
+        res.json(result.recordset.map(r => ({ ...r, tasks: parseJSON(r.tasks) || [] })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Start Server
 app.listen(PORT, async () => {
     console.log('----------------------------------------');
     console.log(`🚀 Server starting on port ${PORT}`);
-    console.log(`🚀 Environment: ${process.env.NODE_ENV || 'Development'}`);
     console.log('----------------------------------------');
     await connectDb();
 });
