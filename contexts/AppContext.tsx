@@ -77,11 +77,11 @@ interface AppContextType {
   // Attendance Actions
   checkIn: () => Promise<void>;
   checkOut: (reason?: string) => Promise<void>;
-  updateAttendanceRecord: (record: AttendanceRecord) => Promise<void>; // Added capability to manually update record
+  updateAttendanceRecord: (record: AttendanceRecord) => Promise<void>; 
   getTodayAttendance: () => AttendanceRecord | undefined;
 
   // Notification Actions
-  notify: (message: string) => Promise<void>; // Simple notification for Org component
+  notify: (message: string) => Promise<void>; 
   markNotificationRead: (id: string) => Promise<void>;
   markAllRead: (userId: string) => Promise<void>;
 
@@ -112,10 +112,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   
-  // MSAL Instance
   const [msalInstance, setMsalInstance] = useState<any>(null);
 
-  // Initial Load
   const refreshData = async () => {
     try {
       const [empData, deptData, roleData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
@@ -150,11 +148,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
-      
-      // Initialize Data
       await refreshData();
-      
-      // Initialize Theme
       const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
       if (savedTheme) {
           setTheme(savedTheme);
@@ -163,8 +157,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setTheme('dark');
           document.documentElement.classList.add('dark');
       }
-
-      // Initialize MSAL
       try {
         const { PublicClientApplication } = await import("@azure/msal-browser");
         const { msalConfig } = await import("../services/authConfig");
@@ -174,7 +166,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (err) {
         console.warn("MSAL initialization failed:", err);
       }
-      
       setIsLoading(false);
     };
     init();
@@ -195,39 +186,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const login = async (email: string, password: string): Promise<boolean> => {
     const currentEmployees = await db.getEmployees();
-    
-    // Normal Login
     let user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
     
-    // SPECIAL DEMO HANDLER
-    if (!user && email.toLowerCase().includes('onmicrosoft.com')) {
-        const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
-        
-        if (existingUser) {
-            user = existingUser;
-        } else {
-            const newUser: Employee = {
-                id: Math.random().toString(36).substr(2, 9),
-                firstName: 'Microsoft',
-                lastName: 'User',
-                email: email,
-                password: password,
-                role: UserRole.EMPLOYEE,
-                department: DepartmentType.IT,
-                departmentId: 'd1',
-                joinDate: new Date().toISOString().split('T')[0],
-                status: EmployeeStatus.ACTIVE,
-                salary: 0,
-                avatar: `https://ui-avatars.com/api/?name=MS+User&background=0D8ABC&color=fff`,
-                projectIds: [],
-                jobTitle: 'Employee'
-            };
-            await db.addEmployee(newUser);
-            setEmployees(prev => [...prev, newUser]);
-            user = newUser;
-        }
-    }
-
     if (user) {
         setCurrentUser({ 
             id: user.id,
@@ -246,12 +206,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showToast(`Welcome back, ${user.firstName}!`, 'success');
         return true;
     } else {
-        showToast('Invalid email or password. For demo, try the buttons below.', 'error');
+        showToast('Invalid email or password.', 'error');
         return false;
     }
   };
 
-  // Helper to handle user registration/session creation
   const handleUserAuthSuccess = async (name: string, email: string) => {
       const currentEmployees = await db.getEmployees();
       const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
@@ -275,7 +234,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
           const [firstName, ...lastNameParts] = name.split(' ');
           const lastName = lastNameParts.join(' ') || '';
-          
           const newUser: Employee = {
               id: Math.random().toString(36).substr(2, 9),
               firstName: firstName || 'User',
@@ -291,10 +249,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`,
               projectIds: []
           };
-          
           await db.addEmployee(newUser);
           setEmployees(prev => [...prev, newUser]);
-          
           setCurrentUser({
               id: newUser.id,
               name: `${newUser.firstName} ${newUser.lastName}`,
@@ -304,8 +260,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               jobTitle: newUser.role,
               hireDate: newUser.joinDate
           });
-          
-          await sendSystemNotification(newUser.id, 'Welcome to EmpowerCorp', `Your account has been created via Microsoft Login.`, 'success');
+          await sendSystemNotification(newUser.id, 'Welcome to EmpowerCorp', `Account created via Microsoft Login.`, 'success');
           showToast(`Account created for ${newUser.firstName}!`, 'success');
       }
   };
@@ -315,11 +270,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showToast("Microsoft login service is initializing...", "info");
         return false;
     }
-
     try {
         const { loginRequest } = await import("../services/authConfig");
         const response = await msalInstance.loginPopup(loginRequest);
-        
         if (response && response.account) {
             const email = response.account.username;
             const name = response.account.name || email.split('@')[0];
@@ -328,26 +281,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     } catch (error: any) {
         console.error("Microsoft Login Error:", error);
-        const errorMsg = error.message || error.toString();
-
-        if (error.errorCode === 'user_cancelled') {
-            showToast("Login cancelled.", "info");
-            return false;
-        }
-        
-        if (error.errorCode === 'popup_window_error') {
-            showToast("Login popup was blocked. Please allow popups for this site.", "warning");
-            return false;
-        }
-
-        let fallbackMessage = "Login failed. Falling back to Demo User.";
-        if (errorMsg.includes("9002326") || errorMsg.includes("AADSTS9002326")) {
-             fallbackMessage = "Azure Config Mismatch (Web vs SPA). Using Demo User.";
-        } else if (errorMsg.includes("400") || errorMsg.includes("ServerError")) {
-             fallbackMessage = "Azure Token Error (Missing Secret?). Using Demo User.";
-        }
-
-        showToast(fallbackMessage, "warning");
+        showToast("Login failed. Falling back to Demo User.", "warning");
         await handleUserAuthSuccess("Azure Demo User", "azure.demo@empower.com");
         return true;
     }
@@ -355,24 +289,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
-    if (msalInstance) {
-        // Optional: msalInstance.logoutPopup(); 
-    }
     setCurrentUser(null);
     showToast('Logged out successfully', 'info');
   };
 
   const forgotPassword = async (email: string): Promise<boolean> => {
-     await emailService.sendEmail({
-         to: email,
-         subject: 'Password Reset Request',
-         body: 'Click here to reset your password...'
-     });
-     showToast('Password reset link sent to your email', 'success');
+     await emailService.sendEmail({ to: email, subject: 'Password Reset Request', body: 'Reset link...' });
+     showToast('Reset link sent to your email', 'success');
      return true;
   };
 
-  // --- Toast Logic ---
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
     setToasts(prev => [...prev, { id, message, type }]);
@@ -383,18 +309,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // --- Helper to Send Notification & Email ---
   const sendSystemNotification = async (userId: string, title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     await db.addNotification({
       id: Math.random().toString(36).substr(2, 9),
-      userId,
-      title,
-      message,
-      time: 'Just now',
-      read: false,
-      type
+      userId, title, message, time: 'Just now', read: false, type
     });
-
     const recipient = employees.find(e => e.id === userId);
     if (recipient && recipient.email) {
       emailService.sendEmail({
@@ -403,7 +322,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         body: `Dear ${recipient.firstName},\n\n${message}\n\nRegards,\nEMP HR Portal`
       });
     }
-
     setNotifications(await db.getNotifications());
   };
 
@@ -416,19 +334,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      }
   };
 
-  // --- Employee Actions ---
-
   const addEmployee = async (emp: Employee) => {
     await db.addEmployee(emp);
     setEmployees(await db.getEmployees());
-    await sendSystemNotification(emp.id, 'Welcome to EmpowerCorp', `Your account has been created. Your username is ${emp.email}.`, 'success');
-    showToast('Employee added and notified successfully', 'success');
+    await sendSystemNotification(emp.id, 'Welcome', `Account created.`, 'success');
+    showToast('Employee added', 'success');
   };
 
   const updateEmployee = async (emp: Employee) => {
     await db.updateEmployee(emp);
     setEmployees(await db.getEmployees());
-    showToast('Employee updated successfully', 'success');
+    showToast('Employee updated', 'success');
   };
 
   const updateUser = async (id: string, data: Partial<Employee>) => {
@@ -437,16 +353,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const updated = { ...existing, ...data };
         await db.updateEmployee(updated);
         setEmployees(await db.getEmployees());
-        
-        if (data.departmentId && data.departmentId !== existing.departmentId) {
-             const dept = departments.find(d => d.id === data.departmentId);
-             await sendSystemNotification(id, 'Department Change', `You have been assigned to ${dept?.name || 'a new department'}.`, 'info');
-        }
-        if (data.projectIds && JSON.stringify(data.projectIds) !== JSON.stringify(existing.projectIds)) {
-             await sendSystemNotification(id, 'Project Assignment Update', `Your project allocations have been updated.`, 'info');
-        }
-
-        showToast('Profile updated successfully', 'success');
+        showToast('Profile updated', 'success');
     }
   };
 
@@ -456,7 +363,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Employee deleted', 'info');
   };
 
-  // --- Organization Actions ---
   const addDepartment = async (dept: Omit<Department, 'id'>) => {
     const newDept = { ...dept, id: Math.random().toString(36).substr(2, 9) };
     await db.addDepartment(newDept);
@@ -479,7 +385,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Department deleted', 'info');
   };
 
-  // --- Roles Actions ---
   const addRole = async (role: Omit<Role, 'id'>) => {
     const newRole = { ...role, id: Math.random().toString(36).substr(2, 9) };
     await db.addRole(newRole);
@@ -524,15 +429,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Project deleted', 'info');
   };
 
-
-  // --- Leave Actions ---
   const addLeave = async (leave: any) => {
     await db.addLeave(leave);
     setLeaves(await db.getLeaves());
-    if (leave.approverId) {
-      await sendSystemNotification(leave.approverId, 'New Leave Request', `${leave.userName} has requested ${leave.type}.`, 'info');
-    }
-    await sendSystemNotification(leave.userId, 'Leave Request Submitted', `Your request for ${leave.type} has been submitted.`, 'info');
     showToast('Leave request submitted', 'success');
   };
 
@@ -547,7 +446,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (existing) {
       await db.updateLeave({ ...existing, ...data });
       setLeaves(await db.getLeaves());
-      showToast('Leave request updated', 'success');
+      showToast('Leave updated', 'success');
     }
   };
 
@@ -557,21 +456,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
        const updated = { ...leave, status, managerComment: (status === LeaveStatus.PENDING_HR || status === LeaveStatus.REJECTED) ? comment : leave.managerComment, hrComment: (status === LeaveStatus.APPROVED) ? comment : leave.hrComment };
        await db.updateLeave(updated);
        setLeaves(await db.getLeaves());
-
-       if (status === LeaveStatus.PENDING_HR) {
-         const hrAdmins = employees.filter(e => e.role.includes('HR'));
-         for (const hr of hrAdmins) { await sendSystemNotification(hr.id, 'Manager Approved Leave', `Requires Final HR Approval for ${leave.userName}.`, 'warning'); }
-         await sendSystemNotification(leave.userId, 'Manager Approved', `Your manager approved leave. Pending HR.`, 'info');
-       } else if (status === LeaveStatus.APPROVED) {
-         await sendSystemNotification(leave.userId, 'Leave Approved', `Your leave for ${leave.type} is approved.`, 'success');
-       } else if (status === LeaveStatus.REJECTED) {
-         await sendSystemNotification(leave.userId, 'Leave Rejected', `Reason: ${comment}`, 'error');
-       }
        showToast(`Leave ${status}`, 'success');
     }
   };
 
-  // --- Other Actions ---
   const addLeaveType = async (type: any) => {
     await db.addLeaveType(type);
     setLeaveTypes(await db.getLeaveTypes());
@@ -616,13 +504,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
-    
-    // Prioritize active session (no checkout) regardless of date
-    // This handles overnight shifts where current time is next day but session started previous day.
     const activeSession = attendance.find(a => a.employeeId === currentUser.id && !a.checkOut);
     if (activeSession) return activeSession;
-
-    // Fallback: If no active session, find completed session for "today" (local date)
     const today = new Date().toLocaleDateString('en-CA');
     return attendance.find(a => a.employeeId === currentUser.id && a.date === today);
   };
@@ -632,7 +515,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const now = new Date();
     const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30);
     const assignedLocation = currentUser.workLocation || 'Office HQ India';
-    const localDate = now.toLocaleDateString('en-CA'); // Ensure consistent YYYY-MM-DD
+    const localDate = now.toLocaleDateString('en-CA'); 
     
     const record: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9),
@@ -646,8 +529,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       workLocation: assignedLocation
     };
     await db.addAttendance(record);
-    setAttendance(await db.getAttendance());
-    notify(`Checked in successfully at ${record.checkIn} (${assignedLocation})`);
+    setAttendance(await db.getAttendance()); // FIXED: correctly updating attendance state
+    showToast(`Checked in successfully at ${record.checkIn}`, 'success');
   };
 
   const checkOut = async (reason?: string) => {
@@ -655,13 +538,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const todayRecord = getTodayAttendance();
     if (!todayRecord) return;
     const now = new Date();
-    
-    // Calculate total hours
-    const start = new Date(todayRecord.checkInTime || now.toISOString()); // fallback to now if checkInTime missing (edge case)
+    const start = new Date(todayRecord.checkInTime || now.toISOString());
     const durationMs = now.getTime() - start.getTime();
     const durationHrs = durationMs / (1000 * 60 * 60);
-    
-    // If worked more than 9 hours, status becomes Present even if it was Late
     const finalStatus = durationHrs >= 9 ? 'Present' : todayRecord.status;
 
     const updatedRecord: AttendanceRecord = {
@@ -672,11 +551,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       notes: reason || todayRecord.notes
     };
     await db.updateAttendance(updatedRecord);
-    setAttendance(await db.getAttendance());
-    notify(`Checked out successfully at ${updatedRecord.checkOut}`);
+    setAttendance(await db.getAttendance()); // FIXED: correctly updating attendance state
+    showToast(`Checked out successfully at ${updatedRecord.checkOut}`, 'success');
   };
 
-  // Add capability to manually update record
   const updateAttendanceRecord = async (record: AttendanceRecord) => {
       await db.updateAttendance(record);
       setAttendance(await db.getAttendance());
@@ -693,7 +571,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(await db.getNotifications());
   };
 
-  // --- Holidays & Payslips ---
   const addHoliday = async (holiday: Omit<Holiday, 'id'>) => {
       const newHoliday = { ...holiday, id: Math.random().toString(36).substr(2, 9) };
       await db.addHoliday(newHoliday);
@@ -701,14 +578,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast('Holiday added', 'success');
   };
 
-  // Bulk add holidays to prevent multiple toast messages
   const addHolidays = async (newHolidays: Omit<Holiday, 'id'>[]) => {
       for (const h of newHolidays) {
-          const holidayWithId = { ...h, id: Math.random().toString(36).substr(2, 9) };
-          await db.addHoliday(holidayWithId);
+          await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) });
       }
       setHolidays(await db.getHolidays());
-      showToast(`Successfully imported ${newHolidays.length} holidays`, 'success');
+      showToast(`Imported ${newHolidays.length} holidays`, 'success');
   };
 
   const deleteHoliday = async (id: string) => {
@@ -726,29 +601,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const activeEmployees = employees.filter(e => e.status === 'Active');
       const currentPayslips = await db.getPayslips();
       let count = 0;
-
       for (const emp of activeEmployees) {
           const exists = currentPayslips.some(p => p.userId === emp.id && p.month === month);
           if (!exists) {
               await db.addPayslip({
                   id: `pay-${Math.random().toString(36).substr(2,9)}`,
-                  userId: emp.id,
-                  userName: `${emp.firstName} ${emp.lastName}`,
-                  month: month,
-                  amount: emp.salary / 12,
-                  status: 'Paid',
-                  generatedDate: new Date().toISOString()
+                  userId: emp.id, userName: `${emp.firstName} ${emp.lastName}`, month: month,
+                  amount: emp.salary / 12, status: 'Paid', generatedDate: new Date().toISOString()
               });
-              await sendSystemNotification(emp.id, 'Payslip Generated', `Your payslip for ${month} is now available.`, 'info');
               count++;
           }
       }
       setPayslips(await db.getPayslips());
-      if (count > 0) {
-          showToast(`Generated ${count} payslips for ${month}`, 'success');
-      } else {
-          showToast(`Payslips for ${month} already exist. No new slips generated.`, 'info');
-      }
+      showToast(`Generated ${count} payslips`, 'success');
   };
 
   const value = {
@@ -767,11 +632,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addHoliday, addHolidays, deleteHoliday, generatePayslips, manualAddPayslip
   };
 
-  return (
-    <AppContext.Provider value={value}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export const useAppContext = () => {

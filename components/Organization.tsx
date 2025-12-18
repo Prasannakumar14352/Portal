@@ -75,67 +75,35 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
       try {
         await loadArcGIS();
         if (cleanup || !mapDiv.current) return;
-
         window.require([
           "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", 
           "esri/widgets/BasemapGallery", "esri/widgets/Expand"
         ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, BasemapGallery: any, Expand: any) => {
-          
           if (cleanup) return;
-
-          // Use topo-vector as it has excellent state and country boundaries out of the box
           const map = new EsriMap({ basemap: "topo-vector" });
-
-          // Graphics layer for employee pins - avoids FeatureLayer loading errors
           const employeeLayer = new GraphicsLayer({ title: "Employees" });
           map.add(employeeLayer);
-
           users.forEach(u => {
             if (u.location && u.location.latitude && u.location.longitude) {
               const point = { type: "point", longitude: u.location.longitude, latitude: u.location.latitude };
-              const markerSymbol = { 
-                type: "simple-marker", 
-                color: [220, 38, 38, 1], // Bold Red for visibility
-                size: "10px", 
-                outline: { color: [255, 255, 255], width: 2 } 
-              };
-              
+              const markerSymbol = { type: "simple-marker", color: [220, 38, 38, 1], size: "10px", outline: { color: [255, 255, 255], width: 2 } };
               const popupTemplate = {
                 title: `${u.firstName} ${u.lastName}`,
-                content: `
-                  <div class="p-2">
-                    <p><b>Role:</b> ${u.jobTitle || u.role}</p>
-                    <p><b>Department:</b> ${u.department}</p>
-                    <hr class="my-2 border-slate-100" />
-                    <p class="text-xs text-slate-500">${u.location.address}</p>
-                  </div>
-                `
+                content: `<div class="p-2"><p><b>Role:</b> ${u.jobTitle || u.role}</p><p><b>Department:</b> ${u.department}</p><hr class="my-2" /><p class="text-xs text-slate-500">${u.location.address}</p></div>`
               };
-
-              employeeLayer.add(new Graphic({ 
-                geometry: point, 
-                symbol: markerSymbol, 
-                popupTemplate: popupTemplate 
-              }));
+              employeeLayer.add(new Graphic({ geometry: point, symbol: markerSymbol, popupTemplate: popupTemplate }));
             }
           });
-
           view = new MapView({
-            container: mapDiv.current,
-            map: map,
-            center: [78.9629, 20.5937], // Centered on India
-            zoom: 4,
+            container: mapDiv.current, map: map, center: [78.9629, 20.5937], zoom: 4,
             popup: { dockEnabled: true, dockOptions: { buttonEnabled: true, breakpoint: false } }
           });
-
           const bgExpand = new Expand({ view: view, content: new BasemapGallery({ view: view }), expandIconClass: "esri-icon-basemap" });
           view.ui.add(bgExpand, "top-right");
-
-          view.when(() => { if (!cleanup) setIsMapLoaded(true); }, (err: any) => { setMapError("Map initialization failed."); });
+          view.when(() => { if (!cleanup) setIsMapLoaded(true); }, () => { setMapError("Map initialization failed."); });
         });
-      } catch (e) { setMapError("ArcGIS resources failed to load."); }
+      } catch (e) { setMapError("ArcGIS failed to load."); }
     };
-
     initMap();
     return () => { cleanup = true; if (view) view.destroy(); };
   }, [users]);
@@ -147,7 +115,6 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
               <AlertTriangle size={48} className="text-red-500 mb-4" />
               <h4 className="font-bold text-slate-800 dark:text-white">Connection Error</h4>
               <p className="text-slate-500 text-sm mt-2">{mapError}</p>
-              <button onClick={() => window.location.reload()} className="mt-6 px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold uppercase tracking-wider">Try Again</button>
           </div>
        ) : (
           <>
@@ -157,14 +124,6 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
                     <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
-            <div className="absolute bottom-6 left-6 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl z-10 pointer-events-none">
-                <h4 className="font-bold mb-2 text-xs uppercase tracking-widest text-slate-500">Legend</h4>
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-red-600 border border-white"></div>
-                    <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">Employee Base</span>
-                </div>
-                <p className="mt-3 text-[10px] text-slate-400 border-t pt-2 border-slate-100 dark:border-slate-700">States and borders provided by Vector Topo.</p>
-            </div>
           </>
        )}
     </div>
@@ -172,59 +131,20 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
 };
 
 const Organization = () => {
-  const { 
-    currentUser, 
-    departments, addDepartment, updateDepartment, deleteDepartment, 
-    projects, addProject, updateProject, deleteProject,
-    roles, addRole, updateRole, deleteRole,
-    users, updateUser, notify,
-    employees, addEmployee, updateEmployee, deleteEmployee 
-  } = useAppContext();
-  
+  const { currentUser, departments, projects, users, notify, updateUser, addDepartment, updateDepartment, deleteDepartment, roles, addRole, updateRole, deleteRole, employees, addEmployee, updateEmployee, deleteEmployee } = useAppContext();
   const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'roles' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [showDeptModal, setShowDeptModal] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [showProjModal, setShowProjModal] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [showConfirmAlloc, setShowConfirmAlloc] = useState(false);
-  
-  const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
-  const [projFilter, setProjFilter] = useState<'All' | 'Active' | 'Completed' | 'On Hold'>('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
-
-  const [deptForm, setDeptForm] = useState<{ id?: string, name: string, description: string, managerId: string }>({ name: '', description: '', managerId: '' });
-  const [roleForm, setRoleForm] = useState<{ id?: string, name: string, description: string }>({ name: '', description: '' });
-  const [projForm, setProjForm] = useState<{ id?: string, name: string, description: string, status: string, tasks: string[] }>({ name: '', description: '', status: 'Active', tasks: [] });
-  
+  const [itemsPerPage] = useState(6);
+  const [deptForm, setDeptForm] = useState<any>({ name: '', description: '', managerId: '' });
   const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
-  const [allocForm, setAllocForm] = useState<{ departmentId: string, projectIds: string[] }>({ departmentId: '', projectIds: [] });
-
+  const [allocForm, setAllocForm] = useState<any>({ departmentId: '', projectIds: [] });
   const isHR = currentUser?.role === UserRole.HR;
   const orgTreeData = useMemo(() => buildOrgTree(users), [users]);
 
-  useEffect(() => { setCurrentPage(1); }, [activeTab, projFilter]);
-
-  const handleDeptSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (deptForm.id) updateDepartment(deptForm.id, deptForm);
-    else addDepartment(deptForm);
-    setShowDeptModal(false);
-  };
-
-  const handleRoleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (roleForm.id) updateRole(roleForm.id, roleForm);
-    else addRole(roleForm);
-    setShowRoleModal(false);
-  };
-
-  const handleProjSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (projForm.id) updateProject(projForm.id, projForm as any);
-    else addProject(projForm as any);
-    setShowProjModal(false);
-  };
+  useEffect(() => { setCurrentPage(1); }, [activeTab]);
 
   const finalizeAllocation = () => {
     if (selectedUser) {
@@ -242,8 +162,8 @@ const Organization = () => {
       <div className="flex justify-between items-center p-4 pt-6 border-t border-slate-200 dark:border-slate-700">
          <span className="text-xs text-slate-500">Showing {Math.min(total, (currentPage - 1) * itemsPerPage + 1)} to {Math.min(total, currentPage * itemsPerPage)} of {total}</span>
          <div className="flex gap-2">
-            <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded border border-slate-300 dark:border-slate-600 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700"><ChevronLeft size={16} /></button>
-            <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="p-1.5 rounded border border-slate-300 dark:border-slate-600 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700"><ChevronRight size={16} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded border border-slate-300 disabled:opacity-50"><ChevronLeft size={16} /></button>
+            <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} className="p-1.5 rounded border border-slate-300 disabled:opacity-50"><ChevronRight size={16} /></button>
          </div>
       </div>
     );
@@ -256,10 +176,10 @@ const Organization = () => {
        <DraggableModal isOpen={showConfirmAlloc} onClose={() => setShowConfirmAlloc(false)} title="Confirm Assignment">
           <div className="text-center p-4">
               <CheckCircle size={48} className="text-emerald-600 mx-auto mb-4" />
-              <p className="text-slate-600 dark:text-slate-300 mb-6">Confirm assignment updates for <b>{selectedUser?.firstName} {selectedUser?.lastName}</b>?</p>
+              <p className="text-slate-600 dark:text-slate-300 mb-6">Confirm updates for <b>{selectedUser?.firstName} {selectedUser?.lastName}</b>?</p>
               <div className="flex justify-end gap-3">
-                 <button onClick={() => setShowConfirmAlloc(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded text-sm">Cancel</button>
-                 <button onClick={finalizeAllocation} className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded text-sm font-bold shadow-sm">Save Changes</button>
+                 <button onClick={() => setShowConfirmAlloc(false)} className="px-4 py-2 text-slate-500 rounded text-sm">Cancel</button>
+                 <button onClick={finalizeAllocation} className="px-4 py-2 bg-emerald-600 text-white rounded text-sm font-bold shadow-sm">Save Changes</button>
               </div>
            </div>
        </DraggableModal>
@@ -274,64 +194,10 @@ const Organization = () => {
        </div>
 
        {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
-       
-       {activeTab === 'locations' && (
-         <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><MapPin className="text-emerald-600" /> Employee Geographical View</h3>
-            <GraphicsLayerMap users={users} />
-         </div>
-       )}
-       
-       {activeTab === 'chart' && (
-         <div className="bg-slate-50 dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="p-8 overflow-auto min-h-[500px] flex justify-center bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
-               {orgTreeData.length === 0 ? <p className="text-slate-400">No data available.</p> : <div className="org-tree"><ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul></div>}
-            </div>
-         </div>
-       )}
-
-       {activeTab === 'departments' && (
-         <div className="space-y-4">
-            <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isHR && <button onClick={() => { setDeptForm({ name: '', description: '', managerId: '' }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {departments.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(dept => (
-                 <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { setDeptForm(dept); setShowDeptModal(true); }}>
-                    <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div>
-                    <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4>
-                    <p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p>
-                 </div>
-               ))}
-            </div>
-            <PaginationControls total={departments.length} />
-         </div>
-       )}
-
-       {activeTab === 'allocations' && (
-         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 text-xs uppercase tracking-wider border-b"><tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Department</th><th className="px-6 py-4">Projects</th><th className="px-6 py-4 text-right">Action</th></tr></thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                   {users.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(user => {
-                     const userDept = departments.find(d => d.id === user.departmentId);
-                     const userProjects = projects.filter(p => user.projectIds?.includes(p.id));
-                     return (
-                       <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                         <td className="px-6 py-4"><div className="flex items-center gap-3"><img src={user.avatar} className="w-8 h-8 rounded-full" /><div><p className="text-sm font-bold text-slate-800 dark:text-white">{user.firstName} {user.lastName}</p><p className="text-xs text-slate-500">{user.role}</p></div></div></td>
-                         <td className="px-6 py-4"><span className="text-sm text-slate-700 dark:text-slate-300">{userDept?.name || '-'}</span></td>
-                         <td className="px-6 py-4"><div className="flex flex-wrap gap-1">{userProjects.map(p => (<span key={p.id} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">{p.name}</span>))}</div></td>
-                         <td className="px-6 py-4 text-right">{isHR && <button onClick={() => { setSelectedUser(user); setAllocForm({ departmentId: user.departmentId || '', projectIds: user.projectIds || [] }); setShowAllocModal(true); }} className="text-emerald-600 hover:text-emerald-800 text-xs font-bold">Edit Alloc</button>}</td>
-                       </tr>
-                     );
-                   })}
-                </tbody>
-              </table>
-            </div>
-            <PaginationControls total={users.length} />
-         </div>
-       )}
-
-       {/* Modals for Dept/Project/Allocation omitted for brevity but they are handled by handleSubmits */}
+       {activeTab === 'locations' && <div className="space-y-4"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><MapPin className="text-emerald-600" /> Employee Geographical View</h3><GraphicsLayerMap users={users} /></div>}
+       {activeTab === 'chart' && <div className="bg-slate-50 dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="p-8 overflow-auto min-h-[500px] flex justify-center bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">{orgTreeData.length === 0 ? <p className="text-slate-400">No data.</p> : <div className="org-tree"><ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul></div>}</div></div>}
+       {activeTab === 'departments' && <div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isHR && <button onClick={() => { setDeptForm({ name: '', description: '', managerId: '' }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{departments.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(dept => (<div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { setDeptForm(dept); setShowDeptModal(true); }}><div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4><p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p></div>))}</div><PaginationControls total={departments.length} /></div>}
+       {activeTab === 'allocations' && <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 text-xs uppercase tracking-wider border-b"><tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Department</th><th className="px-6 py-4">Projects</th><th className="px-6 py-4 text-right">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{users.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(user => { const userDept = departments.find(d => d.id === user.departmentId); const userProjects = projects.filter(p => user.projectIds?.includes(p.id)); return (<tr key={user.id} className="hover:bg-slate-50 transition-colors"><td className="px-6 py-4"><div className="flex items-center gap-3"><img src={user.avatar} className="w-8 h-8 rounded-full" /><div><p className="text-sm font-bold text-slate-800 dark:text-white">{user.firstName} {user.lastName}</p><p className="text-xs text-slate-500">{user.role}</p></div></div></td><td className="px-6 py-4"><span className="text-sm text-slate-700 dark:text-slate-300">{userDept?.name || '-'}</span></td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{userProjects.map(p => (<span key={p.id} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">{p.name}</span>))}</div></td><td className="px-6 py-4 text-right">{isHR && <button onClick={() => { setSelectedUser(user); setAllocForm({ departmentId: user.departmentId || '', projectIds: user.projectIds || [] }); setShowAllocModal(true); }} className="text-emerald-600 hover:text-emerald-800 text-xs font-bold">Edit Alloc</button>}</td></tr>); })}</tbody></table></div><PaginationControls total={users.length} /></div>}
     </div>
   );
 };
