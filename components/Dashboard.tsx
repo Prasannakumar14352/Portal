@@ -99,7 +99,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Employees by Department</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={deptData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
@@ -114,7 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Employee Status</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={statusData}

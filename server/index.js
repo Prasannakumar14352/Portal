@@ -63,11 +63,6 @@ const connectDb = async () => {
         console.error('❌ Database Connection Failed!');
         console.error('Error Message:', err.message);
         console.error('----------------------------------------');
-        console.error('TROUBLESHOOTING STEPS:');
-        console.error(`1. Does the database "${dbConfig.database}" exist in SQL Server?`);
-        console.error(`2. Does user "${dbConfig.user}" have 'db_owner' or 'public' access to "${dbConfig.database}"?`);
-        console.error('   (Go to SSMS > Security > Logins > Right Click User > Properties > User Mapping)');
-        console.error('3. If you just changed the DB name, did you update the user mapping?');
     }
 };
 
@@ -101,7 +96,7 @@ const initDb = async () => {
             )
         `);
         
-        // Migration: Add workLocation if it doesn't exist in existing table
+        // Migration: Add workLocation to Employees
         try {
             await request.query(`
                 IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'employees'))
@@ -109,7 +104,7 @@ const initDb = async () => {
                     ALTER TABLE employees ADD workLocation NVARCHAR(100)
                 END
             `);
-        } catch (e) { console.log("Migration check skipped/failed", e.message); }
+        } catch (e) { console.log("Employees migration skipped/failed", e.message); }
 
         // 2. Departments
         await request.query(`
@@ -191,6 +186,16 @@ const initDb = async () => {
             )
         `);
 
+        // Migration: Add workLocation to Attendance (Fix for 500 error)
+        try {
+            await request.query(`
+                IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'attendance'))
+                BEGIN
+                    ALTER TABLE attendance ADD workLocation NVARCHAR(100)
+                END
+            `);
+        } catch (e) { console.log("Attendance migration skipped/failed", e.message); }
+
         // 7. Time Entries
         await request.query(`
             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='time_entries' AND xtype='U')
@@ -249,7 +254,7 @@ const initDb = async () => {
             )
         `);
 
-        // 11. Roles (New Table)
+        // 11. Roles
         await request.query(`
             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U')
             CREATE TABLE roles (
@@ -615,12 +620,12 @@ app.post('/api/attendance', async (req, res) => {
         reqSql.input('employeeName', sql.NVarChar, a.employeeName);
         reqSql.input('date', sql.NVarChar, a.date);
         reqSql.input('checkIn', sql.NVarChar, a.checkIn);
-        reqSql.input('checkOut', sql.NVarChar, a.checkOut);
+        reqSql.input('checkOut', sql.NVarChar, a.checkOut || '');
         reqSql.input('checkInTime', sql.NVarChar, a.checkInTime);
-        reqSql.input('checkOutTime', sql.NVarChar, a.checkOutTime);
+        reqSql.input('checkOutTime', sql.NVarChar, a.checkOutTime || '');
         reqSql.input('status', sql.NVarChar, a.status);
-        reqSql.input('notes', sql.NVarChar, a.notes);
-        reqSql.input('workLocation', sql.NVarChar, a.workLocation); // Add workLocation input
+        reqSql.input('notes', sql.NVarChar, a.notes || '');
+        reqSql.input('workLocation', sql.NVarChar, a.workLocation || ''); 
         await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
         res.json(a);
     } catch (err) { res.status(500).json({ error: err.message }); }

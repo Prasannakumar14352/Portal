@@ -406,7 +406,7 @@ const Reports = () => {
                     <CalendarCheck size={18} className="text-slate-400"/>
                 </div>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={attendanceStatusData}
@@ -436,7 +436,7 @@ const Reports = () => {
                     <Clock size={18} className="text-slate-400"/>
                 </div>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={attendancePunctualityData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
                             <XAxis dataKey="name" stroke="#94a3b8" />
@@ -458,7 +458,7 @@ const Reports = () => {
              <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Daily Attendance Count (Last 7 Days)</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <LineChart data={dailyAttendanceData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
                             <XAxis dataKey="date" stroke="#94a3b8" />
@@ -476,7 +476,7 @@ const Reports = () => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Project Status Overview</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={projectStatusData}
@@ -503,7 +503,7 @@ const Reports = () => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Task Completion Status</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={taskStatusData}
@@ -531,7 +531,7 @@ const Reports = () => {
             <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Project Progress (%)</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={projectProgressData} layout="vertical" margin={{ left: 20, right: 30 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#475569" strokeOpacity={0.2} />
                             <XAxis type="number" domain={[0, 100]} stroke="#94a3b8" />
@@ -548,7 +548,7 @@ const Reports = () => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Task Priority Distribution</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={taskPriorityData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
                             <XAxis dataKey="name" stroke="#94a3b8" />
@@ -565,7 +565,7 @@ const Reports = () => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Time Allocation by Project</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={projectTimeAllocation}
@@ -593,7 +593,7 @@ const Reports = () => {
             <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Weekly Hours Logged</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={weeklyHoursData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
                             <XAxis dataKey="day" stroke="#94a3b8" />
@@ -611,7 +611,7 @@ const Reports = () => {
             <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Team Member Contributions (Hours)</h3>
                 <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={teamContributionData} margin={{bottom: 20}}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
                             <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={60} tick={{fontSize: 11}} stroke="#94a3b8" />
@@ -628,7 +628,7 @@ const Reports = () => {
              <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 print:break-inside-avoid report-chart">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Billable vs Non-Billable</h3>
                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={billableData}
