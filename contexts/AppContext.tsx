@@ -7,7 +7,7 @@ import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus,
 interface AppContextType {
   // Data State
   employees: Employee[];
-  users: Employee[]; // Alias for Organization component compatibility
+  users: Employee[]; 
   departments: Department[];
   roles: Role[];
   projects: Project[];
@@ -42,7 +42,7 @@ interface AppContextType {
   // Employee Actions
   addEmployee: (emp: Employee) => Promise<void>;
   updateEmployee: (emp: Employee) => Promise<void>;
-  updateUser: (id: string, data: Partial<Employee>) => Promise<void>; // Patch method
+  updateUser: (id: string, data: Partial<Employee>) => Promise<void>; 
   deleteEmployee: (id: string) => Promise<void>;
 
   // Organization Actions
@@ -529,35 +529,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       workLocation: assignedLocation
     };
     await db.addAttendance(record);
-    setAttendance(await db.getAttendance()); // FIXED: correctly updating attendance state
+    const allAttendance = await db.getAttendance();
+    setAttendance(allAttendance); 
     showToast(`Checked in successfully at ${record.checkIn}`, 'success');
   };
 
   const checkOut = async (reason?: string) => {
     if (!currentUser) return;
-    const todayRecord = getTodayAttendance();
-    if (!todayRecord) return;
+    const todayRec = getTodayAttendance();
+    if (!todayRec) return;
     const now = new Date();
-    const start = new Date(todayRecord.checkInTime || now.toISOString());
+    const start = new Date(todayRec.checkInTime || now.toISOString());
     const durationMs = now.getTime() - start.getTime();
     const durationHrs = durationMs / (1000 * 60 * 60);
-    const finalStatus = durationHrs >= 9 ? 'Present' : todayRecord.status;
+    const finalStatus = durationHrs >= 9 ? 'Present' : todayRec.status;
 
     const updatedRecord: AttendanceRecord = {
-      ...todayRecord,
+      ...todayRec,
       checkOut: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
       checkOutTime: now.toISOString(),
       status: finalStatus,
-      notes: reason || todayRecord.notes
+      notes: reason || todayRec.notes
     };
     await db.updateAttendance(updatedRecord);
-    setAttendance(await db.getAttendance()); // FIXED: correctly updating attendance state
+    const allAttendance = await db.getAttendance();
+    setAttendance(allAttendance);
     showToast(`Checked out successfully at ${updatedRecord.checkOut}`, 'success');
   };
 
   const updateAttendanceRecord = async (record: AttendanceRecord) => {
       await db.updateAttendance(record);
-      setAttendance(await db.getAttendance());
+      const allAttendance = await db.getAttendance();
+      setAttendance(allAttendance);
       showToast("Attendance record updated", "success");
   };
 
