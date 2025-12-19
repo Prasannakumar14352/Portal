@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Calendar, Trash2, Plus, Edit2, UploadCloud, FileSpreadsheet, Info, Sun, Moon, ChevronDown } from 'lucide-react';
+import { Calendar, Trash2, Plus, Edit2, UploadCloud, FileSpreadsheet, Info, Sun, Moon, ChevronDown, X } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
 import { read, utils } from 'xlsx';
 
@@ -359,35 +359,37 @@ const Holidays = () => {
            </div>
        </div>
 
-       {/* Add Holiday Modal */}
+       {/* Add Holiday Modal with Scrolling */}
        {showModal && (
            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200 border border-slate-200 dark:border-slate-700">
-                   <div className="flex justify-between items-center mb-4">
+               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+                   <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center flex-shrink-0">
                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Add New Holiday</h3>
-                       <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">&times;</button>
+                       <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={20}/></button>
                    </div>
-                   <form onSubmit={handleSubmit} className="space-y-4">
-                       <div>
-                           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Holiday Name</label>
-                           <input required type="text" placeholder="e.g. Thanksgiving" className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newHoliday.name} onChange={e => setNewHoliday({...newHoliday, name: e.target.value})} />
-                       </div>
-                       <div>
-                           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Date</label>
-                           <input required type="date" className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newHoliday.date} onChange={e => setNewHoliday({...newHoliday, date: e.target.value})} />
-                       </div>
-                       <div>
-                           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label>
-                           <select className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newHoliday.type} onChange={e => setNewHoliday({...newHoliday, type: e.target.value as any})}>
-                               <option value="Public">Public Holiday</option>
-                               <option value="Company">Company Holiday</option>
-                           </select>
-                       </div>
-                       <div className="flex justify-end gap-2 pt-2">
-                           <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium">Cancel</button>
-                           <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm">Add Holiday</button>
-                       </div>
-                   </form>
+                   <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                    <form id="holiday-form" onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Holiday Name</label>
+                            <input required type="text" placeholder="e.g. Thanksgiving" className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newHoliday.name} onChange={e => setNewHoliday({...newHoliday, name: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Date</label>
+                            <input required type="date" className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newHoliday.date} onChange={e => setNewHoliday({...newHoliday, date: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type</label>
+                            <select className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" value={newHoliday.type} onChange={e => setNewHoliday({...newHoliday, type: e.target.value as any})}>
+                                <option value="Public">Public Holiday</option>
+                                <option value="Company">Company Holiday</option>
+                            </select>
+                        </div>
+                    </form>
+                   </div>
+                   <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2 flex-shrink-0">
+                       <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium">Cancel</button>
+                       <button type="submit" form="holiday-form" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm">Add Holiday</button>
+                   </div>
                </div>
            </div>
        )}

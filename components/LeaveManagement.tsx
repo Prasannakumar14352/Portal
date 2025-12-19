@@ -493,30 +493,36 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
             {selectedCalDate && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedCalDate(null)}>
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-                        <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-white">{selectedCalDate.toLocaleDateString()} Leaves</h3>
-                        <div className="space-y-3 max-h-80 overflow-y-auto">
-                            {getLeavesForDate(selectedCalDate).length === 0 ? (
-                                <p className="text-slate-500 dark:text-slate-400 text-sm">No leaves for this date.</p>
-                            ) : (
-                                getLeavesForDate(selectedCalDate).map(l => {
-                                    const lType = leaveTypes.find(t => t.name === l.type);
-                                    return (
-                                        <div key={l.id} className="border border-slate-100 dark:border-slate-700 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <span className="font-bold text-slate-800 dark:text-white block">{l.userName}</span>
-                                                    <span className={`text-xs font-semibold ${lType?.color || 'text-slate-500 dark:text-slate-400'}`}>{l.type}</span>
-                                                </div>
-                                                <StatusBadge status={l.status} />
-                                            </div>
-                                            {l.reason && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-600 italic">"{l.reason}"</p>}
-                                        </div>
-                                    );
-                                })
-                            )}
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-700 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex-shrink-0">
+                           <h3 className="font-bold text-lg text-slate-800 dark:text-white">{selectedCalDate.toLocaleDateString()} Leaves</h3>
                         </div>
-                        <button onClick={() => setSelectedCalDate(null)} className="mt-4 w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600">Close</button>
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="space-y-3">
+                                {getLeavesForDate(selectedCalDate).length === 0 ? (
+                                    <p className="text-slate-500 dark:text-slate-400 text-sm">No leaves for this date.</p>
+                                ) : (
+                                    getLeavesForDate(selectedCalDate).map(l => {
+                                        const lType = leaveTypes.find(t => t.name === l.type);
+                                        return (
+                                            <div key={l.id} className="border border-slate-100 dark:border-slate-700 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="font-bold text-slate-800 dark:text-white block">{l.userName}</span>
+                                                        <span className={`text-xs font-semibold ${lType?.color || 'text-slate-500 dark:text-slate-400'}`}>{l.type}</span>
+                                                    </div>
+                                                    <StatusBadge status={l.status} />
+                                                </div>
+                                                {l.reason && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-600 italic">"{l.reason}"</p>}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex-shrink-0">
+                           <button onClick={() => setSelectedCalDate(null)} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600">Close</button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -978,152 +984,161 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
       {/* ... MODALS ... */}
       
-      {/* Create/Edit Request Modal */}
+      {/* Create/Edit Request Modal with Height Constraints & Scrollbars */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200 border border-slate-200 dark:border-slate-700">
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{isEditing ? 'Edit Request' : 'New Leave Request'}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Fill in the details below for your leave application.</p>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex-shrink-0">
+               <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{isEditing ? 'Edit Request' : 'New Leave Request'}</h3>
+               <p className="text-sm text-slate-500 dark:text-slate-400">Fill in the details below for your leave application.</p>
+            </div>
             
-            <form onSubmit={handleSubmit} className="space-y-5">
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Leave Type</label>
-                <select 
-                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  value={formData.type}
-                  onChange={e => setFormData({...formData, type: e.target.value})}
-                  required
-                >
-                  <option value="" disabled>Select a type...</option>
-                  {leaveTypes.filter(t => t.isActive).map(t => (
-                    <option key={t.id} value={t.name}>{t.name}</option>
-                  ))}
-                </select>
-                {formData.type && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">{getSelectedTypeBalance()}</p>
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <form id="leave-form" onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Leave Type</label>
+                  <select 
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    value={formData.type}
+                    onChange={e => setFormData({...formData, type: e.target.value})}
+                    required
+                  >
+                    <option value="" disabled>Select a type...</option>
+                    {leaveTypes.filter(t => t.isActive).map(t => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
+                  </select>
+                  {formData.type && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">{getSelectedTypeBalance()}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Approving Manager</label>
+                  <select 
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                    value={formData.approverId}
+                    onChange={e => setFormData({...formData, approverId: e.target.value})}
+                    required
+                  >
+                    <option value="" disabled>Select manager...</option>
+                    {users.filter(u => u.role === UserRole.MANAGER || u.role === UserRole.HR).map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">From</label>
+                    <input required type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">To</label>
+                    <input required type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                  </div>
+                </div>
+
+                {/* Dynamic Warning for Sick Leave */}
+                {formData.type.includes('Sick') && getDaysDiff(formData.startDate, formData.endDate) > 2 && (
+                   <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800 flex items-start gap-3">
+                      <Paperclip className="text-amber-600 dark:text-amber-400 mt-0.5" size={16}/>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Medical Certificate Required</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Since this sick leave exceeds 2 days, please upload a certificate.</p>
+                        <input type="file" className="mt-2 block w-full text-xs text-amber-700 dark:text-amber-300" onChange={(e) => setFormData({...formData, attachment: !!e.target.files?.length})} />
+                      </div>
+                   </div>
                 )}
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Approving Manager</label>
-                <select 
-                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  value={formData.approverId}
-                  onChange={e => setFormData({...formData, approverId: e.target.value})}
-                  required
-                >
-                  <option value="" disabled>Select manager...</option>
-                  {users.filter(u => u.role === UserRole.MANAGER || u.role === UserRole.HR).map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">From</label>
-                  <input required type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Reason</label>
+                  <textarea required rows={2} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Annual family trip"></textarea>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">To</label>
-                  <input required type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+
+                {/* Urgent Flag */}
+                <div className="flex items-center space-x-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800">
+                   <div className="flex items-center h-5">
+                      <input 
+                        id="urgent-flag" 
+                        type="checkbox" 
+                        checked={formData.isUrgent}
+                        onChange={(e) => setFormData({...formData, isUrgent: e.target.checked})}
+                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-slate-300" 
+                      />
+                   </div>
+                   <div className="text-sm">
+                      <label htmlFor="urgent-flag" className="font-medium text-red-800 dark:text-red-300 flex items-center gap-1">Mark as Urgent <Flame size={12} fill="currentColor"/></label>
+                      <p className="text-xs text-red-600 dark:text-red-400">Flag this request for immediate attention by your manager.</p>
+                   </div>
                 </div>
-              </div>
 
-              {/* Dynamic Warning for Sick Leave */}
-              {formData.type.includes('Sick') && getDaysDiff(formData.startDate, formData.endDate) > 2 && (
-                 <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800 flex items-start gap-3">
-                    <Paperclip className="text-amber-600 dark:text-amber-400 mt-0.5" size={16}/>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Medical Certificate Required</p>
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Since this sick leave exceeds 2 days, please upload a certificate.</p>
-                      <input type="file" className="mt-2 block w-full text-xs text-amber-700 dark:text-amber-300" onChange={(e) => setFormData({...formData, attachment: !!e.target.files?.length})} />
-                    </div>
-                 </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Reason</label>
-                <textarea required rows={2} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Annual family trip"></textarea>
-              </div>
-
-              {/* Urgent Flag */}
-              <div className="flex items-center space-x-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800">
-                 <div className="flex items-center h-5">
-                    <input 
-                      id="urgent-flag" 
-                      type="checkbox" 
-                      checked={formData.isUrgent}
-                      onChange={(e) => setFormData({...formData, isUrgent: e.target.checked})}
-                      className="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-slate-300" 
-                    />
-                 </div>
-                 <div className="text-sm">
-                    <label htmlFor="urgent-flag" className="font-medium text-red-800 dark:text-red-300 flex items-center gap-1">Mark as Urgent <Flame size={12} fill="currentColor"/></label>
-                    <p className="text-xs text-red-600 dark:text-red-400">Flag this request for immediate attention by your manager.</p>
-                 </div>
-              </div>
-
-              <MultiSelectUser 
-                label="Notify Colleagues" 
-                options={users.filter(u => u.id !== currentUser?.id)} 
-                selectedIds={formData.notifyUserIds} 
-                onChange={(ids) => setFormData({...formData, notifyUserIds: ids})} 
-              />
-              
-              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+                <MultiSelectUser 
+                  label="Notify Colleagues" 
+                  options={users.filter(u => u.id !== currentUser?.id)} 
+                  selectedIds={formData.notifyUserIds} 
+                  onChange={(ids) => setFormData({...formData, notifyUserIds: ids})} 
+                />
+              </form>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end space-x-3 flex-shrink-0">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm font-medium">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm shadow-emerald-200 dark:shadow-none">{isEditing ? 'Update Request' : 'Submit Request'}</button>
-              </div>
-            </form>
+                <button type="submit" form="leave-form" className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm shadow-emerald-200 dark:shadow-none">{isEditing ? 'Update Request' : 'Submit Request'}</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* HR: Manage Leave Type Modal */}
+      {/* HR: Manage Leave Type Modal with Height Constraints & Scrollbars */}
       {showTypeModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">{editingType ? 'Edit Leave Type' : 'Add Leave Type'}</h3>
-            <form onSubmit={handleTypeSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type Name</label>
-                <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} placeholder="e.g. Sabbatical" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Default Days per Year</label>
-                <input required type="number" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} />
-              </div>
-              
-              {/* Color Picker */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Color Label</label>
-                <div className="flex flex-wrap gap-2">
-                    {colorOptions.map((colorClass) => (
-                        <button
-                            key={colorClass}
-                            type="button"
-                            onClick={() => setTypeData({...typeData, color: colorClass})}
-                            className={`w-6 h-6 rounded-full cursor-pointer transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-400 dark:focus:ring-slate-500 ${colorClass.replace('text-', 'bg-').replace('600', '500')} ${typeData.color === colorClass ? 'ring-2 ring-offset-2 ring-slate-800 dark:ring-white scale-110' : ''}`}
-                        />
-                    ))}
+           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex-shrink-0">
+               <h3 className="text-lg font-bold text-slate-800 dark:text-white">{editingType ? 'Edit Leave Type' : 'Add Leave Type'}</h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <form id="type-form" onSubmit={handleTypeSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Type Name</label>
+                  <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} placeholder="e.g. Sabbatical" />
                 </div>
-              </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Default Days per Year</label>
+                  <input required type="number" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} />
+                </div>
+                
+                {/* Color Picker */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Color Label</label>
+                  <div className="flex flex-wrap gap-2">
+                      {colorOptions.map((colorClass) => (
+                          <button
+                              key={colorClass}
+                              type="button"
+                              onClick={() => setTypeData({...typeData, color: colorClass})}
+                              className={`w-6 h-6 rounded-full cursor-pointer transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-400 dark:focus:ring-slate-500 ${colorClass.replace('text-', 'bg-').replace('600', '500')} ${typeData.color === colorClass ? 'ring-2 ring-offset-2 ring-slate-800 dark:ring-white scale-110' : ''}`}
+                          />
+                      ))}
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Description</label>
-                <textarea required rows={2} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Short description..."></textarea>
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                 <input type="checkbox" id="isActive" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"/>
-                 <label htmlFor="isActive" className="text-sm text-slate-700 dark:text-slate-300">Active (Visible to employees)</label>
-              </div>
-              <div className="flex justify-end space-x-3 pt-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Description</label>
+                  <textarea required rows={2} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Short description..."></textarea>
+                </div>
+                <div className="flex items-center space-x-2 pt-2">
+                   <input type="checkbox" id="isActive" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"/>
+                   <label htmlFor="isActive" className="text-sm text-slate-700 dark:text-slate-300">Active (Visible to employees)</label>
+                </div>
+              </form>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end space-x-3 flex-shrink-0">
                 <button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm">{editingType ? 'Save Changes' : 'Create Type'}</button>
-              </div>
-            </form>
+                <button type="submit" form="type-form" className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm">{editingType ? 'Save Changes' : 'Create Type'}</button>
+            </div>
            </div>
         </div>
       )}
