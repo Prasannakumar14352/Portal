@@ -197,6 +197,157 @@ app.put('/api/employees/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/employees/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM employees WHERE id=@id");
+        res.json({ message: "Employee deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Departments
+app.get('/api/departments', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM departments");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/departments', async (req, res) => {
+    const d = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, d.id);
+        reqSql.input('name', sql.NVarChar, d.name);
+        reqSql.input('description', sql.NVarChar, d.description);
+        reqSql.input('managerId', sql.NVarChar, d.managerId);
+        await reqSql.query("INSERT INTO departments (id, name, description, managerId) VALUES (@id, @name, @description, @managerId)");
+        res.json(d);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/departments/:id', async (req, res) => {
+    const d = req.body;
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('name', sql.NVarChar, d.name);
+        reqSql.input('description', sql.NVarChar, d.description);
+        reqSql.input('managerId', sql.NVarChar, d.managerId);
+        await reqSql.query("UPDATE departments SET name=@name, description=@description, managerId=@managerId WHERE id=@id");
+        res.json(d);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/departments/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM departments WHERE id=@id");
+        res.json({ message: "Department deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Roles
+app.get('/api/roles', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM roles");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/roles', async (req, res) => {
+    const r = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, r.id);
+        reqSql.input('name', sql.NVarChar, r.name);
+        reqSql.input('description', sql.NVarChar, r.description);
+        await reqSql.query("INSERT INTO roles (id, name, description) VALUES (@id, @name, @description)");
+        res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/roles/:id', async (req, res) => {
+    const r = req.body;
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('name', sql.NVarChar, r.name);
+        reqSql.input('description', sql.NVarChar, r.description);
+        await reqSql.query("UPDATE roles SET name=@name, description=@description WHERE id=@id");
+        res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/roles/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM roles WHERE id=@id");
+        res.json({ message: "Role deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Projects
+app.get('/api/projects', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM projects");
+        const data = result.recordset.map(p => ({
+            ...p,
+            tasks: parseJSON(p.tasks) || []
+        }));
+        res.json(data);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/projects', async (req, res) => {
+    const p = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, p.id);
+        reqSql.input('name', sql.NVarChar, p.name);
+        reqSql.input('description', sql.NVarChar, p.description || '');
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('tasks', sql.NVarChar, JSON.stringify(p.tasks || []));
+        reqSql.input('dueDate', sql.NVarChar, p.dueDate || '');
+        await reqSql.query("INSERT INTO projects (id, name, description, status, tasks, dueDate) VALUES (@id, @name, @description, @status, @tasks, @dueDate)");
+        res.json(p);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/projects/:id', async (req, res) => {
+    const p = req.body;
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('name', sql.NVarChar, p.name);
+        reqSql.input('description', sql.NVarChar, p.description || '');
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('tasks', sql.NVarChar, JSON.stringify(p.tasks || []));
+        reqSql.input('dueDate', sql.NVarChar, p.dueDate || '');
+        await reqSql.query("UPDATE projects SET name=@name, description=@description, status=@status, tasks=@tasks, dueDate=@dueDate WHERE id=@id");
+        res.json(p);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/projects/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM projects WHERE id=@id");
+        res.json({ message: "Project deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Leaves
 app.get('/api/leaves', async (req, res) => {
     try {
@@ -236,6 +387,55 @@ app.post('/api/leaves', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/leaves/:id', async (req, res) => {
+    const l = req.body;
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('status', sql.NVarChar, l.status);
+        reqSql.input('managerComment', sql.NVarChar, l.managerComment || '');
+        reqSql.input('hrComment', sql.NVarChar, l.hrComment || '');
+        await reqSql.query("UPDATE leaves SET status=@status, managerComment=@managerComment, hrComment=@hrComment WHERE id=@id");
+        res.json(l);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Leave Types
+app.get('/api/leave_types', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM leave_types");
+        const data = result.recordset.map(t => ({ ...t, isActive: !!t.isActive }));
+        res.json(data);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/leave_types', async (req, res) => {
+    const t = req.body;
+    try {
+        const reqSql = pool.request();
+        const id = t.id || Math.random().toString(36).substr(2, 9);
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('name', sql.NVarChar, t.name);
+        reqSql.input('days', sql.Int, t.days);
+        reqSql.input('description', sql.NVarChar, t.description || '');
+        reqSql.input('isActive', sql.Bit, t.isActive ? 1 : 0);
+        reqSql.input('color', sql.NVarChar, t.color || '');
+        await reqSql.query("INSERT INTO leave_types (id, name, days, description, isActive, color) VALUES (@id, @name, @days, @description, @isActive, @color)");
+        res.json({ ...t, id });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/leave_types/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM leave_types WHERE id=@id");
+        res.json({ message: "Leave type deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Attendance
 app.get('/api/attendance', async (req, res) => {
     try {
@@ -261,6 +461,22 @@ app.post('/api/attendance', async (req, res) => {
         reqSql.input('workLocation', sql.NVarChar, a.workLocation || ''); 
         
         await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
+        res.json(a);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/attendance/:id', async (req, res) => {
+    const a = req.body;
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('checkIn', sql.NVarChar, a.checkIn);
+        reqSql.input('checkOut', sql.NVarChar, a.checkOut);
+        reqSql.input('checkInTime', sql.NVarChar, a.checkInTime);
+        reqSql.input('checkOutTime', sql.NVarChar, a.checkOutTime);
+        reqSql.input('status', sql.NVarChar, a.status);
+        await reqSql.query("UPDATE attendance SET checkIn=@checkIn, checkOut=@checkOut, checkInTime=@checkInTime, checkOutTime=@checkOutTime, status=@status WHERE id=@id");
         res.json(a);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -310,6 +526,103 @@ app.put('/api/time_entries/:id', async (req, res) => {
         reqSql.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
         await reqSql.query("UPDATE time_entries SET projectId=@projectId, task=@task, date=@date, durationMinutes=@durationMinutes, extraMinutes=@extraMinutes, description=@description, isBillable=@isBillable WHERE id=@id");
         res.json(t);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/time_entries/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM time_entries WHERE id=@id");
+        res.json({ message: "Time entry deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Notifications
+app.get('/api/notifications', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM notifications");
+        const data = result.recordset.map(n => ({ ...n, read: !!n.read }));
+        res.json(data);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/notifications/:id/read', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("UPDATE notifications SET [read]=1 WHERE id=@id");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/notifications/read-all/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('userId', sql.NVarChar, userId);
+        await reqSql.query("UPDATE notifications SET [read]=1 WHERE userId=@userId");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Holidays
+app.get('/api/holidays', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM holidays");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/holidays', async (req, res) => {
+    const h = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, h.id);
+        reqSql.input('name', sql.NVarChar, h.name);
+        reqSql.input('date', sql.NVarChar, h.date);
+        reqSql.input('type', sql.NVarChar, h.type);
+        await reqSql.query("INSERT INTO holidays (id, name, date, type) VALUES (@id, @name, @date, @type)");
+        res.json(h);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/holidays/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, id);
+        await reqSql.query("DELETE FROM holidays WHERE id=@id");
+        res.json({ message: "Holiday deleted successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Payslips
+app.get('/api/payslips', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM payslips");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/payslips', async (req, res) => {
+    const p = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, p.id);
+        reqSql.input('userId', sql.NVarChar, p.userId);
+        reqSql.input('userName', sql.NVarChar, p.userName);
+        reqSql.input('month', sql.NVarChar, p.month);
+        reqSql.input('amount', sql.Float, p.amount);
+        reqSql.input('currency', sql.NVarChar, p.currency || '₹');
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('generatedDate', sql.NVarChar, p.generatedDate);
+        reqSql.input('fileData', sql.NVarChar, p.fileData || '');
+        reqSql.input('fileName', sql.NVarChar, p.fileName || '');
+        await reqSql.query("INSERT INTO payslips (id, userId, userName, month, amount, currency, status, generatedDate, fileData, fileName) VALUES (@id, @userId, @userName, @month, @amount, @currency, @status, @generatedDate, @fileData, @fileName)");
+        res.json(p);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
