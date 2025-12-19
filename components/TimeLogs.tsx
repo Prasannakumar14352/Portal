@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { TimeEntry, Project, UserRole } from '../types';
@@ -136,7 +135,8 @@ const TimeLogs = () => {
         realEndOfWeek.setHours(23, 59, 59);
         entries = entries.filter(e => {
             const d = new Date(e.date);
-            return d >= startOfMonth && d <= endOfMonth;
+            // Fixed: use startOfWeek and realEndOfWeek which are defined in this scope
+            return d >= startOfWeek && d <= realEndOfWeek;
         });
     }
     return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

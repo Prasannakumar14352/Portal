@@ -154,7 +154,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             if (!targetUser) {
                 console.log(`[Auth] Auto-provisioning new Azure user: ${email}`);
-                const nextId = currentEmployees.length > 0 ? Math.max(...currentEmployees.map(e => Number(e.id))) + 1 : 1001;
+                // Robust nextId calculation that handles potential string IDs in existing records
+                const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+                const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+                
                 const newEmp: Employee = {
                     id: nextId,
                     employeeId: `EMP${nextId}`,

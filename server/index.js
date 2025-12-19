@@ -121,25 +121,22 @@ const initDb = async () => {
         }
 
         // 3. Special handling for numeric 'id' conversion in employees
-        // Checking existing type of 'id' in employees
         const typeInfo = await request.query(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'employees' AND COLUMN_NAME = 'id'`);
         if (typeInfo.recordset.length > 0 && typeInfo.recordset[0].DATA_TYPE !== 'int') {
             console.log("[DB] Detected non-int ID for employees. Attempting conversion...");
             try {
-                // To safely change PK type, we'd need to drop constraints first. 
-                // This is complex for a generic script, so we use a safe ALTER if possible.
-                // Note: This might fail if current string data isn't numeric.
                 await request.query(`
                     DECLARE @ConstraintName nvarchar(200)
                     SELECT @ConstraintName = Name FROM sys.key_constraints WHERE [type] = 'PK' AND [parent_object_id] = Object_id('employees')
                     IF @ConstraintName IS NOT NULL EXEC('ALTER TABLE employees DROP CONSTRAINT ' + @ConstraintName)
                     
+                    -- Only alter if records can be cast to int, else this will fail gracefully via catch
                     ALTER TABLE employees ALTER COLUMN id INT NOT NULL
                     ALTER TABLE employees ADD CONSTRAINT PK_employees PRIMARY KEY (id)
                 `);
                 console.log("[DB] Successfully converted employees.id to INT.");
             } catch (e) {
-                console.error("[DB] Failed to convert id to int automatically:", e.message);
+                console.error("[DB] Failed to convert id to int automatically (non-numeric data present):", e.message);
             }
         }
 
@@ -167,10 +164,13 @@ apiRouter.get('/employees', async (req, res) => {
 
 apiRouter.post('/employees', async (req, res) => {
     const e = req.body;
+    const numericId = parseInt(e.id);
+    if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Validation failed for parameter 'id'. Expected a numeric string or number." });
+    }
     try {
         const reqSql = pool.request();
-        // Force ID to be an integer
-        reqSql.input('id', sql.Int, parseInt(e.id));
+        reqSql.input('id', sql.Int, numericId);
         reqSql.input('employeeId', sql.NVarChar, e.employeeId);
         reqSql.input('firstName', sql.NVarChar, e.firstName);
         reqSql.input('lastName', sql.NVarChar, e.lastName);
@@ -200,9 +200,13 @@ apiRouter.post('/employees', async (req, res) => {
 apiRouter.put('/employees/:id', async (req, res) => {
     const e = req.body;
     const { id } = req.params;
+    const numericId = parseInt(id);
+    if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Validation failed for parameter 'id'. Expected a numeric string or number." });
+    }
     try {
         const reqSql = pool.request();
-        reqSql.input('id', sql.Int, parseInt(id));
+        reqSql.input('id', sql.Int, numericId);
         reqSql.input('employeeId', sql.NVarChar, e.employeeId);
         reqSql.input('firstName', sql.NVarChar, e.firstName);
         reqSql.input('lastName', sql.NVarChar, e.lastName);
@@ -233,13 +237,17 @@ apiRouter.put('/employees/:id', async (req, res) => {
 
 apiRouter.delete('/employees/:id', async (req, res) => {
     const { id } = req.params;
+    const numericId = parseInt(id);
+    if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Validation failed for parameter 'id'. Expected a numeric string or number." });
+    }
     if (!pool) return res.status(503).json({ error: "Database not connected" });
     
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
         const request = new sql.Request(transaction);
-        request.input('id', sql.Int, parseInt(id));
+        request.input('id', sql.Int, numericId);
 
         console.log(`[SQL] Transaction: Deleting employee ${id}...`);
 
