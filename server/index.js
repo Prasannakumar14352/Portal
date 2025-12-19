@@ -119,10 +119,11 @@ const initDb = async () => {
     }
 };
 
-// --- API ENDPOINTS ---
+// --- API ROUTER ---
+const apiRouter = express.Router();
 
 // Employees
-app.get('/api/employees', async (req, res) => {
+apiRouter.get('/employees', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM employees");
         const employees = result.recordset.map(e => ({
@@ -134,7 +135,7 @@ app.get('/api/employees', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/employees', async (req, res) => {
+apiRouter.post('/employees', async (req, res) => {
     const e = req.body;
     try {
         const reqSql = pool.request();
@@ -164,7 +165,7 @@ app.post('/api/employees', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/employees/:id', async (req, res) => {
+apiRouter.put('/employees/:id', async (req, res) => {
     const e = req.body;
     const { id } = req.params;
     try {
@@ -197,49 +198,45 @@ app.put('/api/employees/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/employees/:id', async (req, res) => {
+apiRouter.delete('/employees/:id', async (req, res) => {
     const { id } = req.params;
+    if (!pool) return res.status(503).json({ error: "Database not connected" });
+    
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
         const request = new sql.Request(transaction);
         request.input('id', sql.NVarChar, id);
 
-        console.log(`[SQL] Deleting employee ${id} and all related records...`);
+        console.log(`[SQL] Transaction: Deleting employee ${id}...`);
 
-        // Manual Cascade: Delete related records from other tables first to avoid consistency issues
+        // Manual Cascade
         await request.query("DELETE FROM attendance WHERE employeeId = @id");
         await request.query("DELETE FROM leaves WHERE userId = @id OR employeeId = @id");
         await request.query("DELETE FROM time_entries WHERE userId = @id");
         await request.query("DELETE FROM notifications WHERE userId = @id");
         await request.query("DELETE FROM payslips WHERE userId = @id");
         
-        // Finally delete the employee record itself
         const result = await request.query("DELETE FROM employees WHERE id = @id");
-        
         await transaction.commit();
         
-        if (result.rowsAffected[0] === 0) {
-            console.warn(`[SQL] Delete operation finished but 0 rows were affected for employee ID: ${id}`);
-        }
-
         res.json({ message: "Employee and associated records deleted successfully", rowsAffected: result.rowsAffected[0] });
     } catch (err) {
-        console.error(`[SQL ERROR] Failed to delete employee ${id}:`, err.message);
-        if (transaction) await transaction.rollback();
+        console.error(`[SQL ERROR] Delete failed for ${id}:`, err.message);
+        if (transaction) await transaction.rollback().catch(() => {});
         res.status(500).json({ error: `Database deletion failed: ${err.message}` });
     }
 });
 
 // Departments
-app.get('/api/departments', async (req, res) => {
+apiRouter.get('/departments', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM departments");
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/departments', async (req, res) => {
+apiRouter.post('/departments', async (req, res) => {
     const d = req.body;
     try {
         const reqSql = pool.request();
@@ -252,7 +249,7 @@ app.post('/api/departments', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/departments/:id', async (req, res) => {
+apiRouter.put('/departments/:id', async (req, res) => {
     const d = req.body;
     const { id } = req.params;
     try {
@@ -266,25 +263,25 @@ app.put('/api/departments/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/departments/:id', async (req, res) => {
+apiRouter.delete('/departments/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
         await reqSql.query("DELETE FROM departments WHERE id=@id");
-        res.json({ message: "Department deleted successfully" });
+        res.json({ message: "Department deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Roles
-app.get('/api/roles', async (req, res) => {
+apiRouter.get('/roles', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM roles");
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/roles', async (req, res) => {
+apiRouter.post('/roles', async (req, res) => {
     const r = req.body;
     try {
         const reqSql = pool.request();
@@ -296,7 +293,7 @@ app.post('/api/roles', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/roles/:id', async (req, res) => {
+apiRouter.put('/roles/:id', async (req, res) => {
     const r = req.body;
     const { id } = req.params;
     try {
@@ -309,29 +306,26 @@ app.put('/api/roles/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/roles/:id', async (req, res) => {
+apiRouter.delete('/roles/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
         await reqSql.query("DELETE FROM roles WHERE id=@id");
-        res.json({ message: "Role deleted successfully" });
+        res.json({ message: "Role deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Projects
-app.get('/api/projects', async (req, res) => {
+apiRouter.get('/projects', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM projects");
-        const data = result.recordset.map(p => ({
-            ...p,
-            tasks: parseJSON(p.tasks) || []
-        }));
+        const data = result.recordset.map(p => ({ ...p, tasks: parseJSON(p.tasks) || [] }));
         res.json(data);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/projects', async (req, res) => {
+apiRouter.post('/projects', async (req, res) => {
     const p = req.body;
     try {
         const reqSql = pool.request();
@@ -346,7 +340,7 @@ app.post('/api/projects', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/projects/:id', async (req, res) => {
+apiRouter.put('/projects/:id', async (req, res) => {
     const p = req.body;
     const { id } = req.params;
     try {
@@ -362,31 +356,26 @@ app.put('/api/projects/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/projects/:id', async (req, res) => {
+apiRouter.delete('/projects/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
         await reqSql.query("DELETE FROM projects WHERE id=@id");
-        res.json({ message: "Project deleted successfully" });
+        res.json({ message: "Project deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Leaves
-app.get('/api/leaves', async (req, res) => {
+apiRouter.get('/leaves', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM leaves");
-        const data = result.recordset.map(l => ({
-            ...l,
-            notifyUserIds: parseJSON(l.notifyUserIds) || [],
-            managerConsent: !!l.managerConsent,
-            isUrgent: !!l.isUrgent
-        }));
+        const data = result.recordset.map(l => ({ ...l, notifyUserIds: parseJSON(l.notifyUserIds) || [], managerConsent: !!l.managerConsent, isUrgent: !!l.isUrgent }));
         res.json(data);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/leaves', async (req, res) => {
+apiRouter.post('/leaves', async (req, res) => {
     const l = req.body;
     try {
         const reqSql = pool.request();
@@ -404,14 +393,12 @@ app.post('/api/leaves', async (req, res) => {
         reqSql.input('approverId', sql.NVarChar, l.approverId || '');
         reqSql.input('isUrgent', sql.Bit, l.isUrgent ? 1 : 0);
         reqSql.input('createdAt', sql.NVarChar, l.createdAt || new Date().toISOString());
-        
-        await reqSql.query(`INSERT INTO leaves (id, userId, userName, type, startDate, endDate, reason, status, attachmentUrl, managerConsent, notifyUserIds, approverId, isUrgent, createdAt) 
-            VALUES (@id, @userId, @userName, @type, @startDate, @endDate, @reason, @status, @attachmentUrl, @managerConsent, @notifyUserIds, @approverId, @isUrgent, @createdAt)`);
+        await reqSql.query(`INSERT INTO leaves (id, userId, userName, type, startDate, endDate, reason, status, attachmentUrl, managerConsent, notifyUserIds, approverId, isUrgent, createdAt) VALUES (@id, @userId, @userName, @type, @startDate, @endDate, @reason, @status, @attachmentUrl, @managerConsent, @notifyUserIds, @approverId, @isUrgent, @createdAt)`);
         res.json(l);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/leaves/:id', async (req, res) => {
+apiRouter.put('/leaves/:id', async (req, res) => {
     const l = req.body;
     const { id } = req.params;
     try {
@@ -426,7 +413,7 @@ app.put('/api/leaves/:id', async (req, res) => {
 });
 
 // Leave Types
-app.get('/api/leave_types', async (req, res) => {
+apiRouter.get('/leave_types', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM leave_types");
         const data = result.recordset.map(t => ({ ...t, isActive: !!t.isActive }));
@@ -434,7 +421,7 @@ app.get('/api/leave_types', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/leave_types', async (req, res) => {
+apiRouter.post('/leave_types', async (req, res) => {
     const t = req.body;
     try {
         const reqSql = pool.request();
@@ -450,25 +437,25 @@ app.post('/api/leave_types', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/leave_types/:id', async (req, res) => {
+apiRouter.delete('/leave_types/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
         await reqSql.query("DELETE FROM leave_types WHERE id=@id");
-        res.json({ message: "Leave type deleted successfully" });
+        res.json({ message: "Leave type deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Attendance
-app.get('/api/attendance', async (req, res) => {
+apiRouter.get('/attendance', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM attendance");
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/attendance', async (req, res) => {
+apiRouter.post('/attendance', async (req, res) => {
     const a = req.body;
     try {
         const reqSql = pool.request();
@@ -483,13 +470,12 @@ app.post('/api/attendance', async (req, res) => {
         reqSql.input('status', sql.NVarChar, a.status);
         reqSql.input('notes', sql.NVarChar, a.notes || '');
         reqSql.input('workLocation', sql.NVarChar, a.workLocation || ''); 
-        
         await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
         res.json(a);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/attendance/:id', async (req, res) => {
+apiRouter.put('/attendance/:id', async (req, res) => {
     const a = req.body;
     const { id } = req.params;
     try {
@@ -506,7 +492,7 @@ app.put('/api/attendance/:id', async (req, res) => {
 });
 
 // Time Entries
-app.get('/api/time_entries', async (req, res) => {
+apiRouter.get('/time_entries', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM time_entries");
         const data = result.recordset.map(r => ({ ...r, isBillable: !!r.isBillable, isExtra: !!r.isExtra, extraMinutes: r.extraMinutes || 0 }));
@@ -514,7 +500,7 @@ app.get('/api/time_entries', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/time_entries', async (req, res) => {
+apiRouter.post('/time_entries', async (req, res) => {
     const t = req.body;
     try {
         const reqSql = pool.request();
@@ -535,7 +521,7 @@ app.post('/api/time_entries', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/time_entries/:id', async (req, res) => {
+apiRouter.put('/time_entries/:id', async (req, res) => {
     const t = req.body;
     const { id } = req.params;
     try {
@@ -553,18 +539,18 @@ app.put('/api/time_entries/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/time_entries/:id', async (req, res) => {
+apiRouter.delete('/time_entries/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
         await reqSql.query("DELETE FROM time_entries WHERE id=@id");
-        res.json({ message: "Time entry deleted successfully" });
+        res.json({ message: "Time entry deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Notifications
-app.get('/api/notifications', async (req, res) => {
+apiRouter.get('/notifications', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM notifications");
         const data = result.recordset.map(n => ({ ...n, read: !!n.read }));
@@ -572,7 +558,7 @@ app.get('/api/notifications', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/notifications/:id/read', async (req, res) => {
+apiRouter.put('/notifications/:id/read', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
@@ -582,7 +568,7 @@ app.put('/api/notifications/:id/read', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/notifications/read-all/:userId', async (req, res) => {
+apiRouter.put('/notifications/read-all/:userId', async (req, res) => {
     const { userId } = req.params;
     try {
         const reqSql = pool.request();
@@ -593,14 +579,14 @@ app.put('/api/notifications/read-all/:userId', async (req, res) => {
 });
 
 // Holidays
-app.get('/api/holidays', async (req, res) => {
+apiRouter.get('/holidays', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM holidays");
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/holidays', async (req, res) => {
+apiRouter.post('/holidays', async (req, res) => {
     const h = req.body;
     try {
         const reqSql = pool.request();
@@ -613,25 +599,25 @@ app.post('/api/holidays', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/holidays/:id', async (req, res) => {
+apiRouter.delete('/holidays/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
         await reqSql.query("DELETE FROM holidays WHERE id=@id");
-        res.json({ message: "Holiday deleted successfully" });
+        res.json({ message: "Holiday deleted" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Payslips
-app.get('/api/payslips', async (req, res) => {
+apiRouter.get('/payslips', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM payslips");
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/payslips', async (req, res) => {
+apiRouter.post('/payslips', async (req, res) => {
     const p = req.body;
     try {
         const reqSql = pool.request();
@@ -649,6 +635,9 @@ app.post('/api/payslips', async (req, res) => {
         res.json(p);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Mount API Router
+app.use('/api', apiRouter);
 
 app.listen(PORT, async () => {
     console.log(`🚀 Server starting on port ${PORT}`);

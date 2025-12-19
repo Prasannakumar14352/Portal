@@ -6,21 +6,22 @@ import {
 } from './mockData';
 
 // --- CONFIGURATION ---
-// Controlled via .env file (VITE_USE_MOCK_DATA=true/false)
-const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true'; // Strict check: defaults to real API if not explicitly 'true'
-const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true';
+const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
 console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'REAL API'}`);
 
 // --- REAL API IMPLEMENTATION ---
 const api = {
     get: async (endpoint: string) => {
-        const res = await fetch(`${API_BASE}${endpoint}`);
+        const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const res = await fetch(`${API_BASE}${path}`);
         if (!res.ok) throw new Error(`API GET Error: ${res.status} ${res.statusText}`);
         return res.json();
     },
     post: async (endpoint: string, data: any) => {
-        const res = await fetch(`${API_BASE}${endpoint}`, {
+        const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const res = await fetch(`${API_BASE}${path}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -29,7 +30,8 @@ const api = {
         return res.json();
     },
     put: async (endpoint: string, data: any) => {
-        const res = await fetch(`${API_BASE}${endpoint}`, {
+        const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const res = await fetch(`${API_BASE}${path}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -38,11 +40,13 @@ const api = {
         return res.json();
     },
     delete: async (endpoint: string) => {
-        const res = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE' });
+        const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
         if (!res.ok) {
             const errorText = await res.text().catch(() => res.statusText);
             throw new Error(`API DELETE Error: ${res.status} ${errorText}`);
         }
+        return res.json();
     }
 };
 
@@ -221,27 +225,21 @@ const createHybridDb = () => {
             return async (...args: any[]) => {
                 const isMutation = prop.startsWith('add') || prop.startsWith('update') || prop.startsWith('delete') || prop.startsWith('mark');
                 
-                // 1. If explicit MOCK mode, just use mockDb
                 if (USE_MOCK_DATA) {
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
                 
-                // 2. REAL API Mode
                 try {
                     if (apiDb[prop as keyof typeof apiDb]) {
                         return await (apiDb[prop as keyof typeof apiDb] as Function)(...args);
                     }
-                    // If method doesn't exist in apiDb, fallback to mockDb
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 } catch (error) {
-                    // CRITICAL: Mutations must NOT fallback to mock data silently in real API mode
                     if (isMutation) {
-                        console.error(`[DB] Critical API error during mutation (${prop}):`, error);
-                        throw error; // Propagate error to context so user knows it failed
+                        console.error(`[DB] Mutation error (${prop}):`, error);
+                        throw error; 
                     }
-                    
-                    // GET requests can fallback for resilience
-                    console.warn(`[DB] API read failed for ${String(prop)}, falling back to local Mock Data.`, error);
+                    console.warn(`[DB] Read fallback for ${String(prop)}.`, error);
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
             };
