@@ -12,11 +12,13 @@ const formatDateISO = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-// Robust helper for 24h time HH:mm
-const formatTime24 = (date: Date) => {
-  const h = String(date.getHours()).padStart(2, '0');
-  const m = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+// Robust helper for 12h time (h:mm am/pm)
+const formatTime12 = (date: Date) => {
+  return date.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true 
+  }).toLowerCase();
 };
 
 interface AppContextType {
@@ -270,6 +272,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Find active or the most recent completed session for today
     const sessions = attendance.filter(a => a.employeeId === currentUser.id && a.date === todayStr);
     if (sessions.length === 0) return undefined;
+    // We want the current active one, or if all are checked out, the last one.
     const active = sessions.find(s => !s.checkOut);
     return active || sessions[sessions.length - 1];
   };
@@ -286,7 +289,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       employeeId: currentUser.id,
       employeeName: currentUser.name,
       date: localDate,
-      checkIn: formatTime24(now),
+      checkIn: formatTime12(now),
       checkInTime: now.toISOString(),
       checkOut: '',
       status: isLate ? 'Late' : 'Present',
@@ -300,6 +303,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const checkOut = async (reason?: string) => {
     if (!currentUser) return;
     const todayRec = getTodayAttendance();
+    // Cannot checkout if no record or already checked out
     if (!todayRec || todayRec.checkOut) return;
     const now = new Date();
     const start = new Date(todayRec.checkInTime || now.toISOString());
@@ -308,7 +312,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const updatedRecord: AttendanceRecord = {
       ...todayRec,
-      checkOut: formatTime24(now),
+      checkOut: formatTime12(now),
       checkOutTime: now.toISOString(),
       status: finalStatus,
       notes: reason || todayRec.notes
@@ -324,7 +328,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast("Attendance record updated", "success");
   };
 
-  // Fix: Added missing notify implementation
   const notify = async (message: string) => {
     if (!currentUser) return;
     const newNotif: Notification = {

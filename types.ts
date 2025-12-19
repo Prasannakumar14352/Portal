@@ -47,7 +47,7 @@ export interface Employee {
   firstName: string;
   lastName: string;
   email: string;
-  password?: string; // Added password field
+  password?: string;
   role: string;
   department: string; 
   departmentId?: string; 
@@ -58,7 +58,7 @@ export interface Employee {
   avatar: string;
   managerId?: string; 
   location?: { latitude: number; longitude: number; address: string };
-  workLocation?: string; // Added workLocation field
+  workLocation?: string;
   phone?: string;
   jobTitle?: string;
 }
@@ -121,10 +121,12 @@ export interface TimeEntry {
   projectId: string;
   task: string;
   date: string;
-  durationMinutes: number;
+  durationMinutes: number; // Represents Normal Minutes
+  extraMinutes?: number;   // Represents Extra Minutes in the same record
   description: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   isBillable: boolean;
+  isExtra?: boolean; // Legacy/Flag
 }
 
 export interface ChatMessage {
@@ -171,12 +173,12 @@ export interface Payslip {
   id: string;
   userId: string;
   userName: string;
-  month: string; // "May 2024"
+  month: string;
   amount: number;
-  currency?: string; // e.g. "₹", "$", "€"
+  currency?: string;
   status: 'Paid' | 'Processing';
   generatedDate: string;
-  fileData?: string; // Base64 Data URL for the PDF
+  fileData?: string;
   fileName?: string;
 }
 

@@ -12,10 +12,12 @@ const formatDateISO = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-const formatTime24 = (date: Date) => {
-  const h = String(date.getHours()).padStart(2, '0');
-  const m = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+const formatTime12 = (date: Date) => {
+  return date.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true 
+  }).toLowerCase();
 };
 
 interface AttendanceProps {
@@ -46,15 +48,18 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const todayRecord = useMemo(() => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(currentTime);
+    
     // Find all sessions for today for this user
     const sessions = records.filter(r => r.employeeId === currentUser.id && r.date === todayStr);
     if (sessions.length === 0) return undefined;
-    // Priority: session without a checkOut (Active)
+    
+    // Priority 1: session without a checkOut (Currently clocked in)
     const active = sessions.find(r => !r.checkOut);
     if (active) return active;
-    // Else return the most recent completed session of today
+    
+    // Priority 2: the most recent completed session of today
     return sessions[sessions.length - 1];
-  }, [records, currentUser, currentTime.getDate()]); // Dependency on date part of currentTime
+  }, [records, currentUser, currentTime.getDate()]); // Sync when day changes or records update
 
   const isHR = currentUser?.role === UserRole.HR;
   const userProjects = useMemo(() => projects.filter(p => p.status === 'Active'), [projects]);
@@ -146,6 +151,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   const openEditModal = (record: AttendanceRecord) => {
       setEditingRecord(record);
+      // Native time input expects HH:mm (24h) string
       const cin = record.checkInTime ? new Date(record.checkInTime).toTimeString().substring(0, 5) : '';
       const cout = record.checkOutTime ? new Date(record.checkOutTime).toTimeString().substring(0, 5) : '';
       setEditForm({ checkIn: cin, checkOut: cout });
@@ -158,7 +164,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       const datePart = editingRecord.date;
       const newCheckInISO = editForm.checkIn ? new Date(`${datePart}T${editForm.checkIn}:00`).toISOString() : undefined;
       const newCheckOutISO = editForm.checkOut ? new Date(`${datePart}T${editForm.checkOut}:00`).toISOString() : undefined;
-      const fmtTime = (iso: string | undefined) => iso ? formatTime24(new Date(iso)) : '--:--';
+      const fmtTime = (iso: string | undefined) => iso ? formatTime12(new Date(iso)) : '--:--';
 
       const updatedRecord: AttendanceRecord = {
           ...editingRecord,
@@ -218,8 +224,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
          <div className="text-center lg:text-left">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Attendance Tracker</h2>
             <p className="text-slate-500 dark:text-slate-400">Manage your daily work hours.</p>
-            <div className="mt-2 text-3xl font-mono text-slate-700 dark:text-slate-200 font-semibold tracking-wider">
-               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+            <div className="mt-2 text-3xl font-mono text-slate-700 dark:text-slate-200 font-semibold tracking-wider uppercase">
+               {/* 12-hour format clock */}
+               {currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).toLowerCase()}
             </div>
             <p className="text-sm text-slate-400">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
          </div>
@@ -232,7 +239,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 </button>
              ) : todayRecord.checkOut ? (
                 <div className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-gray-50 dark:bg-slate-700/50 rounded-full border-4 border-gray-100 dark:border-slate-600">
-                   <CheckCircle2 size={48} className="text-gray-400 dark:text-gray-500 mb-2" />
+                   <CheckCircle2 size={48} className="text-emerald-500 dark:text-emerald-400 mb-2" />
                    <span className="font-bold text-gray-500 dark:text-gray-400">Completed</span>
                    <span className="text-xs text-gray-400 dark:text-gray-500">Day finalized</span>
                 </div>
@@ -248,8 +255,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
          <div className="w-full lg:w-auto bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600 min-w-[200px]">
             <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2 uppercase">Today's Session</h4>
             <div className="space-y-2 text-sm">
-               <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Check In:</span><span className="font-medium text-slate-800 dark:text-white">{todayRecord?.checkIn || '--:--'}</span></div>
-               <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Check Out:</span><span className="font-medium text-slate-800 dark:text-white">{todayRecord?.checkOut || '--:--'}</span></div>
+               <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Check In:</span><span className="font-medium text-slate-800 dark:text-white uppercase">{todayRecord?.checkIn || '--:--'}</span></div>
+               <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Check Out:</span><span className="font-medium text-slate-800 dark:text-white uppercase">{todayRecord?.checkOut || '--:--'}</span></div>
                <div className="flex justify-between border-t border-slate-200 dark:border-slate-600 pt-2 mt-2"><span className="text-slate-500 dark:text-slate-400">Status:</span><span className={`font-bold ${todayRecord?.checkOut ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{todayRecord?.checkOut ? 'Completed' : (todayRecord ? 'Active' : 'Pending')}</span></div>
             </div>
          </div>
@@ -262,8 +269,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-slate-600 rounded-lg text-sm">Cancel</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Update Record</button></div>
           </form>
       </DraggableModal>
-
-      {/* Other Modals (TimeLog, EarlyReason) would go here as in the previous version... */}
 
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="sm:col-span-2">
@@ -292,8 +297,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 <tr key={record.id || index} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isGhost ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{record.employeeName}</td>
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{record.date}</td>
-                  <td className="px-6 py-4"><div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300">{!isGhost && <div className="w-2 h-2 rounded-full bg-emerald-500"></div>}<span>{record.checkIn}</span></div></td>
-                  <td className="px-6 py-4"><div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300">{record.checkOut && !isGhost ? (<><div className="w-2 h-2 rounded-full bg-orange-400"></div><span>{record.checkOut}</span></>) : !isGhost ? (<span className="text-slate-400 text-xs italic">Active</span>) : (<span>--:--</span>)}</div></td>
+                  <td className="px-6 py-4"><div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 uppercase">{!isGhost && <div className="w-2 h-2 rounded-full bg-emerald-500"></div>}<span>{record.checkIn}</span></div></td>
+                  <td className="px-6 py-4"><div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 uppercase">{record.checkOut && !isGhost ? (<><div className="w-2 h-2 rounded-full bg-orange-400"></div><span>{record.checkOut}</span></>) : !isGhost ? (<span className="text-slate-400 text-xs italic">Active</span>) : (<span>--:--</span>)}</div></td>
                   <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">{calculateDuration(record)}</td>
                   <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-semibold ${record.status === 'Present' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{record.status}</span></td>
                   <td className="px-6 py-4 text-center">{(isHR || (formatDateISO(new Date(record.date)) === formatDateISO(new Date()))) ? (<button onClick={() => openEditModal(record)} className="p-1.5 text-slate-500 hover:text-emerald-600 rounded"><Edit2 size={16} /></button>) : <Lock size={16} className="text-slate-300 mx-auto"/>}</td>
