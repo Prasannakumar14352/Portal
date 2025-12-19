@@ -75,7 +75,8 @@ const mockDb = {
         return Promise.resolve(emp);
     },
     deleteEmployee: async (id: string) => {
-        store.employees = store.employees.filter(e => e.id !== id);
+        /* Standardized comparison by casting both sides to string */
+        store.employees = store.employees.filter(e => String(e.id) !== String(id));
         return Promise.resolve();
     },
     getDepartments: async (): Promise<Department[]> => Promise.resolve([...store.departments]),
@@ -86,7 +87,7 @@ const mockDb = {
         return Promise.resolve(dept);
     },
     deleteDepartment: async (id: string) => {
-        store.departments = store.departments.filter(d => d.id !== id);
+        store.departments = store.departments.filter(d => String(d.id) !== String(id));
         return Promise.resolve();
     },
     getRoles: async (): Promise<Role[]> => Promise.resolve([...store.roles]),
@@ -97,7 +98,7 @@ const mockDb = {
         return Promise.resolve(role);
     },
     deleteRole: async (id: string) => {
-        store.roles = store.roles.filter(r => r.id !== id);
+        store.roles = store.roles.filter(r => String(r.id) !== String(id));
         return Promise.resolve();
     },
     getProjects: async (): Promise<Project[]> => Promise.resolve([...store.projects]),
@@ -108,7 +109,7 @@ const mockDb = {
         return Promise.resolve(proj);
     },
     deleteProject: async (id: string) => {
-        store.projects = store.projects.filter(p => p.id !== id);
+        store.projects = store.projects.filter(p => String(p.id) !== String(id));
         return Promise.resolve();
     },
     getLeaves: async (): Promise<LeaveRequest[]> => Promise.resolve([...store.leaves]),
@@ -126,7 +127,7 @@ const mockDb = {
         return Promise.resolve(type);
     },
     deleteLeaveType: async (id: string) => {
-        store.leaveTypes = store.leaveTypes.filter(t => t.id !== id);
+        store.leaveTypes = store.leaveTypes.filter(t => String(t.id) !== String(id));
         return Promise.resolve();
     },
     getAttendance: async (): Promise<AttendanceRecord[]> => Promise.resolve([...store.attendance]),
@@ -144,23 +145,23 @@ const mockDb = {
         return Promise.resolve(entry);
     },
     deleteTimeEntry: async (id: string) => {
-        store.timeEntries = store.timeEntries.filter(e => e.id !== id);
+        store.timeEntries = store.timeEntries.filter(e => String(e.id) !== String(id));
         return Promise.resolve();
     },
     getNotifications: async (): Promise<Notification[]> => Promise.resolve([...store.notifications]),
     addNotification: async (notif: Notification) => { store.notifications.push(notif); return Promise.resolve(notif); },
     markNotificationRead: async (id: string) => {
-        const idx = store.notifications.findIndex(n => n.id === id);
+        const idx = store.notifications.findIndex(n => String(n.id) === String(id));
         if(idx !== -1) store.notifications[idx].read = true;
         return Promise.resolve();
     },
     markAllNotificationsRead: async (userId: string) => {
-        store.notifications.forEach(n => { if(n.userId === userId) n.read = true; });
+        store.notifications.forEach(n => { if(String(n.userId) === String(userId)) n.read = true; });
         return Promise.resolve();
     },
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
     addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
-    deleteHoliday: async (id: string) => { store.holidays = store.holidays.filter(h => h.id !== id); return Promise.resolve(); },
+    deleteHoliday: async (id: string) => { store.holidays = store.holidays.filter(h => String(h.id) !== String(id)); return Promise.resolve(); },
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
     addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
 };

@@ -53,7 +53,7 @@ const TimeLogs = () => {
   // Dynamic Tasks based on selected project
   const selectedProjectTasks = useMemo(() => {
     if (!formData.projectId || formData.projectId === NO_PROJECT_ID) return ['General Administration', 'Internal Meeting', 'Documentation', 'Support'];
-    const proj = projects.find(p => p.id === formData.projectId);
+    const proj = projects.find(p => String(p.id) === String(formData.projectId));
     return proj?.tasks || [];
   }, [formData.projectId, projects]);
 
@@ -73,9 +73,9 @@ const TimeLogs = () => {
     return `${h}h ${m}m`;
   };
   
-  const getProjectName = (id?: string) => {
-      if (!id || id === NO_PROJECT_ID) return 'No Client - General';
-      return projects.find(p => p.id === id)?.name || 'Unknown Project';
+  const getProjectName = (id?: string | number) => {
+      if (!id || String(id) === NO_PROJECT_ID) return 'No Client - General';
+      return projects.find(p => String(p.id) === String(id))?.name || 'Unknown Project';
   };
 
   const getWeekDays = (date: Date) => {
@@ -110,16 +110,17 @@ const TimeLogs = () => {
        if (searchEmployee) {
           const lowerQ = searchEmployee.toLowerCase();
           entries = entries.filter(e => {
-             const u = users.find(usr => usr.id === e.userId);
+             const u = users.find(usr => String(usr.id) === String(e.userId));
              return u && `${u.firstName} ${u.lastName}`.toLowerCase().includes(lowerQ);
           });
        }
     } else {
-       entries = entries.filter(e => e.userId === currentUser?.id);
+       entries = entries.filter(e => String(e.userId) === String(currentUser?.id));
     }
-    if (filterProject !== 'All') entries = entries.filter(e => (e.projectId || NO_PROJECT_ID) === filterProject);
+    if (filterProject !== 'All') entries = entries.filter(e => String(e.projectId || NO_PROJECT_ID) === filterProject);
     if (filterStatus !== 'All') entries = entries.filter(e => e.status === filterStatus);
     if (filterTask !== 'All') entries = entries.filter(e => e.task === filterTask);
+    
     if (dateRange === 'Month') {
         const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
         const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
@@ -135,7 +136,7 @@ const TimeLogs = () => {
         realEndOfWeek.setHours(23, 59, 59);
         entries = entries.filter(e => {
             const d = new Date(e.date);
-            return d >= startOfWeek && d <= realEndOfWeek;
+            return d >= startOfMonth && d <= endOfMonth;
         });
     }
     return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -144,7 +145,7 @@ const TimeLogs = () => {
   const groupedEntries = useMemo(() => {
       const groups: Record<string, TimeEntry[]> = {};
       visibleEntries.forEach(entry => {
-          const pid = entry.projectId || NO_PROJECT_ID;
+          const pid = String(entry.projectId || NO_PROJECT_ID);
           if (!groups[pid]) groups[pid] = [];
           groups[pid].push(entry);
       });
@@ -169,7 +170,7 @@ const TimeLogs = () => {
 
     const entryData = {
         userId: currentUser.id, 
-        projectId: formData.projectId === NO_PROJECT_ID ? '' : formData.projectId,
+        projectId: String(formData.projectId) === NO_PROJECT_ID ? '' : formData.projectId,
         task: formData.task,
         date: formData.date,
         durationMinutes: normalMinutes,
@@ -186,7 +187,7 @@ const TimeLogs = () => {
   };
 
   const handleEdit = (entry: TimeEntry) => {
-      setEditingId(entry.id);
+      setEditingId(String(entry.id));
       const nh = Math.floor(entry.durationMinutes / 60);
       const nm = entry.durationMinutes % 60;
       setNormalInput({ hours: nh.toString(), minutes: nm.toString().padStart(2, '0') });
@@ -198,7 +199,7 @@ const TimeLogs = () => {
       setIncludeExtra(emins > 0);
 
       setFormData({
-          projectId: entry.projectId || NO_PROJECT_ID,
+          projectId: String(entry.projectId || NO_PROJECT_ID),
           task: entry.task,
           date: entry.date,
           description: entry.description || '',
@@ -223,9 +224,13 @@ const TimeLogs = () => {
   };
 
   const handleExport = (type: 'csv' | 'pdf') => {
+      if (visibleEntries.length === 0) {
+          showToast("No data to export", "warning");
+          return;
+      }
       const headers = ['Date', 'Project', 'Task', 'User', 'Normal (min)', 'Extra (min)', 'Status', 'Billable'];
       const rows = visibleEntries.map(e => {
-          const user = users.find(u => u.id === e.userId);
+          const user = users.find(u => String(u.id) === String(e.userId));
           const userName = user ? `${user.firstName} ${user.lastName}` : 'Unknown';
           return [
             e.date,
@@ -283,8 +288,8 @@ const TimeLogs = () => {
                 <button onClick={() => { resetForm(); setShowModal(true); }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition"><Plus size={18} /> <span>Log Time</span></button>
              </div>
              <div className="hidden sm:flex gap-2">
-                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm"><FileSpreadsheet size={16}/></button>
-                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm"><FileText size={16}/></button>
+                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm transition-colors" title="Export CSV"><FileSpreadsheet size={16}/></button>
+                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm transition-colors" title="Export PDF"><FileText size={16}/></button>
              </div>
           </div>
        </div>
@@ -295,247 +300,255 @@ const TimeLogs = () => {
              <div className="w-full lg:w-auto">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Time Period</label>
                 <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                   <button onClick={() => setDateRange('Week')} className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Week' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600' : 'text-slate-500'}`}>Week</button>
-                   <button onClick={() => setDateRange('Month')} className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Month' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600' : 'text-slate-500'}`}>Month</button>
+                   <button onClick={() => setDateRange('Week')} className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Week' ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Week</button>
+                   <button onClick={() => setDateRange('Month')} className={`flex-1 lg:flex-none px-3 py-1 text-xs font-medium rounded-md transition ${dateRange === 'Month' ? 'bg-white dark:bg-slate-600 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Month</button>
                 </div>
              </div>
-             <div className="flex flex-col items-center w-full lg:w-auto">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date Range</label>
-                <div className="flex items-center gap-2">
-                   <button onClick={() => handleDateNavigation('prev')} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500"><ChevronLeft size={16} /></button>
-                   <div className="px-4 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-semibold min-w-[180px] text-center">{dateRange === 'Month' ? viewDate.toLocaleString('default', { month: 'long', year: 'numeric' }) : `${weekDays[0].toLocaleDateString()} - ${weekDays[4].toLocaleDateString()}`}</div>
-                   <button onClick={() => handleDateNavigation('next')} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500"><ChevronRight size={16} /></button>
-                </div>
+             <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
+                <button onClick={() => handleDateNavigation('prev')} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronLeft size={20}/></button>
+                <h3 className="font-bold text-slate-800 dark:text-white min-w-[120px] text-center">
+                    {dateRange === 'Month' 
+                        ? viewDate.toLocaleString('default', { month: 'long', year: 'numeric' }) 
+                        : `${weekDays[0].toLocaleDateString('default', { day: 'numeric', month: 'short' })} - ${weekDays[4].toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                </h3>
+                <button onClick={() => handleDateNavigation('next')} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronRight size={20}/></button>
              </div>
-             <div className="hidden lg:block w-32"></div> 
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Filter by Project</label>
-                <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white">
-                    <option value="All">All Projects</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    <option value={NO_PROJECT_ID}>General (No Client)</option>
-                </select>
-             </div>
-             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Filter by Status</label>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white">
-                    <option value="All">All Status</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                </select>
-             </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
              {isHR && (
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Search Employee</label>
-                  <input type="text" placeholder="Search name..." value={searchEmployee} onChange={e => setSearchEmployee(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white" />
-               </div>
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Employee</label>
+                   <input type="text" placeholder="Search name..." className="w-full px-3 py-2 text-sm border dark:border-slate-600 rounded-lg dark:bg-slate-700 bg-white" value={searchEmployee} onChange={e => setSearchEmployee(e.target.value)} />
+                </div>
              )}
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Project</label>
+                <select className="w-full px-3 py-2 text-sm border dark:border-slate-600 rounded-lg dark:bg-slate-700 bg-white" value={filterProject} onChange={e => setFilterProject(e.target.value)}>
+                   <option value="All">All Projects</option>
+                   {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                   <option value={NO_PROJECT_ID}>Internal - General</option>
+                </select>
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Status</label>
+                <select className="w-full px-3 py-2 text-sm border dark:border-slate-600 rounded-lg dark:bg-slate-700 bg-white" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                   <option value="All">Any Status</option>
+                   <option value="Pending">Pending</option>
+                   <option value="Approved">Approved</option>
+                   <option value="Rejected">Rejected</option>
+                </select>
+             </div>
           </div>
        </div>
 
-       {/* Unified Record List */}
-       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="divide-y divide-slate-100 dark:divide-slate-700">
-             {Object.keys(groupedEntries).map(projectId => {
-                const projectEntries = groupedEntries[projectId];
-                const isExpanded = expandedProjects[projectId];
-                const projectName = getProjectName(projectId);
-                const totalNormal = projectEntries.reduce((acc, curr) => acc + curr.durationMinutes, 0);
-                const totalExtra = projectEntries.reduce((acc, curr) => acc + (curr.extraMinutes || 0), 0);
-
-                return (
-                   <div key={projectId}>
-                      <div onClick={() => toggleProjectGroup(projectId)} className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors">
+       {/* Time Logs List */}
+       <div className="space-y-4">
+          {Object.keys(groupedEntries).length === 0 ? (
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-12 text-center">
+                  <Clock className="mx-auto text-slate-300 mb-4" size={48} />
+                  <p className="text-slate-500 dark:text-slate-400 font-medium">No time logs found for the selected period.</p>
+              </div>
+          ) : (
+              Object.entries(groupedEntries).map(([pid, entries]) => (
+                  <div key={pid} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      <button 
+                        onClick={() => toggleProjectGroup(pid)}
+                        className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
+                      >
                          <div className="flex items-center gap-3">
-                            {isExpanded ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
-                            <div>
-                               <h4 className="font-bold text-slate-800 dark:text-white text-sm">{projectName}</h4>
-                               <p className="text-xs text-slate-500">{projectEntries.length} records</p>
+                            <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-xs">
+                               <BriefcaseIcon pid={pid} />
+                            </div>
+                            <div className="text-left">
+                               <h4 className="font-bold text-slate-800 dark:text-white">{getProjectName(pid)}</h4>
+                               <p className="text-xs text-slate-500">{entries.length} entries in this period</p>
                             </div>
                          </div>
-                         <div className="text-right flex flex-col items-end">
-                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDuration(totalNormal + totalExtra)}</span>
-                            {totalExtra > 0 && <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full mt-1">Incl. {formatDuration(totalExtra)} Extra</span>}
+                         <div className="flex items-center gap-4">
+                             <div className="text-right hidden sm:block">
+                                <p className="text-xs font-bold text-slate-400 uppercase">Total Logged</p>
+                                <p className="font-bold text-slate-700 dark:text-emerald-400">
+                                   {formatDuration(entries.reduce((acc, e) => acc + e.durationMinutes + (e.extraMinutes || 0), 0))}
+                                </p>
+                             </div>
+                             {expandedProjects[pid] ? <ChevronDown size={20}/> : <ChevronRight size={20}/>}
                          </div>
-                      </div>
-                      {isExpanded && (
-                         <div className="bg-slate-50/50 dark:bg-slate-900/20 border-t border-slate-100 dark:border-slate-700">
-                            {projectEntries.map(entry => (
-                               <div key={entry.id} className={`p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors group relative ${(entry.extraMinutes || 0) > 0 ? 'border-l-4 border-l-purple-400' : ''}`}>
-                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                           <span className="text-xs font-bold text-slate-500">{entry.date}</span>
-                                           <StatusBadge status={entry.status} />
-                                           {entry.isBillable && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1 font-bold"><DollarSign size={10}/> Billable</span>}
-                                        </div>
-                                        <h5 className="font-medium text-slate-800 dark:text-white text-sm truncate">{entry.task}</h5>
-                                        {entry.description && <p className="text-xs text-slate-500 line-clamp-1 mt-0.5 italic">"{entry.description}"</p>}
-                                     </div>
-                                     <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDuration(entry.durationMinutes + (entry.extraMinutes || 0))}</span>
-                                            {(entry.extraMinutes || 0) > 0 && <p className="text-[10px] text-purple-600 font-bold">+{formatDuration(entry.extraMinutes!)} Overtime</p>}
-                                        </div>
-                                        <div className="relative">
-                                           <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === entry.id ? null : entry.id); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md"><MoreHorizontal size={16} /></button>
-                                           {activeMenuId === entry.id && (
-                                              <div ref={menuRef} className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 rounded-lg shadow-xl border z-20 overflow-hidden">
-                                                 <button onClick={() => handleEdit(entry)} className="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Edit2 size={12}/> Edit Log</button>
-                                                 <button onClick={() => { if (confirm('Delete this entry?')) deleteTimeEntry(entry.id); }} className="w-full text-left px-3 py-2.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 border-t"><Trash2 size={12}/> Delete</button>
-                                              </div>
+                      </button>
+
+                      {expandedProjects[pid] && (
+                          <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-700">
+                              <table className="w-full text-left">
+                                 <thead className="bg-white dark:bg-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                    <tr>
+                                       <th className="px-6 py-3">Date</th>
+                                       {isHR && <th className="px-6 py-3">Employee</th>}
+                                       <th className="px-6 py-3">Task & Description</th>
+                                       <th className="px-6 py-3">Duration</th>
+                                       <th className="px-6 py-3">Status</th>
+                                       <th className="px-6 py-3"></th>
+                                    </tr>
+                                 </thead>
+                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                    {entries.map(entry => (
+                                        <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                           <td className="px-6 py-4 whitespace-nowrap">
+                                              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{new Date(entry.date).toLocaleDateString('default', { day: 'numeric', month: 'short' })}</p>
+                                              <p className="text-[10px] text-slate-400">{new Date(entry.date).toLocaleDateString('default', { weekday: 'short' })}</p>
+                                           </td>
+                                           {isHR && (
+                                              <td className="px-6 py-4">
+                                                 <div className="flex items-center gap-2">
+                                                    <img src={users.find(u => String(u.id) === String(entry.userId))?.avatar} className="w-6 h-6 rounded-full" alt=""/>
+                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                                                       {users.find(u => String(u.id) === String(entry.userId))?.firstName}
+                                                    </p>
+                                                 </div>
+                                              </td>
                                            )}
-                                        </div>
-                                     </div>
-                                  </div>
-                               </div>
-                            ))}
-                         </div>
+                                           <td className="px-6 py-4">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{entry.task}</span>
+                                                 {/* Fixed: Wrapped DollarSign icon in a span to handle title prop correctly */}
+                                                 {entry.isBillable && <span title="Billable"><DollarSign size={10} className="text-emerald-500" /></span>}
+                                              </div>
+                                              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 max-w-xs">{entry.description}</p>
+                                           </td>
+                                           <td className="px-6 py-4 whitespace-nowrap">
+                                              <div className="flex items-center gap-1.5">
+                                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{formatDuration(entry.durationMinutes)}</span>
+                                                 {(entry.extraMinutes || 0) > 0 && (
+                                                     <span className="flex items-center gap-0.5 text-[10px] bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-full font-bold">
+                                                        <Zap size={8} fill="currentColor" /> +{formatDuration(entry.extraMinutes || 0)}
+                                                     </span>
+                                                 )}
+                                              </div>
+                                           </td>
+                                           <td className="px-6 py-4">
+                                              <StatusBadge status={entry.status} />
+                                           </td>
+                                           <td className="px-6 py-4 text-right">
+                                              <div className="flex justify-end gap-1">
+                                                  {(isHR || String(entry.userId) === String(currentUser?.id)) && entry.status === 'Pending' && (
+                                                      <>
+                                                        <button onClick={() => handleEdit(entry)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"><Edit2 size={14}/></button>
+                                                        <button onClick={() => { setItemToDelete(String(entry.id)); setShowDeleteConfirm(true); }} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={14}/></button>
+                                                      </>
+                                                  )}
+                                              </div>
+                                           </td>
+                                        </tr>
+                                    ))}
+                                 </tbody>
+                              </table>
+                          </div>
                       )}
-                   </div>
-                );
-             })}
-          </div>
+                  </div>
+              ))
+          )}
        </div>
 
-       {/* Log Time Modal with Scrollbars, Dragging, Subtask Dropdown, and 5-line Description */}
-       <DraggableModal 
-         isOpen={showModal} 
-         onClose={() => setShowModal(false)} 
-         title={editingId ? 'Edit Time Log' : 'Add Time Log'} 
-         width="max-w-lg"
-       >
-          <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Project Selection */}
-              <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Project / Client</label>
-                  <select 
-                    required 
-                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm" 
-                    value={formData.projectId} 
-                    onChange={e => setFormData({...formData, projectId: e.target.value, task: ''})}
-                  >
-                    <option value="" disabled>Choose a project...</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    <option value={NO_PROJECT_ID}>Internal - General Administration</option>
-                  </select>
-              </div>
+       {/* Log Time Modal */}
+       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? "Edit Time Log" : "Log New Work Session"} width="max-w-xl">
+           <form onSubmit={handleSubmit} className="space-y-6">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div>
+                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Date</label>
+                       <input required type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                   </div>
+                   <div>
+                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Project / Client</label>
+                       <select required className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
+                          <option value="" disabled>Select Project</option>
+                          {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                          <option value={NO_PROJECT_ID}>No Project - General</option>
+                       </select>
+                   </div>
+               </div>
 
-              {/* Subtask Dropdown (Project wise) */}
-              <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Work Done (Subtask)</label>
-                  <select 
-                    required 
-                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm" 
-                    value={formData.task} 
-                    onChange={e => setFormData({...formData, task: e.target.value})}
-                  >
-                    <option value="" disabled>Select subtask...</option>
-                    {selectedProjectTasks.map(task => <option key={task} value={task}>{task}</option>)}
-                    <option value="Other">Other (Manual Entry)</option>
-                  </select>
-                  {formData.task === 'Other' && (
-                      <input type="text" placeholder="Describe the task..." className="mt-2 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-emerald-500" onChange={e => setFormData({...formData, task: e.target.value})} />
-                  )}
-              </div>
+               <div>
+                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Subtask / Activity</label>
+                   <select required className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" value={formData.task} onChange={e => setFormData({...formData, task: e.target.value})}>
+                      <option value="" disabled>Select Activity</option>
+                      {selectedProjectTasks.map(t => <option key={t} value={t}>{t}</option>)}
+                      <option value="Other">Other (Custom)</option>
+                   </select>
+               </div>
 
-              {/* Date & Normal Hours Row */}
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Date</label>
-                    <input required type="date" className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none dark:text-white transition shadow-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Normal Hours</label>
-                    <div className="flex gap-2">
-                        <input type="number" min="0" className="w-full px-2 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-center dark:bg-slate-700 dark:text-white shadow-sm" value={normalInput.hours} onChange={e => setNormalInput({...normalInput, hours: e.target.value})} />
-                        <span className="self-center font-bold text-slate-300">:</span>
-                        <select className="w-full border border-slate-300 dark:border-slate-600 rounded-xl px-2 py-2.5 dark:bg-slate-700 dark:text-white shadow-sm" value={normalInput.minutes} onChange={e => setNormalInput({...normalInput, minutes: e.target.value})}>
-                          <option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
-                        </select>
-                    </div>
-                  </div>
-              </div>
-
-              {/* Extra Hours Toggle */}
-              <div className="pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer group w-fit">
-                    <input type="checkbox" checked={includeExtra} onChange={(e) => setIncludeExtra(e.target.checked)} className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-slate-300" />
-                    <span className={`text-sm font-bold transition-colors ${includeExtra ? 'text-purple-700 dark:text-purple-400' : 'text-slate-500'}`}>Include Extra Hours / Overtime</span>
-                    {includeExtra && <Zap size={14} className="text-purple-500 animate-pulse" fill="currentColor" />}
-                  </label>
-                  
-                  {includeExtra && (
-                      <div className="mt-3 bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800 animate-in slide-in-from-top-2 duration-300">
-                        <label className="block text-[10px] font-bold text-purple-600 uppercase mb-2">Overtime Duration</label>
-                        <div className="flex gap-4">
-                            <div className="flex-1">
-                                <span className="text-[10px] text-slate-400 uppercase block mb-1">Hours</span>
-                                <input type="number" min="0" className="w-full px-3 py-2 border border-purple-200 dark:border-purple-800 rounded-lg text-center bg-white dark:bg-slate-800 dark:text-white" value={extraInput.hours} onChange={e => setExtraInput({...extraInput, hours: e.target.value})} />
-                            </div>
-                            <div className="flex-1">
-                                <span className="text-[10px] text-slate-400 uppercase block mb-1">Minutes</span>
-                                <select className="w-full border border-purple-200 rounded-lg px-2 py-2 bg-white dark:bg-slate-800 dark:text-white" value={extraInput.minutes} onChange={e => setExtraInput({...extraInput, minutes: e.target.value})}>
-                                  <option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
-                                </select>
-                            </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                   <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Standard Hours</label>
+                        <div className="flex items-center gap-2">
+                            <input type="number" min="0" max="24" className="w-full px-3 py-2 border rounded-xl text-center dark:bg-slate-700 font-bold" value={normalInput.hours} onChange={e => setNormalInput({...normalInput, hours: e.target.value})} />
+                            <span className="font-bold text-slate-400">:</span>
+                            <select className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 font-bold" value={normalInput.minutes} onChange={e => setNormalInput({...normalInput, minutes: e.target.value})}>
+                               <option value="00">00</option>
+                               <option value="15">15</option>
+                               <option value="30">30</option>
+                               <option value="45">45</option>
+                            </select>
                         </div>
                       </div>
-                  )}
-              </div>
-
-              {/* Description Area - 5 lines */}
-              <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Effort Description</label>
-                  <textarea 
-                    required 
-                    rows={5} 
-                    placeholder="Briefly describe what you worked on today (min 5 lines recommended)..." 
-                    className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm resize-none custom-scrollbar" 
-                    value={formData.description} 
-                    onChange={e => setFormData({...formData, description: e.target.value})}
-                  />
-              </div>
-
-              {/* Billable Toggle */}
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700">
-                  <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                        <DollarSign size={18} className="text-blue-500" />
+                      <div className="flex items-center">
+                          <label className="flex items-center gap-2 cursor-pointer group">
+                             <div className={`w-10 h-5 rounded-full p-1 transition-colors ${includeExtra ? 'bg-purple-600' : 'bg-slate-200 dark:bg-slate-700'}`} onClick={() => setIncludeExtra(!includeExtra)}>
+                                <div className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform ${includeExtra ? 'translate-x-5' : 'translate-x-0'}`} />
+                             </div>
+                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider group-hover:text-purple-600 transition-colors">Overtime Session?</span>
+                          </label>
                       </div>
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Billable to Client</span>
-                  </div>
-                  <div className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all duration-300 ${formData.isBillable ? 'bg-blue-600 shadow-inner' : 'bg-slate-300 dark:bg-slate-600'}`} onClick={() => setFormData({...formData, isBillable: !formData.isBillable})}>
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${formData.isBillable ? 'translate-x-6' : ''}`} />
-                  </div>
-              </div>
+                   </div>
 
-              {/* Footer Buttons */}
-              <div className="pt-4 flex justify-end items-center gap-6 border-t border-slate-100 dark:border-slate-700">
-                  <button type="button" onClick={() => setShowModal(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm font-bold transition">Cancel</button>
-                  <button type="submit" className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-bold shadow-lg shadow-emerald-200 dark:shadow-none transition flex items-center gap-2">
-                      <CheckCircle2 size={20}/> {editingId ? 'Update Entry' : 'Save Entry'}
+                   {includeExtra && (
+                       <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl animate-in slide-in-from-right-2">
+                          <div className="flex items-center gap-2 mb-3">
+                             <Zap size={14} className="text-purple-600" fill="currentColor" />
+                             <label className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Extra Effort</label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input type="number" min="0" max="24" className="w-full px-2 py-1.5 border border-purple-200 rounded-lg text-center dark:bg-slate-800 font-bold" value={extraInput.hours} onChange={e => setExtraInput({...extraInput, hours: e.target.value})} />
+                            <span className="font-bold text-purple-300">:</span>
+                            <select className="w-full px-2 py-1.5 border border-purple-200 rounded-lg dark:bg-slate-800 font-bold" value={extraInput.minutes} onChange={e => setExtraInput({...extraInput, minutes: e.target.value})}>
+                               <option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
+                            </select>
+                          </div>
+                       </div>
+                   )}
+               </div>
+
+               <div>
+                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Notes / Summary</label>
+                   <textarea required rows={4} className="w-full px-4 py-3 border rounded-xl text-sm dark:bg-slate-700 bg-white dark:text-white resize-none" placeholder="Explain what was accomplished..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+               </div>
+
+               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                  <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2 text-slate-500 font-bold">Cancel</button>
+                  <button type="submit" className="px-10 py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition transform hover:scale-[1.02]">
+                     {editingId ? 'Update Entry' : 'Log Entry'}
                   </button>
-              </div>
-          </form>
+               </div>
+           </form>
        </DraggableModal>
 
-       {/* Delete Confirm */}
-       <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete record?" width="max-w-sm">
-          <div className="text-center">
-             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner"><AlertTriangle size={32} /></div>
-             <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">This record and its associated normal and overtime hours will be removed.</p>
-             <div className="flex gap-3">
-                 <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition">Keep</button>
-                 <button onClick={() => { if (itemToDelete) deleteTimeEntry(itemToDelete); setShowDeleteConfirm(false); }} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition shadow-md">Confirm Delete</button>
-             </div>
-          </div>
+       {/* Delete Confirmation */}
+       <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Remove Entry?" width="max-w-sm">
+           <div className="text-center">
+              <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
+              <p className="text-slate-600 dark:text-slate-300 mb-6">Are you sure you want to delete this log? This action cannot be reversed.</p>
+              <div className="flex justify-center gap-3">
+                 <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 text-slate-500 font-bold">Cancel</button>
+                 <button onClick={() => { if (itemToDelete) { deleteTimeEntry(itemToDelete); setShowDeleteConfirm(false); setItemToDelete(null); } }} className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold">Delete Log</button>
+              </div>
+           </div>
        </DraggableModal>
     </div>
   );
+};
+
+const BriefcaseIcon = ({ pid }: { pid: string }) => {
+    if (pid === "NO_PROJECT") return <Zap className="text-amber-500" size={20} />;
+    return <FileText className="text-blue-500" size={20} />;
 };
 
 export default TimeLogs;

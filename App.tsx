@@ -76,6 +76,8 @@ const App: React.FC = () => {
   // Convert Employees to Users for the Leave Component props
   const users: User[] = employees.map(emp => ({
     id: emp.id,
+    /* Added missing employeeId */
+    employeeId: emp.employeeId,
     name: `${emp.firstName} ${emp.lastName}`,
     role: emp.role.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
     avatar: emp.avatar,

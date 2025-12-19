@@ -1,4 +1,5 @@
 
+
 export enum DepartmentType {
   IT = 'IT',
   HR = 'HR',
@@ -21,20 +22,20 @@ export interface ToastMessage {
 }
 
 export interface Department {
-  id: string;
+  id: string | number;
   name: string;
   description: string;
-  managerId: string;
+  managerId: string | number;
 }
 
 export interface Role {
-  id: string;
+  id: string | number;
   name: string;
   description: string;
 }
 
 export interface Project {
-  id: string;
+  id: string | number;
   name: string;
   description?: string;
   status: 'Active' | 'On Hold' | 'Completed';
@@ -43,20 +44,22 @@ export interface Project {
 }
 
 export interface Employee {
-  id: string;
+  /* Updated id to support both string and number */
+  id: number | string;
+  employeeId: string; // Business ID like EMP001
   firstName: string;
   lastName: string;
   email: string;
   password?: string;
   role: string;
   department: string; 
-  departmentId?: string; 
-  projectIds?: string[]; 
+  departmentId?: string | number; 
+  projectIds?: (string | number)[]; 
   joinDate: string;
   status: EmployeeStatus;
   salary: number;
   avatar: string;
-  managerId?: string; 
+  managerId?: string | number; 
   location?: { latitude: number; longitude: number; address: string };
   workLocation?: string;
   phone?: string;
@@ -64,7 +67,7 @@ export interface Employee {
 }
 
 export interface LeaveTypeConfig {
-  id: string;
+  id: string | number;
   name: string;
   days: number;
   description: string;
@@ -81,8 +84,8 @@ export enum LeaveStatus {
 }
 
 export interface LeaveRequest {
-  id: string;
-  userId: string;
+  id: string | number;
+  userId: string | number;
   userName: string;
   type: string;
   startDate: string;
@@ -91,19 +94,19 @@ export interface LeaveRequest {
   status: LeaveStatus;
   attachmentUrl?: string;
   managerConsent?: boolean;
-  notifyUserIds?: string[];
-  approverId?: string;
+  notifyUserIds?: (string | number)[];
+  approverId?: string | number;
   isUrgent?: boolean;
   managerComment?: string;
   hrComment?: string;
   createdAt?: string;
-  employeeId?: string; 
+  employeeId?: string | number; 
   employeeName?: string;
 }
 
 export interface AttendanceRecord {
-  id: string;
-  employeeId: string;
+  id: string | number;
+  employeeId: string | number;
   employeeName: string;
   date: string;
   checkIn: string; 
@@ -116,17 +119,17 @@ export interface AttendanceRecord {
 }
 
 export interface TimeEntry {
-  id: string;
-  userId: string;
-  projectId: string;
+  id: string | number;
+  userId: string | number;
+  projectId: string | number;
   task: string;
   date: string;
-  durationMinutes: number; // Represents Normal Minutes
-  extraMinutes?: number;   // Represents Extra Minutes in the same record
+  durationMinutes: number; 
+  extraMinutes?: number;   
   description: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   isBillable: boolean;
-  isExtra?: boolean; // Legacy/Flag
+  isExtra?: boolean; 
 }
 
 export interface ChatMessage {
@@ -144,14 +147,16 @@ export enum UserRole {
 }
 
 export interface User {
-  id: string;
+  /* Updated id to support both string and number */
+  id: number | string;
+  employeeId: string;
   name: string;
   role: UserRole;
   avatar: string;
-  managerId?: string;
+  managerId?: string | number;
   jobTitle?: string;
-  departmentId?: string; 
-  projectIds?: string[]; 
+  departmentId?: string | number; 
+  projectIds?: (string | number)[]; 
   phone?: string;
   location?: { latitude: number; longitude: number; address: string };
   workLocation?: string;
@@ -160,8 +165,8 @@ export interface User {
 }
 
 export interface Notification {
-  id: string;
-  userId: string; 
+  id: string | number;
+  userId: string | number; 
   title: string;
   message: string;
   time: string;
@@ -170,8 +175,8 @@ export interface Notification {
 }
 
 export interface Payslip {
-  id: string;
-  userId: string;
+  id: string | number;
+  userId: string | number;
   userName: string;
   month: string;
   amount: number;
@@ -183,7 +188,7 @@ export interface Payslip {
 }
 
 export interface Holiday {
-  id: string;
+  id: string | number;
   name: string;
   date: string;
   type: 'Public' | 'Company';

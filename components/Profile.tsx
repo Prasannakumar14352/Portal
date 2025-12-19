@@ -48,13 +48,15 @@ const Profile = () => {
       setFormData({
         name: currentUser.name,
         phone: currentUser.phone || '',
-        departmentId: currentUser.departmentId || '',
+        // Fixed: cast departmentId to string
+        departmentId: String(currentUser.departmentId || ''),
         jobTitle: currentUser.jobTitle || '',
         hireDate: currentUser.hireDate || '',
         address: currentUser.location?.address || '',
         avatar: currentUser.avatar,
         workLocation: currentUser.workLocation || '',
-        projectIds: currentUser.projectIds || []
+        // Fixed: map projectIds to string array
+        projectIds: (currentUser.projectIds || []).map(String)
       });
       if (currentUser.location) {
         setLocation({ lat: currentUser.location.latitude, lng: currentUser.location.longitude });
@@ -334,6 +336,7 @@ const Profile = () => {
       };
     }
 
+    // Fixed: ensure id is passed correctly to updateUser
     updateUser(profileUser.id, updates);
     setTimeout(() => setIsSaving(false), 800);
   };
@@ -409,7 +412,7 @@ const Profile = () => {
 
                 <div className="space-y-4">
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Full Name</label>
+                     <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Full Name</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <UserIcon size={16} className="text-gray-400 dark:text-slate-500" />
                         <input 
@@ -424,7 +427,7 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Job Title</label>
+                     <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Job Title</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <Briefcase size={16} className="text-gray-400 dark:text-slate-500" />
                         <div className="relative w-full">
@@ -454,7 +457,7 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Department</label>
+                     <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Department</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <Building2 size={16} className="text-gray-400 dark:text-slate-500" />
                         <div className="relative w-full">
@@ -476,7 +479,7 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Work Location</label>
+                     <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Work Location</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <MapPin size={16} className="text-gray-400 dark:text-slate-500" />
                         <div className="relative w-full">
@@ -498,10 +501,10 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Assigned Projects</label>
+                     <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Assigned Projects</label>
                      <div className={`border border-gray-200 dark:border-slate-600 rounded-lg max-h-40 overflow-y-auto p-2 space-y-2 ${canEditAllocations ? 'bg-gray-50 dark:bg-slate-700' : 'bg-white dark:bg-slate-800'}`}>
                         {projects.map(proj => {
-                          const isAssigned = formData.projectIds.includes(proj.id);
+                          const isAssigned = formData.projectIds.includes(String(proj.id));
                           if (!canEditAllocations && !isAssigned) return null; // If not editing, only show assigned
                           
                           return (
@@ -510,7 +513,7 @@ const Profile = () => {
                                 <input 
                                   type="checkbox" 
                                   checked={isAssigned}
-                                  onChange={() => toggleProject(proj.id)}
+                                  onChange={() => toggleProject(String(proj.id))}
                                   className="rounded text-emerald-600 focus:ring-emerald-500"
                                 />
                               ) : (
@@ -530,7 +533,7 @@ const Profile = () => {
                    </div>
 
                    <div className="relative">
-                     <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Hire Date</label>
+                     <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Hire Date</label>
                      <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                         <Calendar size={16} className="text-gray-400 dark:text-slate-500" />
                         <input 
@@ -551,7 +554,7 @@ const Profile = () => {
                 <h4 className="font-bold text-gray-800 dark:text-white text-sm uppercase tracking-wide border-b border-gray-100 dark:border-slate-700 pb-2">Contact Information</h4>
                 
                 <div className="relative">
-                   <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Email Address</label>
+                   <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Email Address</label>
                    <div className="flex items-center space-x-2 border border-transparent bg-gray-100 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-3 py-2">
                       <Mail size={16} className="text-gray-400 dark:text-slate-500" />
                       <input 
@@ -565,7 +568,7 @@ const Profile = () => {
                 </div>
 
                 <div className="relative">
-                   <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Phone Number</label>
+                   <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Phone Number</label>
                    <div className={`flex items-center space-x-2 border rounded-lg px-3 py-2 ${canEditDetails ? 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-800 border-transparent'}`}>
                       <Phone size={16} className="text-gray-400 dark:text-slate-500" />
                       <input 
@@ -606,7 +609,7 @@ const Profile = () => {
                 </div>
                 
                 <div className="p-4 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
-                   <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Address</label>
+                   <label className="block text-sm font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Address</label>
                    <div className="flex items-center space-x-2">
                       <MapPin size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
                       <p className="text-sm text-gray-700 dark:text-slate-300 truncate w-full">{formData.address || 'No address set'}</p>

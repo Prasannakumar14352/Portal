@@ -82,10 +82,11 @@ const connectDb = async () => {
 const initDb = async () => {
     try {
         const request = pool.request();
-        console.log("[DB] Synchronizing tables...");
+        console.log("[DB] Synchronizing tables and performing migrations...");
 
+        // 1. Core table definitions (using numeric ID for employees)
         const tables = [
-            { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100))` },
+            { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id INT PRIMARY KEY, employeeId NVARCHAR(50), firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100))` },
             { name: 'departments', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U') CREATE TABLE departments (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), managerId NVARCHAR(50))` },
             { name: 'projects', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='projects' AND xtype='U') CREATE TABLE projects (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), status NVARCHAR(50), tasks NVARCHAR(MAX), dueDate NVARCHAR(50))` },
             { name: 'leaves', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U') CREATE TABLE leaves (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(100), type NVARCHAR(50), startDate NVARCHAR(50), endDate NVARCHAR(50), reason NVARCHAR(MAX), status NVARCHAR(50), attachmentUrl NVARCHAR(MAX), managerConsent BIT, notifyUserIds NVARCHAR(MAX), approverId NVARCHAR(50), isUrgent BIT, managerComment NVARCHAR(MAX), hrComment NVARCHAR(MAX), createdAt NVARCHAR(50), employeeId NVARCHAR(50), employeeName NVARCHAR(100))` },
@@ -103,14 +104,43 @@ const initDb = async () => {
             console.log(`[DB] Verified table: ${table.name}`);
         }
         
-        console.log("[DB] Verifying migrations...");
-        try {
-            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'employees')) ALTER TABLE employees ADD workLocation NVARCHAR(100)`);
-            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'attendance')) ALTER TABLE attendance ADD workLocation NVARCHAR(100)`);
-            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'isExtra' AND Object_ID = Object_ID(N'time_entries')) ALTER TABLE time_entries ADD isExtra BIT DEFAULT 0`);
-            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'extraMinutes' AND Object_ID = Object_ID(N'time_entries')) ALTER TABLE time_entries ADD extraMinutes INT DEFAULT 0`);
-        } catch (e) { 
-            console.warn("[DB] Migration warning:", e.message); 
+        // 2. Dynamic column migrations (Ensuring missing columns are added to existing tables)
+        const migrations = [
+            { table: 'employees', column: 'employeeId', type: 'NVARCHAR(50)' },
+            { table: 'employees', column: 'workLocation', type: 'NVARCHAR(100)' },
+            { table: 'employees', column: 'jobTitle', type: 'NVARCHAR(100)' },
+            { table: 'employees', column: 'phone', type: 'NVARCHAR(50)' },
+            { table: 'attendance', column: 'workLocation', type: 'NVARCHAR(100)' },
+            { table: 'time_entries', column: 'isExtra', type: 'BIT DEFAULT 0' },
+            { table: 'time_entries', column: 'extraMinutes', type: 'INT DEFAULT 0' }
+        ];
+
+        for (const m of migrations) {
+            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'${m.column}' AND Object_ID = Object_ID(N'${m.table}')) ALTER TABLE ${m.table} ADD ${m.column} ${m.type}`);
+            console.log(`[DB] Migration check: ${m.table}.${m.column}`);
+        }
+
+        // 3. Special handling for numeric 'id' conversion in employees
+        // Checking existing type of 'id' in employees
+        const typeInfo = await request.query(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'employees' AND COLUMN_NAME = 'id'`);
+        if (typeInfo.recordset.length > 0 && typeInfo.recordset[0].DATA_TYPE !== 'int') {
+            console.log("[DB] Detected non-int ID for employees. Attempting conversion...");
+            try {
+                // To safely change PK type, we'd need to drop constraints first. 
+                // This is complex for a generic script, so we use a safe ALTER if possible.
+                // Note: This might fail if current string data isn't numeric.
+                await request.query(`
+                    DECLARE @ConstraintName nvarchar(200)
+                    SELECT @ConstraintName = Name FROM sys.key_constraints WHERE [type] = 'PK' AND [parent_object_id] = Object_id('employees')
+                    IF @ConstraintName IS NOT NULL EXEC('ALTER TABLE employees DROP CONSTRAINT ' + @ConstraintName)
+                    
+                    ALTER TABLE employees ALTER COLUMN id INT NOT NULL
+                    ALTER TABLE employees ADD CONSTRAINT PK_employees PRIMARY KEY (id)
+                `);
+                console.log("[DB] Successfully converted employees.id to INT.");
+            } catch (e) {
+                console.error("[DB] Failed to convert id to int automatically:", e.message);
+            }
         }
 
         console.log("✅ [DB] Initialization complete.");
@@ -139,7 +169,9 @@ apiRouter.post('/employees', async (req, res) => {
     const e = req.body;
     try {
         const reqSql = pool.request();
-        reqSql.input('id', sql.NVarChar, e.id);
+        // Force ID to be an integer
+        reqSql.input('id', sql.Int, parseInt(e.id));
+        reqSql.input('employeeId', sql.NVarChar, e.employeeId);
         reqSql.input('firstName', sql.NVarChar, e.firstName);
         reqSql.input('lastName', sql.NVarChar, e.lastName);
         reqSql.input('email', sql.NVarChar, e.email);
@@ -159,8 +191,8 @@ apiRouter.post('/employees', async (req, res) => {
         reqSql.input('jobTitle', sql.NVarChar, e.jobTitle);
 
         await reqSql.query(`INSERT INTO employees 
-            (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, workLocation, phone, jobTitle) 
-            VALUES (@id, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @workLocation, @phone, @jobTitle)`);
+            (id, employeeId, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, workLocation, phone, jobTitle) 
+            VALUES (@id, @employeeId, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @workLocation, @phone, @jobTitle)`);
         res.json(e);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -170,7 +202,8 @@ apiRouter.put('/employees/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const reqSql = pool.request();
-        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('id', sql.Int, parseInt(id));
+        reqSql.input('employeeId', sql.NVarChar, e.employeeId);
         reqSql.input('firstName', sql.NVarChar, e.firstName);
         reqSql.input('lastName', sql.NVarChar, e.lastName);
         reqSql.input('email', sql.NVarChar, e.email);
@@ -190,7 +223,7 @@ apiRouter.put('/employees/:id', async (req, res) => {
         reqSql.input('jobTitle', sql.NVarChar, e.jobTitle);
 
         await reqSql.query(`UPDATE employees SET 
-            firstName=@firstName, lastName=@lastName, email=@email, password=@password, role=@role, 
+            employeeId=@employeeId, firstName=@firstName, lastName=@lastName, email=@email, password=@password, role=@role, 
             department=@department, departmentId=@departmentId, projectIds=@projectIds, joinDate=@joinDate, 
             status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, workLocation=@workLocation,
             phone=@phone, jobTitle=@jobTitle WHERE id=@id`);
@@ -206,16 +239,16 @@ apiRouter.delete('/employees/:id', async (req, res) => {
     try {
         await transaction.begin();
         const request = new sql.Request(transaction);
-        request.input('id', sql.NVarChar, id);
+        request.input('id', sql.Int, parseInt(id));
 
         console.log(`[SQL] Transaction: Deleting employee ${id}...`);
 
-        // Manual Cascade
-        await request.query("DELETE FROM attendance WHERE employeeId = @id");
-        await request.query("DELETE FROM leaves WHERE userId = @id OR employeeId = @id");
-        await request.query("DELETE FROM time_entries WHERE userId = @id");
-        await request.query("DELETE FROM notifications WHERE userId = @id");
-        await request.query("DELETE FROM payslips WHERE userId = @id");
+        // Cascade delete child records
+        await request.query("DELETE FROM attendance WHERE employeeId = CAST(@id AS NVARCHAR(50))");
+        await request.query("DELETE FROM leaves WHERE userId = CAST(@id AS NVARCHAR(50)) OR employeeId = CAST(@id AS NVARCHAR(50))");
+        await request.query("DELETE FROM time_entries WHERE userId = CAST(@id AS NVARCHAR(50))");
+        await request.query("DELETE FROM notifications WHERE userId = CAST(@id AS NVARCHAR(50))");
+        await request.query("DELETE FROM payslips WHERE userId = CAST(@id AS NVARCHAR(50))");
         
         const result = await request.query("DELETE FROM employees WHERE id = @id");
         await transaction.commit();
@@ -637,6 +670,7 @@ apiRouter.post('/payslips', async (req, res) => {
 });
 
 // Mount API Router
+apiRouter.get('/test', (req, res) => res.json({ status: "ok" }));
 app.use('/api', apiRouter);
 
 app.listen(PORT, async () => {

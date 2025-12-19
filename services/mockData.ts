@@ -70,6 +70,7 @@ export const mockProjects: Project[] = [
 export const mockEmployees: Employee[] = [
   {
     id: 'super1',
+    employeeId: 'EMP001', // Added missing employeeId
     firstName: 'Sarah',
     lastName: 'Connor',
     email: 'superadmin@empower.com',
@@ -89,6 +90,7 @@ export const mockEmployees: Employee[] = [
   },
   {
     id: 'u2',
+    employeeId: 'EMP002', // Added missing employeeId
     firstName: 'Alice',
     lastName: 'Johnson',
     email: 'alice.j@empower.com',
@@ -109,6 +111,7 @@ export const mockEmployees: Employee[] = [
   },
   {
     id: 'u3',
+    employeeId: 'EMP003', // Added missing employeeId
     firstName: 'Bob',
     lastName: 'Smith',
     email: 'bob.smith@empower.com',
@@ -128,6 +131,7 @@ export const mockEmployees: Employee[] = [
   },
   {
     id: 'u4',
+    employeeId: 'EMP004', // Added missing employeeId
     firstName: 'David',
     lastName: 'Chen',
     email: 'david.c@empower.com',

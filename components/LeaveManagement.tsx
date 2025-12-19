@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { UserRole, LeaveStatus, LeaveRequest, LeaveTypeConfig, User } from '../types';
+import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User } from '../types';
 import { 
   Upload, Paperclip, CheckSquare, Search, Edit2, Calendar as CalendarIcon, 
   List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers, Filter
@@ -8,18 +8,19 @@ import {
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
-export interface LeaveManagementProps {
-  currentUser: User;
+// Defined missing LeaveManagementProps interface
+interface LeaveManagementProps {
+  currentUser: User | null;
   users: User[];
   leaves: LeaveRequest[];
   leaveTypes: LeaveTypeConfig[];
   addLeave: (leave: any) => void;
-  editLeave: (id: string, data: any) => void;
+  editLeave: (id: string | number, data: any) => void;
   addLeaves: (leaves: any[]) => void;
-  updateLeaveStatus: (id: string, status: LeaveStatus, comment?: string) => void;
+  updateLeaveStatus: (id: string | number, status: LeaveStatusEnum, comment?: string) => void;
   addLeaveType: (type: any) => void;
-  updateLeaveType: (id: string, data: any) => void;
-  deleteLeaveType: (id: string) => void;
+  updateLeaveType: (id: string | number, data: any) => void;
+  deleteLeaveType: (id: string | number) => void;
 }
 
 // Custom MultiSelect Component
@@ -69,7 +70,7 @@ const MultiSelectUser = ({
       >
         {selectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1">Select colleagues...</span>}
         {selectedIds.map(id => {
-          const user = options.find(u => u.id === id);
+          const user = options.find(u => String(u.id) === id);
           return (
             <span key={id} className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100 dark:border-emerald-900">
               {user?.name}
@@ -87,11 +88,11 @@ const MultiSelectUser = ({
           {options.map(user => (
             <div 
               key={user.id} 
-              onClick={() => handleSelect(user.id)}
+              onClick={() => handleSelect(String(user.id))}
               className="flex items-center px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
             >
-              <div className={`w-4 h-4 border rounded mr-3 flex items-center justify-center ${selectedIds.includes(user.id) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 dark:border-slate-500'}`}>
-                {selectedIds.includes(user.id) && <CheckCircle size={12} className="text-white" />}
+              <div className={`w-4 h-4 border rounded mr-3 flex items-center justify-center ${selectedIds.includes(String(user.id)) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 dark:border-slate-500'}`}>
+                {selectedIds.includes(String(user.id)) && <CheckCircle size={12} className="text-white" />}
               </div>
               <img src={user.avatar} className="w-6 h-6 rounded-full mr-2" alt="" />
               <div>
@@ -136,23 +137,23 @@ const LeaveTypeCard: React.FC<{
     {isHR && (
       <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-4">
           <div className="flex items-center space-x-2">
-          <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${config.isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} 
-              onClick={() => onUpdate(config.id, { isActive: !config.isActive })}>
-              <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${config.isActive ? 'translate-x-5' : ''}`} />
-          </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400">{config.isActive ? 'Active' : 'Hidden'}</span>
+            <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${config.isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} 
+                onClick={() => onUpdate(String(config.id), { isActive: !config.isActive })}>
+                <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${config.isActive ? 'translate-x-5' : ''}`} />
+            </div>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{config.isActive ? 'Active' : 'Hidden'}</span>
           </div>
           
           <div className="flex space-x-2">
           <button 
-              onClick={() => onEdit(config.id, config)}
+              onClick={() => onEdit(String(config.id), config)}
               className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-900/30 rounded"
           >
               <Edit2 size={16} />
           </button>
           <button 
               onClick={() => {
-              if (window.confirm('Delete this leave type?')) onDelete(config.id);
+              if (window.confirm('Delete this leave type?')) onDelete(String(config.id));
               }}
               className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:text-slate-400 dark:hover:text-red-400 dark:hover:bg-red-900/30 rounded"
           >
@@ -180,7 +181,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar' | 'team'>('requests');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [reviewComment, setReviewComment] = useState('');
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -188,7 +188,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   
   // Calendar View State
   const [calMonth, setCalMonth] = useState(new Date());
-  const [selectedCalDate, setSelectedCalDate] = useState<Date | null>(null);
 
   // Request Form State
   const [formData, setFormData] = useState<{
@@ -209,7 +208,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     attachment: false, 
     consent: false,
     notifyUserIds: [],
-    approverId: currentUser?.managerId || '',
+    approverId: String(currentUser?.managerId || ''),
     isUrgent: false
   });
 
@@ -226,7 +225,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const colorOptions = [
     'text-slate-600', 'text-red-600', 'text-orange-600', 'text-amber-600', 
     'text-green-600', 'text-emerald-600', 'text-teal-600', 'text-cyan-600',
-    'text-blue-600', 'text-indigo-Indie', 'text-violet-600', 'text-purple-600', 
+    'text-blue-600', 'text-indigo-600', 'text-violet-600', 'text-purple-600', 
     'text-fuchsia-600', 'text-pink-600', 'text-rose-600'
   ];
 
@@ -243,33 +242,23 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const isDateInRange = (checkDate: Date, start: string, end: string) => {
-    const s = new Date(start);
-    const e = new Date(end);
-    s.setHours(0,0,0,0);
-    e.setHours(0,0,0,0);
-    const d = new Date(checkDate);
-    d.setHours(0,0,0,0);
-    return d >= s && d <= e;
-  };
-
   // --- Filtering & Derived State ---
   const visibleLeaves = useMemo(() => {
     let filtered = [];
     if (currentUser?.role === UserRole.HR) {
       filtered = leaves;
     } else if (currentUser?.role === UserRole.MANAGER) {
-      const directReports = users.filter(u => u.managerId === currentUser.id).map(u => u.id);
+      const directReports = users.filter(u => String(u.managerId) === String(currentUser.id)).map(u => u.id);
       
       const relevantLeaves = leaves.filter(l => 
-        l.userId === currentUser.id || 
-        l.approverId === currentUser.id || 
-        (directReports.includes(l.userId) && (!l.approverId || l.approverId === currentUser.id)) 
+        String(l.userId) === String(currentUser.id) || 
+        String(l.approverId) === String(currentUser.id) || 
+        (directReports.includes(l.userId) && (!l.approverId || String(l.approverId) === String(currentUser.id))) 
       );
       
       filtered = relevantLeaves;
     } else {
-      filtered = leaves.filter(l => l.userId === currentUser?.id);
+      filtered = leaves.filter(l => String(l.userId) === String(currentUser?.id));
     }
     return filtered;
   }, [leaves, currentUser, users]);
@@ -294,17 +283,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     currentPage * itemsPerPage
   );
 
-  const pendingApprovals = useMemo(() => {
-    return visibleLeaves.filter(l => 
-      (currentUser?.role === UserRole.MANAGER && l.status === LeaveStatus.PENDING_MANAGER && l.userId !== currentUser.id && l.approverId === currentUser.id) ||
-      (currentUser?.role === UserRole.HR && l.status === LeaveStatus.PENDING_HR)
-    );
-  }, [visibleLeaves, currentUser]);
-
-  const getBalance = (typeName: string, limit: number, userId?: string) => {
+  const getBalance = (typeName: string, limit: number, userId?: string | number) => {
     const targetId = userId || currentUser?.id;
     const used = leaves
-      .filter(l => l.userId === targetId && l.type === typeName && l.status === LeaveStatus.APPROVED)
+      .filter(l => String(l.userId) === String(targetId) && l.type === typeName && l.status === LeaveStatusEnum.APPROVED)
       .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate), 0);
     return Math.max(0, limit - used);
   };
@@ -321,18 +303,18 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       type: leaveTypes.find(t => t.isActive)?.name || '', 
       startDate: '', endDate: '', reason: '', 
       attachment: false, consent: false, notifyUserIds: [], 
-      approverId: currentUser?.managerId || '',
+      approverId: String(currentUser?.managerId || ''),
       isUrgent: false
     });
     setShowModal(true);
   };
 
   const handleOpenEdit = (leave: LeaveRequest) => {
-    if (leave.status !== LeaveStatus.PENDING_MANAGER) {
+    if (leave.status !== LeaveStatusEnum.PENDING_MANAGER) {
         showToast("You can only edit pending requests.", "error");
         return;
     }
-    setIsEditing(leave.id);
+    setIsEditing(String(leave.id));
     setFormData({
       type: leave.type,
       startDate: leave.startDate,
@@ -340,8 +322,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       reason: leave.reason,
       attachment: !!leave.attachmentUrl,
       consent: !!leave.managerConsent,
-      notifyUserIds: leave.notifyUserIds || [],
-      approverId: leave.approverId || currentUser?.managerId || '',
+      notifyUserIds: (leave.notifyUserIds || []).map(String),
+      approverId: String(leave.approverId || currentUser?.managerId || ''),
       isUrgent: leave.isUrgent || false
     });
     setShowModal(true);
@@ -372,12 +354,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     setShowModal(false);
   };
 
-  const StatusBadge = ({ status }: { status: LeaveStatus | string }) => {
+  const StatusBadge = ({ status }: { status: LeaveStatusEnum | string }) => {
     const styles: Record<string, string> = {
-      [LeaveStatus.APPROVED]: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
-      [LeaveStatus.REJECTED]: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-      [LeaveStatus.PENDING_MANAGER]: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
-      [LeaveStatus.PENDING_HR]: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+      [LeaveStatusEnum.APPROVED]: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+      [LeaveStatusEnum.REJECTED]: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+      [LeaveStatusEnum.PENDING_MANAGER]: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+      [LeaveStatusEnum.PENDING_HR]: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
     };
     return <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${styles[status] || 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>{status}</span>;
   };
@@ -418,7 +400,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                       <td className="px-6 py-4 text-sm">{getDaysDiff(leave.startDate, leave.endDate)} Days</td>
                       <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
                       <td className="px-6 py-4 text-right">
-                         {(currentUser?.id === leave.userId && leave.status.includes('Pending')) ? (
+                         {(String(currentUser?.id) === String(leave.userId) && leave.status.includes('Pending')) ? (
                              <button onClick={() => handleOpenEdit(leave)} className="text-emerald-600 hover:text-emerald-800"><Edit2 size={16}/></button>
                          ) : '-'}
                       </td>
@@ -426,6 +408,28 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center p-4 border-t dark:border-slate-700">
+              <div className="text-xs text-slate-500">
+                Page {currentPage} of {totalPages || 1}
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  className="p-1 rounded border dark:border-slate-600 disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button 
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  className="p-1 rounded border dark:border-slate-600 disabled:opacity-50"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
         </div>
       )}
@@ -464,10 +468,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                <input type="checkbox" checked={formData.isUrgent} onChange={(e) => setFormData({...formData, isUrgent: e.target.checked})} className="w-4 h-4 text-red-600 rounded border-slate-300" />
                <label className="text-sm font-medium text-red-800 dark:text-red-300">Mark as Urgent <Flame size={12} className="inline ml-1" fill="currentColor"/></label>
             </div>
-            <MultiSelectUser label="Notify Colleagues" options={users.filter(u => u.id !== currentUser?.id)} selectedIds={formData.notifyUserIds} onChange={(ids) => setFormData({...formData, notifyUserIds: ids})} />
-            <div className="pt-4 flex justify-end gap-3 border-t">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-600 text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium shadow-sm">{isEditing ? 'Update Request' : 'Submit Request'}</button>
+            <MultiSelectUser label="Notify Colleagues" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={(ids) => setFormData({...formData, notifyUserIds: ids})} />
+            <div className="pt-4 flex justify-end gap-3 border-t dark:border-slate-700">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-600 text-sm dark:text-slate-400">Cancel</button>
+                <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-emerald-700 transition">{isEditing ? 'Update Request' : 'Submit Request'}</button>
             </div>
         </form>
       </DraggableModal>
@@ -475,10 +479,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       {/* Leave Type Modal */}
       <DraggableModal isOpen={showTypeModal} onClose={() => setShowTypeModal(false)} title={editingType ? 'Edit Leave Type' : 'Add Leave Type'} width="max-w-md">
         <form onSubmit={handleTypeSubmit} className="space-y-4">
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type Name</label><input required type="text" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} /></div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Days per Year</label><input required type="number" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label><textarea required rows={2} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} /></div>
-            <div className="flex justify-end gap-3 border-t pt-4"><button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 text-sm">Cancel</button><button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium">Save Type</button></div>
+            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type Name</label><input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} /></div>
+            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Days per Year</label><input required type="number" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
+            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label><textarea required rows={2} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} /></div>
+            <div className="flex justify-end gap-3 border-t dark:border-slate-700 pt-4"><button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 text-sm">Cancel</button><button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium">Save Type</button></div>
         </form>
       </DraggableModal>
     </div>

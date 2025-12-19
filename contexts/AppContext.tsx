@@ -48,37 +48,37 @@ interface AppContextType {
   removeToast: (id: string) => void;
   addEmployee: (emp: Employee) => Promise<void>;
   updateEmployee: (emp: Employee) => Promise<void>;
-  updateUser: (id: string, data: Partial<Employee>) => Promise<void>; 
-  deleteEmployee: (id: string) => Promise<void>;
+  updateUser: (id: string | number, data: Partial<Employee>) => Promise<void>; 
+  deleteEmployee: (id: string | number) => Promise<void>;
   addDepartment: (dept: Omit<Department, 'id'>) => Promise<void>;
-  updateDepartment: (id: string, data: Partial<Department>) => Promise<void>;
-  deleteDepartment: (id: string) => Promise<void>;
+  updateDepartment: (id: string | number, data: Partial<Department>) => Promise<void>;
+  deleteDepartment: (id: string | number) => Promise<void>;
   addRole: (role: Omit<Role, 'id'>) => Promise<void>;
-  updateRole: (id: string, data: Partial<Role>) => Promise<void>;
-  deleteRole: (id: string) => Promise<void>;
+  updateRole: (id: string | number, data: Partial<Role>) => Promise<void>;
+  deleteRole: (id: string | number) => Promise<void>;
   addProject: (proj: Omit<Project, 'id'>) => Promise<void>;
-  updateProject: (id: string, data: Partial<Project>) => Promise<void>;
-  deleteProject: (id: string) => Promise<void>;
+  updateProject: (id: string | number, data: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string | number) => Promise<void>;
   addLeave: (leave: any) => Promise<void>; 
   addLeaves: (leaves: any[]) => Promise<void>;
-  updateLeave: (id: string, data: any) => Promise<void>;
-  updateLeaveStatus: (id: string, status: LeaveStatus, comment?: string) => Promise<void>;
+  updateLeave: (id: string | number, data: any) => Promise<void>;
+  updateLeaveStatus: (id: string | number, status: LeaveStatus, comment?: string) => Promise<void>;
   addLeaveType: (type: any) => Promise<void>;
-  updateLeaveType: (id: string, data: any) => Promise<void>;
-  deleteLeaveType: (id: string) => Promise<void>;
+  updateLeaveType: (id: string | number, data: any) => Promise<void>;
+  deleteLeaveType: (id: string | number) => Promise<void>;
   addTimeEntry: (entry: Omit<TimeEntry, 'id'>) => Promise<void>;
-  updateTimeEntry: (id: string, data: Partial<TimeEntry>) => Promise<void>;
-  deleteTimeEntry: (id: string) => Promise<void>;
+  updateTimeEntry: (id: string | number, data: Partial<TimeEntry>) => Promise<void>;
+  deleteTimeEntry: (id: string | number) => Promise<void>;
   checkIn: () => Promise<void>;
   checkOut: (reason?: string) => Promise<void>;
   updateAttendanceRecord: (record: AttendanceRecord) => Promise<void>; 
   getTodayAttendance: () => AttendanceRecord | undefined;
   notify: (message: string) => Promise<void>; 
-  markNotificationRead: (id: string) => Promise<void>;
-  markAllRead: (userId: string) => Promise<void>;
+  markNotificationRead: (id: string | number) => Promise<void>;
+  markAllRead: (userId: string | number) => Promise<void>;
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
   addHolidays: (holidays: Omit<Holiday, 'id'>[]) => Promise<void>;
-  deleteHoliday: (id: string) => Promise<void>;
+  deleteHoliday: (id: string | number) => Promise<void>;
   generatePayslips: (month: string) => Promise<void>;
   manualAddPayslip: (payslip: Payslip) => Promise<void>;
 }
@@ -141,10 +141,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const pca = new PublicClientApplication(msalConfig);
         await pca.initialize();
         
-        // Handle redirect promise on load
         const result = await pca.handleRedirectPromise();
-        
-        // Also check if there's an active account already in session
         const accounts = pca.getAllAccounts();
         const activeAccount = result?.account || (accounts.length > 0 ? accounts[0] : null);
 
@@ -155,15 +152,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
-            // Auto-provision user if not found (allows new Azure users to sign in)
             if (!targetUser) {
                 console.log(`[Auth] Auto-provisioning new Azure user: ${email}`);
+                const nextId = currentEmployees.length > 0 ? Math.max(...currentEmployees.map(e => Number(e.id))) + 1 : 1001;
                 const newEmp: Employee = {
-                    id: `az-${Math.random().toString(36).substr(2, 9)}`,
+                    id: nextId,
+                    employeeId: `EMP${nextId}`,
                     firstName: name.split(' ')[0],
                     lastName: name.split(' ').slice(1).join(' ') || 'User',
                     email: email,
-                    password: 'ms-auth-user', // Sentinel password
+                    password: 'ms-auth-user', 
                     role: 'Employee',
                     department: 'General',
                     joinDate: new Date().toISOString().split('T')[0],
@@ -174,13 +172,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 };
                 await db.addEmployee(newEmp);
                 targetUser = newEmp;
-                // Refresh local employee list
                 setEmployees(await db.getEmployees());
             }
 
             if (targetUser) {
                 setCurrentUser({ 
-                    id: targetUser.id, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
+                    id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
                     role: targetUser.role.includes('HR') || targetUser.role.includes('Admin') ? UserRole.HR : targetUser.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
                     avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
                     departmentId: targetUser.departmentId, projectIds: targetUser.projectIds,
@@ -209,7 +206,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
     if (user) {
         setCurrentUser({ 
-            id: user.id, name: `${user.firstName} ${user.lastName}`, email: user.email,
+            id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
             role: user.role.includes('HR') || user.role.includes('Admin') ? UserRole.HR : user.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
             avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
             departmentId: user.departmentId, projectIds: user.projectIds,
@@ -226,7 +223,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!msalInstance) return false;
     try {
         const { loginRequest } = await import("../services/authConfig");
-        // loginRedirect restarts the page flow, handleRedirectPromise in useEffect picks it up
         await msalInstance.loginRedirect(loginRequest);
         return true;
     } catch (error: any) { 
@@ -239,7 +235,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const logout = async () => { 
     if (msalInstance) {
         try {
-            // Optional: Also logout from MSAL session
             const accounts = msalInstance.getAllAccounts();
             if (accounts.length > 0) {
                 await msalInstance.logoutRedirect({ postLogoutRedirectUri: window.location.origin });
@@ -262,15 +257,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addEmployee = async (emp: Employee) => { await db.addEmployee(emp); setEmployees(await db.getEmployees()); showToast('Employee added', 'success'); };
   const updateEmployee = async (emp: Employee) => { await db.updateEmployee(emp); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Employee updated', 'success'); };
-  const updateUser = async (id: string, data: Partial<Employee>) => {
+  const updateUser = async (id: string | number, data: Partial<Employee>) => {
     const existing = employees.find(e => e.id === id);
     if (existing) { await db.updateEmployee({ ...existing, ...data }); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Profile updated', 'success'); }
   };
-  const deleteEmployee = async (id: string) => { 
+  const deleteEmployee = async (id: string | number) => { 
     try {
-      // Wait for real deletion in API mode
-      await db.deleteEmployee(id); 
-      // Refresh state from DB to ensure UI is in sync
+      await db.deleteEmployee(id.toString()); 
       setEmployees(await db.getEmployees()); 
       showToast('Employee and all linked records deleted', 'success'); 
     } catch (err: any) {
@@ -280,33 +273,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addDepartment = async (dept: Omit<Department, 'id'>) => { await db.addDepartment({ ...dept, id: Math.random().toString(36).substr(2, 9) }); setDepartments(await db.getDepartments()); showToast('Department created', 'success'); };
-  const updateDepartment = async (id: string, data: Partial<Department>) => {
+  const updateDepartment = async (id: string | number, data: Partial<Department>) => {
     const existing = departments.find(d => d.id === id);
     if (existing) { await db.updateDepartment({ ...existing, ...data }); setDepartments(await db.getDepartments()); showToast('Department updated', 'success'); }
   };
-  const deleteDepartment = async (id: string) => { await db.deleteDepartment(id); setDepartments(await db.getDepartments()); showToast('Department deleted', 'info'); };
+  const deleteDepartment = async (id: string | number) => { await db.deleteDepartment(id.toString()); setDepartments(await db.getDepartments()); showToast('Department deleted', 'info'); };
 
   const addRole = async (role: Omit<Role, 'id'>) => { await db.addRole({ ...role, id: Math.random().toString(36).substr(2, 9) }); setRoles(await db.getRoles()); showToast('Role created', 'success'); };
-  const updateRole = async (id: string, data: Partial<Role>) => {
+  const updateRole = async (id: string | number, data: Partial<Role>) => {
     const existing = roles.find(r => r.id === id);
     if (existing) { await db.updateRole({ ...existing, ...data }); setRoles(await db.getRoles()); showToast('Role updated', 'success'); }
   };
-  const deleteRole = async (id: string) => { await db.deleteRole(id); setRoles(await db.getRoles()); showToast('Role deleted', 'info'); };
+  const deleteRole = async (id: string | number) => { await db.deleteRole(id.toString()); setRoles(await db.getRoles()); showToast('Role deleted', 'info'); };
 
   const addProject = async (proj: Omit<Project, 'id'>) => { await db.addProject({ ...proj, id: Math.random().toString(36).substr(2, 9) }); setProjects(await db.getProjects()); showToast('Project created', 'success'); };
-  const updateProject = async (id: string, data: Partial<Project>) => {
+  const updateProject = async (id: string | number, data: Partial<Project>) => {
     const existing = projects.find(p => p.id === id);
     if (existing) { await db.updateProject({ ...existing, ...data }); setProjects(await db.getProjects()); showToast('Project updated', 'success'); }
   };
-  const deleteProject = async (id: string) => { await db.deleteProject(id); setProjects(await db.getProjects()); showToast('Project deleted', 'info'); };
+  const deleteProject = async (id: string | number) => { await db.deleteProject(id.toString()); setProjects(await db.getProjects()); showToast('Project deleted', 'info'); };
 
   const addLeave = async (leave: any) => { await db.addLeave(leave); setLeaves(await db.getLeaves()); showToast('Leave request submitted', 'success'); };
   const addLeaves = async (newLeaves: any[]) => { for (const leave of newLeaves) { await db.addLeave(leave); } setLeaves(await db.getLeaves()); showToast(`${newLeaves.length} leaves uploaded`, 'success'); };
-  const updateLeave = async (id: string, data: any) => {
+  const updateLeave = async (id: string | number, data: any) => {
     const existing = leaves.find(l => l.id === id);
     if (existing) { await db.updateLeave({ ...existing, ...data }); setLeaves(await db.getLeaves()); showToast('Leave updated', 'success'); }
   };
-  const updateLeaveStatus = async (id: string, status: LeaveStatus, comment?: string) => {
+  const updateLeaveStatus = async (id: string | number, status: LeaveStatus, comment?: string) => {
     const leave = leaves.find(l => l.id === id);
     if (leave) {
        const updated = { ...leave, status, managerComment: (status === LeaveStatus.PENDING_HR || status === LeaveStatus.REJECTED) ? comment : leave.managerComment, hrComment: (status === LeaveStatus.APPROVED) ? comment : leave.hrComment };
@@ -315,18 +308,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addLeaveType = async (type: any) => { await db.addLeaveType(type); setLeaveTypes(await db.getLeaveTypes()); showToast('Leave type added', 'success'); };
-  const updateLeaveType = async (id: string, data: any) => {
+  const updateLeaveType = async (id: string | number, data: any) => {
     const existing = leaveTypes.find(t => t.id === id);
     if (existing) { await db.updateLeaveType({ ...existing, ...data }); setLeaveTypes(await db.getLeaveTypes()); showToast('Leave type updated', 'success'); }
   };
-  const deleteLeaveType = async (id: string) => { await db.deleteLeaveType(id); setLeaveTypes(await db.getLeaveTypes()); showToast('Leave type deleted', 'info'); };
+  const deleteLeaveType = async (id: string | number) => { await db.deleteLeaveType(id.toString()); setLeaveTypes(await db.getLeaveTypes()); showToast('Leave type deleted', 'info'); };
 
   const addTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => { await db.addTimeEntry({ ...entry, id: Math.random().toString(36).substr(2, 9) }); setTimeEntries(await db.getTimeEntries()); showToast('Time entry logged', 'success'); };
-  const updateTimeEntry = async (id: string, data: Partial<TimeEntry>) => {
+  const updateTimeEntry = async (id: string | number, data: Partial<TimeEntry>) => {
     const existing = timeEntries.find(e => e.id === id);
     if (existing) { await db.updateTimeEntry({ ...existing, ...data }); setTimeEntries(await db.getTimeEntries()); showToast('Time entry updated', 'success'); }
   };
-  const deleteTimeEntry = async (id: string) => { await db.deleteTimeEntry(id); setTimeEntries(await db.getTimeEntries()); showToast('Time entry deleted', 'info'); };
+  const deleteTimeEntry = async (id: string | number) => { await db.deleteTimeEntry(id.toString()); setTimeEntries(await db.getTimeEntries()); showToast('Time entry deleted', 'info'); };
 
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
@@ -402,11 +395,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(await db.getNotifications());
   };
 
-  const markNotificationRead = async (id: string) => { await db.markNotificationRead(id); setNotifications(await db.getNotifications()); };
-  const markAllRead = async (userId: string) => { await db.markAllNotificationsRead(userId); setNotifications(await db.getNotifications()); };
+  const markNotificationRead = async (id: string | number) => { await db.markNotificationRead(id.toString()); setNotifications(await db.getNotifications()); };
+  const markAllRead = async (userId: string | number) => { await db.markAllNotificationsRead(userId.toString()); setNotifications(await db.getNotifications()); };
   const addHoliday = async (holiday: Omit<Holiday, 'id'>) => { await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) }); setHolidays(await db.getHolidays()); showToast('Holiday added', 'success'); };
   const addHolidays = async (newHolidays: Omit<Holiday, 'id'>[]) => { for (const h of newHolidays) { await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) }); } setHolidays(await db.getHolidays()); showToast(`Imported ${newHolidays.length} holidays`, 'success'); };
-  const deleteHoliday = async (id: string) => { await db.deleteHoliday(id); setHolidays(await db.getHolidays()); showToast('Holiday deleted', 'info'); };
+  const deleteHoliday = async (id: string | number) => { await db.deleteHoliday(id.toString()); setHolidays(await db.getHolidays()); showToast('Holiday deleted', 'info'); };
   const manualAddPayslip = async (payslip: Payslip) => { await db.addPayslip(payslip); setPayslips(await db.getPayslips()); };
   const generatePayslips = async (month: string) => {
       const activeEmployees = employees.filter(e => e.status === 'Active');
