@@ -199,12 +199,36 @@ app.put('/api/employees/:id', async (req, res) => {
 
 app.delete('/api/employees/:id', async (req, res) => {
     const { id } = req.params;
+    const transaction = new sql.Transaction(pool);
     try {
-        const reqSql = pool.request();
-        reqSql.input('id', sql.NVarChar, id);
-        await reqSql.query("DELETE FROM employees WHERE id=@id");
-        res.json({ message: "Employee deleted successfully" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        await transaction.begin();
+        const request = new sql.Request(transaction);
+        request.input('id', sql.NVarChar, id);
+
+        console.log(`[SQL] Deleting employee ${id} and all related records...`);
+
+        // Manual Cascade: Delete related records from other tables first to avoid consistency issues
+        await request.query("DELETE FROM attendance WHERE employeeId = @id");
+        await request.query("DELETE FROM leaves WHERE userId = @id OR employeeId = @id");
+        await request.query("DELETE FROM time_entries WHERE userId = @id");
+        await request.query("DELETE FROM notifications WHERE userId = @id");
+        await request.query("DELETE FROM payslips WHERE userId = @id");
+        
+        // Finally delete the employee record itself
+        const result = await request.query("DELETE FROM employees WHERE id = @id");
+        
+        await transaction.commit();
+        
+        if (result.rowsAffected[0] === 0) {
+            console.warn(`[SQL] Delete operation finished but 0 rows were affected for employee ID: ${id}`);
+        }
+
+        res.json({ message: "Employee and associated records deleted successfully", rowsAffected: result.rowsAffected[0] });
+    } catch (err) {
+        console.error(`[SQL ERROR] Failed to delete employee ${id}:`, err.message);
+        if (transaction) await transaction.rollback();
+        res.status(500).json({ error: `Database deletion failed: ${err.message}` });
+    }
 });
 
 // Departments

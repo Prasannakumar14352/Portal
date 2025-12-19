@@ -266,7 +266,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const existing = employees.find(e => e.id === id);
     if (existing) { await db.updateEmployee({ ...existing, ...data }); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Profile updated', 'success'); }
   };
-  const deleteEmployee = async (id: string) => { await db.deleteEmployee(id); setEmployees(await db.getEmployees()); showToast('Employee deleted', 'info'); };
+  const deleteEmployee = async (id: string) => { 
+    try {
+      // Wait for real deletion in API mode
+      await db.deleteEmployee(id); 
+      // Refresh state from DB to ensure UI is in sync
+      setEmployees(await db.getEmployees()); 
+      showToast('Employee and all linked records deleted', 'success'); 
+    } catch (err: any) {
+      console.error("Deletion failed:", err);
+      showToast(`Delete failed: ${err.message || 'Unknown database error'}`, 'error');
+    }
+  };
 
   const addDepartment = async (dept: Omit<Department, 'id'>) => { await db.addDepartment({ ...dept, id: Math.random().toString(36).substr(2, 9) }); setDepartments(await db.getDepartments()); showToast('Department created', 'success'); };
   const updateDepartment = async (id: string, data: Partial<Department>) => {

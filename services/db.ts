@@ -7,8 +7,7 @@ import {
 
 // --- CONFIGURATION ---
 // Controlled via .env file (VITE_USE_MOCK_DATA=true/false)
-// Defaults to TRUE if the variable is missing to ensure the app works out of the box.
-const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'false' ? false : true;
+const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true'; // Strict check: defaults to real API if not explicitly 'true'
 const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'REAL API'}`);
@@ -17,7 +16,7 @@ console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'RE
 const api = {
     get: async (endpoint: string) => {
         const res = await fetch(`${API_BASE}${endpoint}`);
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) throw new Error(`API GET Error: ${res.status} ${res.statusText}`);
         return res.json();
     },
     post: async (endpoint: string, data: any) => {
@@ -26,7 +25,7 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) throw new Error(`API POST Error: ${res.status} ${res.statusText}`);
         return res.json();
     },
     put: async (endpoint: string, data: any) => {
@@ -35,17 +34,19 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) throw new Error(`API PUT Error: ${res.status} ${res.statusText}`);
         return res.json();
     },
     delete: async (endpoint: string) => {
         const res = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => res.statusText);
+            throw new Error(`API DELETE Error: ${res.status} ${errorText}`);
+        }
     }
 };
 
 // --- MOCK DATA STORE ---
-// Mutable store for the session
 const store = {
     employees: [...mockEmployees],
     departments: [...mockDepartments],
@@ -60,9 +61,8 @@ const store = {
     payslips: [...mockPayslips]
 };
 
-// --- MOCK IMPLEMENTATION ---
+// --- MOCK DB IMPLEMENTATION ---
 const mockDb = {
-    // EMPLOYEES
     getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
     addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
     updateEmployee: async (emp: Employee) => {
@@ -74,8 +74,6 @@ const mockDb = {
         store.employees = store.employees.filter(e => e.id !== id);
         return Promise.resolve();
     },
-
-    // DEPARTMENTS
     getDepartments: async (): Promise<Department[]> => Promise.resolve([...store.departments]),
     addDepartment: async (dept: Department) => { store.departments.push(dept); return Promise.resolve(dept); },
     updateDepartment: async (dept: Department) => {
@@ -87,8 +85,6 @@ const mockDb = {
         store.departments = store.departments.filter(d => d.id !== id);
         return Promise.resolve();
     },
-
-    // ROLES
     getRoles: async (): Promise<Role[]> => Promise.resolve([...store.roles]),
     addRole: async (role: Role) => { store.roles.push(role); return Promise.resolve(role); },
     updateRole: async (role: Role) => {
@@ -100,8 +96,6 @@ const mockDb = {
         store.roles = store.roles.filter(r => r.id !== id);
         return Promise.resolve();
     },
-
-    // PROJECTS
     getProjects: async (): Promise<Project[]> => Promise.resolve([...store.projects]),
     addProject: async (proj: Project) => { store.projects.push(proj); return Promise.resolve(proj); },
     updateProject: async (proj: Project) => {
@@ -113,8 +107,6 @@ const mockDb = {
         store.projects = store.projects.filter(p => p.id !== id);
         return Promise.resolve();
     },
-
-    // LEAVES
     getLeaves: async (): Promise<LeaveRequest[]> => Promise.resolve([...store.leaves]),
     addLeave: async (leave: LeaveRequest) => { store.leaves.push(leave); return Promise.resolve(leave); },
     updateLeave: async (leave: LeaveRequest) => {
@@ -122,8 +114,6 @@ const mockDb = {
         if(idx !== -1) store.leaves[idx] = leave;
         return Promise.resolve(leave);
     },
-
-    // LEAVE TYPES
     getLeaveTypes: async (): Promise<LeaveTypeConfig[]> => Promise.resolve([...store.leaveTypes]),
     addLeaveType: async (type: LeaveTypeConfig) => { store.leaveTypes.push(type); return Promise.resolve(type); },
     updateLeaveType: async (type: LeaveTypeConfig) => {
@@ -135,8 +125,6 @@ const mockDb = {
         store.leaveTypes = store.leaveTypes.filter(t => t.id !== id);
         return Promise.resolve();
     },
-
-    // ATTENDANCE
     getAttendance: async (): Promise<AttendanceRecord[]> => Promise.resolve([...store.attendance]),
     addAttendance: async (record: AttendanceRecord) => { store.attendance.push(record); return Promise.resolve(record); },
     updateAttendance: async (record: AttendanceRecord) => {
@@ -144,8 +132,6 @@ const mockDb = {
         if(idx !== -1) store.attendance[idx] = record;
         return Promise.resolve(record);
     },
-
-    // TIME ENTRIES
     getTimeEntries: async (): Promise<TimeEntry[]> => Promise.resolve([...store.timeEntries]),
     addTimeEntry: async (entry: TimeEntry) => { store.timeEntries.push(entry); return Promise.resolve(entry); },
     updateTimeEntry: async (entry: TimeEntry) => {
@@ -157,8 +143,6 @@ const mockDb = {
         store.timeEntries = store.timeEntries.filter(e => e.id !== id);
         return Promise.resolve();
     },
-
-    // NOTIFICATIONS
     getNotifications: async (): Promise<Notification[]> => Promise.resolve([...store.notifications]),
     addNotification: async (notif: Notification) => { store.notifications.push(notif); return Promise.resolve(notif); },
     markNotificationRead: async (id: string) => {
@@ -167,26 +151,17 @@ const mockDb = {
         return Promise.resolve();
     },
     markAllNotificationsRead: async (userId: string) => {
-        store.notifications.forEach(n => {
-            if(n.userId === userId) n.read = true;
-        });
+        store.notifications.forEach(n => { if(n.userId === userId) n.read = true; });
         return Promise.resolve();
     },
-
-    // HOLIDAYS
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
     addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
-    deleteHoliday: async (id: string) => {
-        store.holidays = store.holidays.filter(h => h.id !== id);
-        return Promise.resolve();
-    },
-
-    // PAYSLIPS
+    deleteHoliday: async (id: string) => { store.holidays = store.holidays.filter(h => h.id !== id); return Promise.resolve(); },
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
     addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
 };
 
-// --- REAL IMPLEMENTATION OBJECT ---
+// --- REAL API DB IMPLEMENTATION ---
 const apiDb = {
   getEmployees: () => api.get('/employees'),
   addEmployee: (emp: Employee) => api.post('/employees', emp),
@@ -239,27 +214,35 @@ const apiDb = {
   addPayslip: (payslip: Payslip) => api.post('/payslips', payslip)
 };
 
-// --- HYBRID EXPORT ---
-// This Proxy wraps calls. If USE_MOCK_DATA is true, it uses mockDb.
-// If FALSE, it attempts apiDb. If apiDb fails (e.g. server not running), it catches the error and falls back to mockDb.
+// --- HYBRID DB PROXY ---
 const createHybridDb = () => {
     return new Proxy(mockDb, {
-        get(target, prop: keyof typeof mockDb) {
+        get(target, prop: string) {
             return async (...args: any[]) => {
+                const isMutation = prop.startsWith('add') || prop.startsWith('update') || prop.startsWith('delete') || prop.startsWith('mark');
+                
+                // 1. If explicit MOCK mode, just use mockDb
                 if (USE_MOCK_DATA) {
-                    return (mockDb[prop] as Function)(...args);
+                    return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
                 
+                // 2. REAL API Mode
                 try {
-                    // Try real API
                     if (apiDb[prop as keyof typeof apiDb]) {
                         return await (apiDb[prop as keyof typeof apiDb] as Function)(...args);
                     }
-                    return (mockDb[prop] as Function)(...args);
+                    // If method doesn't exist in apiDb, fallback to mockDb
+                    return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 } catch (error) {
-                    console.warn(`[DB] API call failed for ${String(prop)}, falling back to Mock Data.`);
-                    // Fallback
-                    return (mockDb[prop] as Function)(...args);
+                    // CRITICAL: Mutations must NOT fallback to mock data silently in real API mode
+                    if (isMutation) {
+                        console.error(`[DB] Critical API error during mutation (${prop}):`, error);
+                        throw error; // Propagate error to context so user knows it failed
+                    }
+                    
+                    // GET requests can fallback for resilience
+                    console.warn(`[DB] API read failed for ${String(prop)}, falling back to local Mock Data.`, error);
+                    return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
             };
         }
