@@ -189,7 +189,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       
       const formatTime = (iso: string | undefined) => {
           if (!iso) return '--:--';
-          return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+          // Use 24-hour format (HH:mm) for consistent internal time representation
+          return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
       };
 
       const updatedRecord: AttendanceRecord = {
@@ -290,7 +291,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Attendance Tracker</h2>
             <p className="text-slate-500 dark:text-slate-400">Manage your daily work hours.</p>
             <div className="mt-2 text-3xl font-mono text-slate-700 dark:text-slate-200 font-semibold tracking-wider">
-               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+               {/* Clock switched to 24-hour format */}
+               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
             </div>
             <p className="text-sm text-slate-400">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
          </div>

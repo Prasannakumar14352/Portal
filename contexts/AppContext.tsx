@@ -534,7 +534,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       employeeId: currentUser.id,
       employeeName: currentUser.name,
       date: localDate,
-      checkIn: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
+      // Use 24-hour format (HH:mm) to ensure midnight shows as 00:xx
+      checkIn: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
       checkInTime: now.toISOString(),
       checkOut: '',
       status: isLate ? 'Late' : 'Present',
@@ -558,7 +559,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const updatedRecord: AttendanceRecord = {
       ...todayRec,
-      checkOut: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
+      // Use 24-hour format (HH:mm) to ensure midnight shows as 00:xx
+      checkOut: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
       checkOutTime: now.toISOString(),
       status: finalStatus,
       notes: reason || todayRec.notes
