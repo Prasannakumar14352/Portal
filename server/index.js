@@ -66,16 +66,15 @@ let pool;
 const connectDb = async () => {
     try {
         console.log('----------------------------------------');
-        console.log(`[SQL] Attempting connection to: ${dbConfig.server}`);
-        console.log(`[SQL] Database: ${dbConfig.database}`);
+        console.log(`[SQL] Connecting to: ${dbConfig.server} | DB: ${dbConfig.database}`);
         
         pool = await sql.connect(dbConfig);
-        console.log(`✅ [SQL] Connection established successfully.`);
+        console.log(`✅ [SQL] Connection successful.`);
         
         await initDb();
     } catch (err) {
         console.error('❌ [SQL] CONNECTION FAILED!');
-        console.error(`[SQL] Error Detail: ${err.message}`);
+        console.error(`[SQL] Error: ${err.message}`);
         console.log('----------------------------------------');
     }
 };
@@ -83,7 +82,7 @@ const connectDb = async () => {
 const initDb = async () => {
     try {
         const request = pool.request();
-        console.log("[DB] Starting schema synchronization...");
+        console.log("[DB] Synchronizing tables...");
 
         const tables = [
             { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100))` },
@@ -101,26 +100,26 @@ const initDb = async () => {
 
         for (const table of tables) {
             await request.query(table.query);
-            console.log(`[DB] Checked table: ${table.name}`);
+            console.log(`[DB] Verified table: ${table.name}`);
         }
         
-        console.log("[DB] Checking for column updates/migrations...");
+        console.log("[DB] Verifying migrations...");
         try {
             await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'employees')) ALTER TABLE employees ADD workLocation NVARCHAR(100)`);
             await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'workLocation' AND Object_ID = Object_ID(N'attendance')) ALTER TABLE attendance ADD workLocation NVARCHAR(100)`);
-            console.log("✅ [DB] Migrations verified.");
         } catch (e) { 
-            console.warn("[DB] Migration check encountered issues:", e.message); 
+            console.warn("[DB] Migration warning:", e.message); 
         }
 
-        console.log("✅ [DB] Schema synchronization complete.");
+        console.log("✅ [DB] Initialization complete.");
     } catch (err) {
-        console.error("❌ [DB] Schema synchronization failed critical error:", err);
+        console.error("❌ [DB] Initialization FAILED:", err);
     }
 };
 
-// --- ROUTES ---
+// --- API ENDPOINTS ---
 
+// Employees
 app.get('/api/employees', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM employees");
@@ -129,7 +128,7 @@ app.get('/api/employees', async (req, res) => {
             projectIds: parseJSON(e.projectIds) || [],
             location: parseJSON(e.location),
         }));
-        console.log(`[GET /api/employees] SUCCESS: Fetched ${employees.length} employees.`);
+        console.log(`[GET /api/employees] SUCCESS: Sent ${employees.length} records.`);
         res.json(employees);
     } catch (err) { 
         console.error("[GET /api/employees] ERROR:", err.message);
@@ -164,7 +163,7 @@ app.post('/api/employees', async (req, res) => {
             (id, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, workLocation, phone, jobTitle) 
             VALUES (@id, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @workLocation, @phone, @jobTitle)`);
         
-        console.log(`[POST /api/employees] SUCCESS: Created employee ${e.id}`);
+        console.log(`[POST /api/employees] SUCCESS: Created ID ${e.id}`);
         res.json(e);
     } catch (err) { 
         console.error(`[POST /api/employees] FAILED for ${e.id}:`, err.message);
@@ -202,49 +201,134 @@ app.put('/api/employees/:id', async (req, res) => {
             status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, workLocation=@workLocation,
             phone=@phone, jobTitle=@jobTitle WHERE id=@id`);
         
-        console.log(`[PUT /api/employees/${id}] SUCCESS: Updated employee record.`);
+        console.log(`[PUT /api/employees/${id}] SUCCESS: Updated employee.`);
 
-        // Cascade Work Location change to Attendance Table as requested
         if (e.workLocation) {
             try {
                 const attendReq = pool.request();
                 attendReq.input('eid', sql.NVarChar, id);
                 attendReq.input('loc', sql.NVarChar, e.workLocation);
                 await attendReq.query("UPDATE attendance SET workLocation = @loc WHERE employeeId = @eid");
-                console.log(`[CASCADE] SUCCESS: Synced workLocation to '${e.workLocation}' for all attendance records of employee ${id}`);
+                console.log(`[CASCADE] SUCCESS: Updated workLocation for all attendance records of ${id}`);
             } catch (cascadeErr) {
-                console.error(`[CASCADE] FAILED to sync attendance for ${id}:`, cascadeErr.message);
+                console.error(`[CASCADE] FAILED for ${id}:`, cascadeErr.message);
             }
         }
-        
         res.json(e);
     } catch (err) { 
-        console.error(`[PUT /api/employees/${id}] FAILED:`, err.message);
+        console.error(`[PUT /api/employees/${id}] ERROR:`, err.message);
         res.status(500).json({ error: err.message }); 
     }
 });
 
-app.delete('/api/employees/:id', async (req, res) => {
+// Leaves (Fixed 404)
+app.get('/api/leaves', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM leaves");
+        const data = result.recordset.map(l => ({
+            ...l,
+            notifyUserIds: parseJSON(l.notifyUserIds) || [],
+            managerConsent: !!l.managerConsent,
+            isUrgent: !!l.isUrgent
+        }));
+        console.log(`[GET /api/leaves] SUCCESS: Sent ${data.length} records.`);
+        res.json(data);
+    } catch (err) {
+        console.error("[GET /api/leaves] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/leaves', async (req, res) => {
+    const l = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, l.id);
+        reqSql.input('userId', sql.NVarChar, l.userId);
+        reqSql.input('userName', sql.NVarChar, l.userName);
+        reqSql.input('type', sql.NVarChar, l.type);
+        reqSql.input('startDate', sql.NVarChar, l.startDate);
+        reqSql.input('endDate', sql.NVarChar, l.endDate);
+        reqSql.input('reason', sql.NVarChar, l.reason);
+        reqSql.input('status', sql.NVarChar, l.status);
+        reqSql.input('attachmentUrl', sql.NVarChar, l.attachmentUrl || '');
+        reqSql.input('managerConsent', sql.Bit, l.managerConsent ? 1 : 0);
+        reqSql.input('notifyUserIds', sql.NVarChar, JSON.stringify(l.notifyUserIds || []));
+        reqSql.input('approverId', sql.NVarChar, l.approverId || '');
+        reqSql.input('isUrgent', sql.Bit, l.isUrgent ? 1 : 0);
+        reqSql.input('createdAt', sql.NVarChar, l.createdAt || new Date().toISOString());
+        
+        await reqSql.query(`INSERT INTO leaves (id, userId, userName, type, startDate, endDate, reason, status, attachmentUrl, managerConsent, notifyUserIds, approverId, isUrgent, createdAt) 
+            VALUES (@id, @userId, @userName, @type, @startDate, @endDate, @reason, @status, @attachmentUrl, @managerConsent, @notifyUserIds, @approverId, @isUrgent, @createdAt)`);
+        
+        console.log(`[POST /api/leaves] SUCCESS: Request ${l.id} from ${l.userName}`);
+        res.json(l);
+    } catch (err) {
+        console.error("[POST /api/leaves] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/leaves/:id', async (req, res) => {
+    const l = req.body;
     const { id } = req.params;
     try {
         const reqSql = pool.request();
         reqSql.input('id', sql.NVarChar, id);
-        await reqSql.query("DELETE FROM employees WHERE id = @id");
-        console.log(`[DELETE /api/employees/${id}] SUCCESS: Deleted record.`);
-        res.json({ message: "Deleted" });
-    } catch (err) { 
-        console.error(`[DELETE /api/employees/${id}] FAILED:`, err.message);
-        res.status(500).json({ error: err.message }); 
+        reqSql.input('status', sql.NVarChar, l.status);
+        reqSql.input('managerComment', sql.NVarChar, l.managerComment || '');
+        reqSql.input('hrComment', sql.NVarChar, l.hrComment || '');
+        
+        await reqSql.query("UPDATE leaves SET status=@status, managerComment=@managerComment, hrComment=@hrComment WHERE id=@id");
+        console.log(`[PUT /api/leaves/${id}] SUCCESS: Status changed to ${l.status}`);
+        res.json(l);
+    } catch (err) {
+        console.error(`[PUT /api/leaves/${id}] ERROR:`, err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
+// Leave Types (Fixed 404)
+app.get('/api/leave_types', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM leave_types");
+        const data = result.recordset.map(t => ({ ...t, isActive: !!t.isActive }));
+        console.log(`[GET /api/leave_types] SUCCESS: Sent ${data.length} records.`);
+        res.json(data);
+    } catch (err) {
+        console.error("[GET /api/leave_types] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/leave_types', async (req, res) => {
+    const t = req.body;
+    try {
+        const reqSql = pool.request();
+        const id = t.id || Math.random().toString(36).substr(2, 9);
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('name', sql.NVarChar, t.name);
+        reqSql.input('days', sql.Int, t.days);
+        reqSql.input('description', sql.NVarChar, t.description || '');
+        reqSql.input('isActive', sql.Bit, t.isActive ? 1 : 0);
+        reqSql.input('color', sql.NVarChar, t.color || 'text-emerald-600');
+        await reqSql.query("INSERT INTO leave_types (id, name, days, description, isActive, color) VALUES (@id, @name, @days, @description, @isActive, @color)");
+        console.log(`[POST /api/leave_types] SUCCESS: Created ${t.name}`);
+        res.json({ ...t, id });
+    } catch (err) {
+        console.error("[POST /api/leave_types] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Attendance
 app.get('/api/attendance', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM attendance");
-        console.log(`[GET /api/attendance] SUCCESS: Fetched ${result.recordset.length} records.`);
+        console.log(`[GET /api/attendance] SUCCESS: Sent ${result.recordset.length} records.`);
         res.json(result.recordset);
     } catch (err) { 
-        console.error("[GET /api/attendance] FAILED:", err.message);
+        console.error("[GET /api/attendance] ERROR:", err.message);
         res.status(500).json({ error: err.message }); 
     }
 });
@@ -266,11 +350,10 @@ app.post('/api/attendance', async (req, res) => {
         reqSql.input('workLocation', sql.NVarChar, a.workLocation || ''); 
         
         await reqSql.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
-        
-        console.log(`[POST /api/attendance] SUCCESS: Check-In logged for ${a.employeeName}`);
+        console.log(`[POST /api/attendance] SUCCESS: Check-In ${a.employeeName}`);
         res.json(a);
     } catch (err) { 
-        console.error(`[POST /api/attendance] FAILED for ${a.employeeName}:`, err.message);
+        console.error(`[POST /api/attendance] ERROR for ${a.employeeName}:`, err.message);
         res.status(500).json({ error: err.message }); 
     }
 });
@@ -286,20 +369,89 @@ app.put('/api/attendance/:id', async (req, res) => {
         reqSql.input('status', sql.NVarChar, a.status);
         reqSql.input('notes', sql.NVarChar, a.notes);
         await reqSql.query("UPDATE attendance SET checkOut=@checkOut, checkOutTime=@checkOutTime, status=@status, notes=@notes WHERE id=@id");
-        
-        console.log(`[PUT /api/attendance/${id}] SUCCESS: Check-Out complete.`);
+        console.log(`[PUT /api/attendance/${id}] SUCCESS: Check-Out confirmed.`);
         res.json(a);
     } catch (err) { 
-        console.error(`[PUT /api/attendance/${id}] FAILED:`, err.message);
+        console.error(`[PUT /api/attendance/${id}] ERROR:`, err.message);
         res.status(500).json({ error: err.message }); 
     }
 });
 
+// Holidays (Fixed 404)
+app.get('/api/holidays', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM holidays");
+        console.log(`[GET /api/holidays] SUCCESS: Sent ${result.recordset.length} records.`);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[GET /api/holidays] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/holidays', async (req, res) => {
+    const h = req.body;
+    try {
+        const reqSql = pool.request();
+        const id = h.id || Math.random().toString(36).substr(2, 9);
+        reqSql.input('id', sql.NVarChar, id);
+        reqSql.input('name', sql.NVarChar, h.name);
+        reqSql.input('date', sql.NVarChar, h.date);
+        reqSql.input('type', sql.NVarChar, h.type);
+        await reqSql.query("INSERT INTO holidays (id, name, date, type) VALUES (@id, @name, @date, @type)");
+        console.log(`[POST /api/holidays] SUCCESS: Added ${h.name}`);
+        res.json({ ...h, id });
+    } catch (err) {
+        console.error("[POST /api/holidays] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Payslips (Fixed 404)
+app.get('/api/payslips', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM payslips");
+        console.log(`[GET /api/payslips] SUCCESS: Sent ${result.recordset.length} records.`);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[GET /api/payslips] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/payslips', async (req, res) => {
+    const p = req.body;
+    try {
+        const reqSql = pool.request();
+        reqSql.input('id', sql.NVarChar, p.id);
+        reqSql.input('userId', sql.NVarChar, p.userId);
+        reqSql.input('userName', sql.NVarChar, p.userName);
+        reqSql.input('month', sql.NVarChar, p.month);
+        reqSql.input('amount', sql.Float, p.amount);
+        reqSql.input('currency', sql.NVarChar, p.currency || '₹');
+        reqSql.input('status', sql.NVarChar, p.status);
+        reqSql.input('generatedDate', sql.NVarChar, p.generatedDate);
+        reqSql.input('fileData', sql.NVarChar, p.fileData || '');
+        reqSql.input('fileName', sql.NVarChar, p.fileName || '');
+        
+        await reqSql.query(`INSERT INTO payslips (id, userId, userName, month, amount, currency, status, generatedDate, fileData, fileName) 
+            VALUES (@id, @userId, @userName, @month, @amount, @currency, @status, @generatedDate, @fileData, @fileName)`);
+        
+        console.log(`[POST /api/payslips] SUCCESS: Generated for ${p.userName} for ${p.month}`);
+        res.json(p);
+    } catch (err) {
+        console.error("[POST /api/payslips] ERROR:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Time Entries
 app.get('/api/time_entries', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM time_entries");
-        console.log(`[GET /api/time_entries] SUCCESS: Retrieved ${result.recordset.length} entries.`);
-        res.json(result.recordset.map(r => ({ ...r, isBillable: !!r.isBillable })));
+        const data = result.recordset.map(r => ({ ...r, isBillable: !!r.isBillable }));
+        console.log(`[GET /api/time_entries] SUCCESS: Sent ${data.length} records.`);
+        res.json(data);
     } catch (err) { 
         console.error("[GET /api/time_entries] ERROR:", err.message);
         res.status(500).json({ error: err.message }); 
@@ -310,59 +462,30 @@ app.post('/api/time_entries', async (req, res) => {
     const t = req.body;
     try {
         const reqSql = pool.request();
-        reqSql.input('id', sql.NVarChar, t.id);
+        const id = t.id || Math.random().toString(36).substr(2, 9);
+        reqSql.input('id', sql.NVarChar, id);
         reqSql.input('userId', sql.NVarChar, t.userId);
-        reqSql.input('projectId', sql.NVarChar, t.projectId);
+        reqSql.input('projectId', sql.NVarChar, t.projectId || '');
         reqSql.input('task', sql.NVarChar, t.task);
         reqSql.input('date', sql.NVarChar, t.date);
         reqSql.input('durationMinutes', sql.Int, t.durationMinutes);
-        reqSql.input('description', sql.NVarChar, t.description);
+        reqSql.input('description', sql.NVarChar, t.description || '');
         reqSql.input('status', sql.NVarChar, t.status);
         reqSql.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
         await reqSql.query("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, description, status, isBillable) VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @description, @status, @isBillable)");
-        console.log(`[POST /api/time_entries] SUCCESS: Logged entry for ${t.userId}`);
-        res.json(t);
+        console.log(`[POST /api/time_entries] SUCCESS: Added log for ${t.userId}`);
+        res.json({ ...t, id });
     } catch (err) { 
-        console.error("[POST /api/time_entries] FAILED:", err.message);
+        console.error("[POST /api/time_entries] ERROR:", err.message);
         res.status(500).json({ error: err.message }); 
     }
 });
 
-app.get('/api/notifications', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM notifications");
-        console.log(`[GET /api/notifications] SUCCESS: Fetched ${result.recordset.length} items.`);
-        res.json(result.recordset.map(r => ({ ...r, read: !!r.read })));
-    } catch (err) { 
-        console.error("[GET /api/notifications] ERROR:", err.message);
-        res.status(500).json({ error: err.message }); 
-    }
-});
-
-app.post('/api/notifications', async (req, res) => {
-    const n = req.body;
-    try {
-        const reqSql = pool.request();
-        reqSql.input('id', sql.NVarChar, n.id);
-        reqSql.input('userId', sql.NVarChar, n.userId);
-        reqSql.input('title', sql.NVarChar, n.title);
-        reqSql.input('message', sql.NVarChar, n.message);
-        reqSql.input('time', sql.NVarChar, n.time);
-        reqSql.input('read', sql.Bit, n.read ? 1 : 0);
-        reqSql.input('type', sql.NVarChar, n.type);
-        await reqSql.query("INSERT INTO notifications (id, userId, title, message, time, [read], type) VALUES (@id, @userId, @title, @message, @time, @read, @type)");
-        console.log(`[POST /api/notifications] SUCCESS: Sent to ${n.userId}`);
-        res.json(n);
-    } catch (err) { 
-        console.error("[POST /api/notifications] ERROR:", err.message);
-        res.status(500).json({ error: err.message }); 
-    }
-});
-
+// Organization structure
 app.get('/api/departments', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM departments");
-        console.log(`[GET /api/departments] SUCCESS: Retrieved ${result.recordset.length} records.`);
+        console.log(`[GET /api/departments] SUCCESS: Sent ${result.recordset.length} records.`);
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -370,7 +493,7 @@ app.get('/api/departments', async (req, res) => {
 app.get('/api/roles', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM roles");
-        console.log(`[GET /api/roles] SUCCESS: Retrieved ${result.recordset.length} records.`);
+        console.log(`[GET /api/roles] SUCCESS: Sent ${result.recordset.length} records.`);
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -378,8 +501,18 @@ app.get('/api/roles', async (req, res) => {
 app.get('/api/projects', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM projects");
-        console.log(`[GET /api/projects] SUCCESS: Retrieved ${result.recordset.length} records.`);
-        res.json(result.recordset.map(r => ({ ...r, tasks: parseJSON(r.tasks) || [] })));
+        const data = result.recordset.map(r => ({ ...r, tasks: parseJSON(r.tasks) || [] }));
+        console.log(`[GET /api/projects] SUCCESS: Sent ${data.length} records.`);
+        res.json(data);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Notifications
+app.get('/api/notifications', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM notifications");
+        console.log(`[GET /api/notifications] SUCCESS: Sent ${result.recordset.length} items.`);
+        res.json(result.recordset.map(r => ({ ...r, read: !!r.read })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
