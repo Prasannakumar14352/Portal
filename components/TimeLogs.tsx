@@ -4,7 +4,7 @@ import { useAppContext } from '../contexts/AppContext';
 import { TimeEntry, Project, UserRole } from '../types';
 import { 
   Clock, Plus, Filter, FileText, ChevronDown, ChevronRight, ChevronLeft, Calendar as CalendarIcon, Edit2, Trash2,
-  DollarSign, FileSpreadsheet, AlertTriangle, CheckCircle2, MoreHorizontal, X, SlidersHorizontal, Zap
+  DollarSign, FileSpreadsheet, AlertTriangle, CheckCircle2, MoreHorizontal, X, SlidersHorizontal, Zap, AlignLeft
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -48,6 +48,13 @@ const TimeLogs = () => {
 
   const isHR = currentUser?.role === UserRole.HR;
   const NO_PROJECT_ID = "NO_PROJECT";
+
+  // Dynamic Tasks based on selected project
+  const selectedProjectTasks = useMemo(() => {
+    if (!formData.projectId || formData.projectId === NO_PROJECT_ID) return ['General Administration', 'Internal Meeting', 'Documentation', 'Support'];
+    const proj = projects.find(p => p.id === formData.projectId);
+    return proj?.tasks || [];
+  }, [formData.projectId, projects]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -144,13 +151,6 @@ const TimeLogs = () => {
       return groups;
   }, [visibleEntries]);
 
-  useEffect(() => {
-      const allIds = Object.keys(groupedEntries);
-      const initialState: Record<string, boolean> = {};
-      allIds.forEach(id => initialState[id] = true);
-      setExpandedProjects(prev => ({...initialState, ...prev})); 
-  }, [groupedEntries]);
-
   const toggleProjectGroup = (pid: string) => {
       setExpandedProjects(prev => ({...prev, [pid]: !prev[pid]}));
   };
@@ -201,16 +201,10 @@ const TimeLogs = () => {
           projectId: entry.projectId || NO_PROJECT_ID,
           task: entry.task,
           date: entry.date,
-          description: entry.description,
+          description: entry.description || '',
           isBillable: entry.isBillable
       });
       setShowModal(true);
-      setActiveMenuId(null);
-  };
-
-  const initiateDelete = (id: string) => {
-      setItemToDelete(id);
-      setShowDeleteConfirm(true);
       setActiveMenuId(null);
   };
 
@@ -281,7 +275,7 @@ const TimeLogs = () => {
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
              <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Clock className="text-emerald-600" /> Time Logs</h2>
-             <p className="text-sm text-slate-500 dark:text-slate-400">Log standard and extra hours in a single entry.</p>
+             <p className="text-sm text-slate-500 dark:text-slate-400">Track and manage project effort efficiently.</p>
           </div>
           <div className="flex flex-col sm:flex-row w-full xl:w-auto gap-2">
              <div className="flex gap-2 w-full sm:w-auto">
@@ -289,8 +283,8 @@ const TimeLogs = () => {
                 <button onClick={() => { resetForm(); setShowModal(true); }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 shadow-sm transition"><Plus size={18} /> <span>Log Time</span></button>
              </div>
              <div className="hidden sm:flex gap-2">
-                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm" title="Export CSV"><FileSpreadsheet size={16}/></button>
-                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm" title="Export PDF"><FileText size={16}/></button>
+                <button onClick={() => handleExport('csv')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm"><FileSpreadsheet size={16}/></button>
+                <button onClick={() => handleExport('pdf')} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-sm"><FileText size={16}/></button>
              </div>
           </div>
        </div>
@@ -342,16 +336,15 @@ const TimeLogs = () => {
           </div>
        </div>
 
-       {/* Unified Log List */}
+       {/* Log List */}
        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
              {Object.keys(groupedEntries).map(projectId => {
                 const projectEntries = groupedEntries[projectId];
                 const isExpanded = expandedProjects[projectId];
                 const projectName = getProjectName(projectId);
-                
-                const totalNormalMins = projectEntries.reduce((acc, curr) => acc + curr.durationMinutes, 0);
-                const totalExtraMins = projectEntries.reduce((acc, curr) => acc + (curr.extraMinutes || 0), 0);
+                const totalNormal = projectEntries.reduce((acc, curr) => acc + curr.durationMinutes, 0);
+                const totalExtra = projectEntries.reduce((acc, curr) => acc + (curr.extraMinutes || 0), 0);
 
                 return (
                    <div key={projectId}>
@@ -364,129 +357,123 @@ const TimeLogs = () => {
                             </div>
                          </div>
                          <div className="text-right flex flex-col items-end">
-                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDuration(totalNormalMins + totalExtraMins)}</span>
-                            {totalExtraMins > 0 && (
-                                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800 mt-1">
-                                    Includes {formatDuration(totalExtraMins)} Extra
-                                </span>
-                            )}
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDuration(totalNormal + totalExtra)}</span>
+                            {totalExtra > 0 && <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full mt-1">Incl. {formatDuration(totalExtra)} Extra</span>}
                          </div>
                       </div>
                       {isExpanded && (
                          <div className="bg-slate-50/50 dark:bg-slate-900/20 border-t border-slate-100 dark:border-slate-700">
-                            {projectEntries.map(entry => {
-                               const extraMins = entry.extraMinutes || 0;
-                               return (
-                               <div key={entry.id} className={`p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors group relative ${extraMins > 0 ? 'border-l-4 border-l-purple-400' : ''}`}>
+                            {projectEntries.map(entry => (
+                               <div key={entry.id} className={`p-4 border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors group relative ${(entry.extraMinutes || 0) > 0 ? 'border-l-4 border-l-purple-400' : ''}`}>
                                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                      <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                            <span className="text-xs font-bold text-slate-500">{entry.date}</span>
                                            <StatusBadge status={entry.status} />
-                                           {entry.isBillable && <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900 flex items-center gap-1 font-bold"><DollarSign size={10}/> Billable</span>}
+                                           {entry.isBillable && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1 font-bold"><DollarSign size={10}/> Billable</span>}
                                         </div>
                                         <h5 className="font-medium text-slate-800 dark:text-white text-sm truncate">{entry.task}</h5>
-                                        <p className="text-xs text-slate-500 truncate mt-0.5">{entry.description}</p>
+                                        {entry.description && <p className="text-xs text-slate-500 line-clamp-1 mt-0.5 italic">"{entry.description}"</p>}
                                      </div>
                                      <div className="flex items-center gap-4">
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                                                {formatDuration(entry.durationMinutes)}
-                                                {extraMins > 0 && <span className="text-purple-600 dark:text-purple-400 ml-1"> + {formatDuration(extraMins)} <Zap size={10} className="inline mb-1" /></span>}
-                                            </span>
-                                            {extraMins > 0 && <span className="text-[10px] text-slate-400">Total: {formatDuration(entry.durationMinutes + extraMins)}</span>}
+                                        <div className="text-right">
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDuration(entry.durationMinutes + (entry.extraMinutes || 0))}</span>
+                                            {(entry.extraMinutes || 0) > 0 && <p className="text-[10px] text-purple-600 font-bold">+{formatDuration(entry.extraMinutes!)} Overtime</p>}
                                         </div>
                                         <div className="relative">
-                                           <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === entry.id ? null : entry.id); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md transition"><MoreHorizontal size={16} /></button>
+                                           <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === entry.id ? null : entry.id); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md"><MoreHorizontal size={16} /></button>
                                            {activeMenuId === entry.id && (
-                                              <div ref={menuRef} className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 rounded-lg shadow-xl border z-20 overflow-hidden border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-150">
-                                                 <button onClick={() => handleEdit(entry)} className="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"><Edit2 size={12}/> Edit Log</button>
-                                                 <button onClick={() => initiateDelete(entry.id)} className="w-full text-left px-3 py-2.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 transition-colors border-t border-slate-100 dark:border-slate-700"><Trash2 size={12}/> Delete</button>
+                                              <div ref={menuRef} className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 rounded-lg shadow-xl border z-20 overflow-hidden">
+                                                 <button onClick={() => handleEdit(entry)} className="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Edit2 size={12}/> Edit Log</button>
+                                                 <button onClick={() => { if (confirm('Delete this entry?')) deleteTimeEntry(entry.id); }} className="w-full text-left px-3 py-2.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 border-t"><Trash2 size={12}/> Delete</button>
                                               </div>
                                            )}
                                         </div>
                                      </div>
                                   </div>
                                </div>
-                            )})}
+                            ))}
                          </div>
                       )}
                    </div>
                 );
              })}
-             {Object.keys(groupedEntries).length === 0 && (
-                <div className="p-12 text-center text-slate-400">No records found for this period.</div>
-             )}
           </div>
        </div>
 
        {/* Unified Modal */}
        {showModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-300">
-                <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
-                   <div className="flex items-center gap-2">
+             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                   <div className="flex items-center gap-2 text-slate-800 dark:text-white font-bold">
                        <Clock className="text-emerald-600" size={20} />
-                       <h3 className="font-bold text-slate-800 dark:text-white">{editingId ? 'Update Log' : 'Add Time Log'}</h3>
+                       <h3>{editingId ? 'Edit Time Log' : 'Add Time Log'}</h3>
                    </div>
-                   <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition"><X size={20}/></button>
+                   <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition p-1"><X size={20}/></button>
                 </div>
+                
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                   {/* Selection */}
-                   <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Project / Client</label>
-                        <select required className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm" value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
-                            <option value="" disabled>Choose a project...</option>
-                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            <option value={NO_PROJECT_ID}>Internal - General</option>
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Work Done</label>
-                        <input required type="text" placeholder="Detailed task name" className="w-full px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm" value={formData.task} onChange={e => setFormData({...formData, task: e.target.value})} />
-                      </div>
+                   {/* Project Selection */}
+                   <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Project / Client</label>
+                      <select required className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm" value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value, task: ''})}>
+                         <option value="" disabled>Choose a project...</option>
+                         {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                         <option value={NO_PROJECT_ID}>Internal - General Administration</option>
+                      </select>
                    </div>
 
-                   {/* Date & Primary Hours */}
+                   {/* Subtask Dropdown */}
+                   <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Work Done (Subtask)</label>
+                      <select required className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm" value={formData.task} onChange={e => setFormData({...formData, task: e.target.value})}>
+                         <option value="" disabled>Select subtask...</option>
+                         {selectedProjectTasks.map(task => <option key={task} value={task}>{task}</option>)}
+                         <option value="Other">Other (Custom Task)</option>
+                      </select>
+                      {formData.task === 'Other' && (
+                          <input type="text" placeholder="Enter custom task name" className="mt-2 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-emerald-500" onChange={e => setFormData({...formData, task: e.target.value})} />
+                      )}
+                   </div>
+
+                   {/* Date & Normal Hours Row */}
                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Date</label>
+                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Date</label>
                          <input required type="date" className="w-full px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none dark:text-white transition shadow-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                       </div>
                       <div>
-                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Normal Hours</label>
+                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Normal Hours</label>
                          <div className="flex gap-2">
-                            <input type="number" min="0" className="w-full px-2 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-center dark:bg-slate-700 dark:text-white transition shadow-sm" value={normalInput.hours} onChange={e => setNormalInput({...normalInput, hours: e.target.value})} />
-                            <span className="self-center font-bold text-slate-400">:</span>
-                            <select className="w-full border border-slate-300 dark:border-slate-600 rounded-xl px-2 py-2.5 dark:bg-slate-700 dark:text-white transition shadow-sm" value={normalInput.minutes} onChange={e => setNormalInput({...normalInput, minutes: e.target.value})}>
+                            <input type="number" min="0" className="w-full px-2 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-center dark:bg-slate-700 dark:text-white shadow-sm" value={normalInput.hours} onChange={e => setNormalInput({...normalInput, hours: e.target.value})} />
+                            <span className="self-center font-bold text-slate-300">:</span>
+                            <select className="w-full border border-slate-300 dark:border-slate-600 rounded-xl px-2 py-2.5 dark:bg-slate-700 dark:text-white shadow-sm" value={normalInput.minutes} onChange={e => setNormalInput({...normalInput, minutes: e.target.value})}>
                                <option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
                             </select>
                          </div>
                       </div>
                    </div>
 
-                   {/* Extra Hours Toggle & Section */}
-                   <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                      <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-2 cursor-pointer group">
-                             <input type="checkbox" checked={includeExtra} onChange={(e) => setIncludeExtra(e.target.checked)} className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-slate-300" />
-                             <span className={`text-sm font-bold ${includeExtra ? 'text-purple-700 dark:text-purple-400' : 'text-slate-500'}`}>Include Extra Hours / Overtime</span>
-                          </label>
-                          {includeExtra && <Zap size={16} className="text-purple-500 animate-pulse" fill="currentColor" />}
-                      </div>
-
+                   {/* Extra Hours Toggle */}
+                   <div className="pt-2">
+                      <label className="flex items-center gap-2 cursor-pointer group w-fit">
+                         <input type="checkbox" checked={includeExtra} onChange={(e) => setIncludeExtra(e.target.checked)} className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-slate-300" />
+                         <span className={`text-sm font-bold transition-colors ${includeExtra ? 'text-purple-700 dark:text-purple-400' : 'text-slate-500'}`}>Include Extra Hours / Overtime</span>
+                         {includeExtra && <Zap size={14} className="text-purple-500 animate-pulse" fill="currentColor" />}
+                      </label>
+                      
                       {includeExtra && (
-                          <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800 animate-in slide-in-from-top-2 duration-300">
-                             <label className="block text-xs font-bold text-purple-600 dark:text-purple-400 uppercase mb-2 tracking-wider">Overtime Duration</label>
+                          <div className="mt-3 bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800 animate-in slide-in-from-top-2 duration-300">
+                             <label className="block text-[10px] font-bold text-purple-600 uppercase mb-2">Overtime Duration</label>
                              <div className="flex gap-4">
                                 <div className="flex-1">
                                     <span className="text-[10px] text-slate-400 uppercase block mb-1">Hours</span>
-                                    <input type="number" min="0" className="w-full px-3 py-2 border border-purple-200 dark:border-purple-800 rounded-lg text-center dark:bg-slate-800 dark:text-white" value={extraInput.hours} onChange={e => setExtraInput({...extraInput, hours: e.target.value})} />
+                                    <input type="number" min="0" className="w-full px-3 py-2 border border-purple-200 dark:border-purple-800 rounded-lg text-center bg-white dark:bg-slate-800 dark:text-white" value={extraInput.hours} onChange={e => setExtraInput({...extraInput, hours: e.target.value})} />
                                 </div>
                                 <div className="flex-1">
                                     <span className="text-[10px] text-slate-400 uppercase block mb-1">Minutes</span>
-                                    <select className="w-full border border-purple-200 dark:border-purple-800 rounded-lg px-2 py-2 dark:bg-slate-800 dark:text-white" value={extraInput.minutes} onChange={e => setExtraInput({...extraInput, minutes: e.target.value})}>
+                                    <select className="w-full border border-purple-200 dark:border-purple-800 rounded-lg px-2 py-2 bg-white dark:bg-slate-800 dark:text-white" value={extraInput.minutes} onChange={e => setExtraInput({...extraInput, minutes: e.target.value})}>
                                        <option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
                                     </select>
                                 </div>
@@ -495,39 +482,40 @@ const TimeLogs = () => {
                       )}
                    </div>
 
-                   {/* Billable Toggle */}
-                   <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700">
-                      <div className="flex items-center gap-2">
-                          <DollarSign size={16} className="text-blue-500" />
+                   {/* Description Area */}
+                   <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Effort Description</label>
+                      <textarea 
+                        required 
+                        rows={5} 
+                        placeholder="Detail the work performed today..." 
+                        className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition shadow-sm resize-none" 
+                        value={formData.description} 
+                        onChange={e => setFormData({...formData, description: e.target.value})}
+                      />
+                   </div>
+
+                   {/* Billable Toggle (Matching Screenshot Style) */}
+                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                            <DollarSign size={18} className="text-blue-500" />
+                          </div>
                           <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Billable to Client</span>
                       </div>
-                      <div className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${formData.isBillable ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`} onClick={() => setFormData({...formData, isBillable: !formData.isBillable})}>
-                          <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform ${formData.isBillable ? 'translate-x-6' : ''}`} />
+                      <div className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all duration-300 ${formData.isBillable ? 'bg-blue-600 shadow-inner' : 'bg-slate-300 dark:bg-slate-600'}`} onClick={() => setFormData({...formData, isBillable: !formData.isBillable})}>
+                          <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${formData.isBillable ? 'translate-x-6' : ''}`} />
                       </div>
                    </div>
 
-                   <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
-                      <button type="button" onClick={() => setShowModal(false)} className="px-5 py-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-sm font-medium transition">Cancel</button>
-                      <button type="submit" className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2">
-                          <CheckCircle2 size={18}/> {editingId ? 'Update Log' : 'Save Entry'}
+                   {/* Footer Buttons */}
+                   <div className="pt-4 flex justify-end items-center gap-6 border-t border-slate-100 dark:border-slate-700">
+                      <button type="button" onClick={() => setShowModal(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm font-bold transition">Cancel</button>
+                      <button type="submit" className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-bold shadow-lg shadow-emerald-200 dark:shadow-none transition flex items-center gap-2">
+                          <CheckCircle2 size={20}/> {editingId ? 'Update Entry' : 'Save Entry'}
                       </button>
                    </div>
                 </form>
-             </div>
-          </div>
-       )}
-
-       {/* Delete Confirm */}
-       {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
-             <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-200 dark:border-slate-700 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-200">
-                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner"><AlertTriangle size={32} /></div>
-                <h3 className="font-bold text-xl text-slate-800 dark:text-white mb-2">Delete entry?</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">This unified record and its overtime data will be permanently removed.</p>
-                <div className="flex gap-3">
-                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition">Keep Entry</button>
-                    <button onClick={() => { if (itemToDelete) deleteTimeEntry(itemToDelete); setShowDeleteConfirm(false); }} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition shadow-md shadow-red-200 dark:shadow-none">Delete All</button>
-                </div>
              </div>
           </div>
        )}
