@@ -140,6 +140,54 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const { msalConfig } = await import("../services/authConfig");
         const pca = new PublicClientApplication(msalConfig);
         await pca.initialize();
+        
+        // Handle redirect promise on load
+        const result = await pca.handleRedirectPromise();
+        
+        // Also check if there's an active account already in session
+        const accounts = pca.getAllAccounts();
+        const activeAccount = result?.account || (accounts.length > 0 ? accounts[0] : null);
+
+        if (activeAccount) {
+            const email = activeAccount.username;
+            const name = activeAccount.name || email.split('@')[0];
+            const currentEmployees = await db.getEmployees();
+            
+            let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
+            
+            // Auto-provision user if not found (allows new Azure users to sign in)
+            if (!targetUser) {
+                console.log(`[Auth] Auto-provisioning new Azure user: ${email}`);
+                const newEmp: Employee = {
+                    id: `az-${Math.random().toString(36).substr(2, 9)}`,
+                    firstName: name.split(' ')[0],
+                    lastName: name.split(' ').slice(1).join(' ') || 'User',
+                    email: email,
+                    password: 'ms-auth-user', // Sentinel password
+                    role: 'Employee',
+                    department: 'General',
+                    joinDate: new Date().toISOString().split('T')[0],
+                    status: EmployeeStatus.ACTIVE,
+                    salary: 0,
+                    avatar: `https://i.pravatar.cc/150?u=${email}`,
+                    jobTitle: 'New Joiner (SSO)'
+                };
+                await db.addEmployee(newEmp);
+                targetUser = newEmp;
+                // Refresh local employee list
+                setEmployees(await db.getEmployees());
+            }
+
+            if (targetUser) {
+                setCurrentUser({ 
+                    id: targetUser.id, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
+                    role: targetUser.role.includes('HR') || targetUser.role.includes('Admin') ? UserRole.HR : targetUser.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+                    avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
+                    departmentId: targetUser.departmentId, projectIds: targetUser.projectIds,
+                    location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
+                });
+            }
+        }
         setMsalInstance(pca);
       } catch (err) { console.warn("MSAL initialization failed:", err); }
       setIsLoading(false);
@@ -163,7 +211,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentUser({ 
             id: user.id, name: `${user.firstName} ${user.lastName}`, email: user.email,
             role: user.role.includes('HR') || user.role.includes('Admin') ? UserRole.HR : user.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
-            avatar: user.avatar, managerId: user.managerId, jobTitle: user.role,
+            avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
             departmentId: user.departmentId, projectIds: user.projectIds,
             location: user.location, workLocation: user.workLocation, hireDate: user.joinDate
         });
@@ -178,28 +226,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!msalInstance) return false;
     try {
         const { loginRequest } = await import("../services/authConfig");
-        const response = await msalInstance.loginPopup(loginRequest);
-        if (response && response.account) {
-            const email = response.account.username;
-            const name = response.account.name || email.split('@')[0];
-            const currentEmployees = await db.getEmployees();
-            const existingUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
-            if (existingUser) {
-                setCurrentUser({ 
-                    id: existingUser.id, name: `${existingUser.firstName} ${existingUser.lastName}`, email: existingUser.email,
-                    role: existingUser.role.includes('HR') || existingUser.role.includes('Admin') ? UserRole.HR : existingUser.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
-                    avatar: existingUser.avatar, managerId: existingUser.managerId, jobTitle: existingUser.role,
-                    departmentId: existingUser.departmentId, projectIds: existingUser.projectIds,
-                    location: existingUser.location, workLocation: existingUser.workLocation, hireDate: existingUser.joinDate
-                });
-            }
-            return true;
-        }
-    } catch (error: any) { console.error("MS Login Error:", error); }
-    return false;
+        // loginRedirect restarts the page flow, handleRedirectPromise in useEffect picks it up
+        await msalInstance.loginRedirect(loginRequest);
+        return true;
+    } catch (error: any) { 
+        console.error("MS Redirect Login Error:", error); 
+        showToast("Microsoft Sign-In failed to initiate.", "error");
+        return false;
+    }
   };
 
-  const logout = () => { setCurrentUser(null); showToast('Logged out successfully', 'info'); };
+  const logout = async () => { 
+    if (msalInstance) {
+        try {
+            // Optional: Also logout from MSAL session
+            const accounts = msalInstance.getAllAccounts();
+            if (accounts.length > 0) {
+                await msalInstance.logoutRedirect({ postLogoutRedirectUri: window.location.origin });
+                return;
+            }
+        } catch (e) { console.warn("MSAL Logout failed", e); }
+    }
+    setCurrentUser(null); 
+    showToast('Logged out successfully', 'info'); 
+  };
+
   const forgotPassword = async (email: string): Promise<boolean> => { showToast('Reset link sent to your email', 'success'); return true; };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -269,10 +320,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(new Date());
-    // Find active or the most recent completed session for today
     const sessions = attendance.filter(a => a.employeeId === currentUser.id && a.date === todayStr);
     if (sessions.length === 0) return undefined;
-    // We want the current active one, or if all are checked out, the last one.
     const active = sessions.find(s => !s.checkOut);
     return active || sessions[sessions.length - 1];
   };
@@ -303,7 +352,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const checkOut = async (reason?: string) => {
     if (!currentUser) return;
     const todayRec = getTodayAttendance();
-    // Cannot checkout if no record or already checked out
     if (!todayRec || todayRec.checkOut) return;
     const now = new Date();
     const start = new Date(todayRec.checkInTime || now.toISOString());

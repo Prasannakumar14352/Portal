@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Lock } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Lock, Zap } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -38,32 +38,39 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [earlyReason, setEarlyReason] = useState('');
   const [showTimeLogModal, setShowTimeLogModal] = useState(false);
   const [pendingCheckoutAction, setPendingCheckoutAction] = useState<'normal' | 'early' | null>(null);
-  const [logForm, setLogForm] = useState({ projectId: '', task: '', hours: '8', minutes: '00', description: '' });
+  
+  const [logForm, setLogForm] = useState({ 
+    projectId: '', 
+    task: '', 
+    hours: '8', 
+    minutes: '00', 
+    description: '',
+    includeExtra: false,
+    extraHours: '0',
+    extraMinutes: '00'
+  });
+  
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [editForm, setEditForm] = useState({ checkIn: '', checkOut: '' });
-  const [isCustomTask, setIsCustomTask] = useState(false);
 
-  // Derive today's record directly from props to ensure reactivity
   const todayRecord = useMemo(() => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(currentTime);
-    
-    // Find all sessions for today for this user
     const sessions = records.filter(r => r.employeeId === currentUser.id && r.date === todayStr);
     if (sessions.length === 0) return undefined;
-    
-    // Priority 1: session without a checkOut (Currently clocked in)
     const active = sessions.find(r => !r.checkOut);
     if (active) return active;
-    
-    // Priority 2: the most recent completed session of today
     return sessions[sessions.length - 1];
-  }, [records, currentUser, currentTime.getDate()]); // Sync when day changes or records update
+  }, [records, currentUser, currentTime.getDate()]);
 
   const isHR = currentUser?.role === UserRole.HR;
+  
   const userProjects = useMemo(() => projects.filter(p => p.status === 'Active'), [projects]);
-  const selectedProjectTasks = useMemo(() => projects.find(p => p.id === logForm.projectId)?.tasks || [], [logForm.projectId, projects]);
+  const selectedProjectTasks = useMemo(() => {
+    if (!logForm.projectId || logForm.projectId === 'NO_PROJECT') return ['General Administration', 'Internal Meeting', 'Documentation', 'Support'];
+    return projects.find(p => p.id === logForm.projectId)?.tasks || [];
+  }, [logForm.projectId, projects]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -84,29 +91,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const elapsedHours = elapsedMs / (1000 * 60 * 60);
   const isEarlyLogout = elapsedHours < 9;
 
-  const getDurationHours = (record: AttendanceRecord): number => {
-    if (!record.checkInTime || !record.checkOutTime) return 0;
-    const diffMs = new Date(record.checkOutTime).getTime() - new Date(record.checkInTime).getTime();
-    return diffMs > 0 ? diffMs / (1000 * 60 * 60) : 0;
-  };
-
   const calculateDuration = (record: AttendanceRecord) => {
-    const hrs = getDurationHours(record);
-    if (hrs === 0) return '--';
+    if (!record.checkInTime || !record.checkOutTime) return '--';
+    const hrs = (new Date(record.checkOutTime).getTime() - new Date(record.checkInTime).getTime()) / (1000 * 60 * 60);
     const diffHrs = Math.floor(hrs);
     const diffMins = Math.floor((hrs % 1) * 60);
     return `${diffHrs}h ${diffMins}m`;
-  };
-
-  const getAllDatesInRange = (start: string, end: string) => {
-      const dates = [];
-      const curr = new Date(start);
-      const last = new Date(end);
-      while (curr <= last) {
-          dates.push(formatDateISO(curr));
-          curr.setDate(curr.getDate() + 1);
-      }
-      return dates;
   };
 
   const handleCheckOutClick = () => {
@@ -116,8 +106,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     const actionType = isEarlyLogout ? 'early' : 'normal';
     if (!hasLog) {
         setPendingCheckoutAction(actionType);
-        setLogForm({ projectId: '', task: '', hours: '8', minutes: '00', description: '' });
-        setIsCustomTask(false);
+        setLogForm({ projectId: '', task: '', hours: '8', minutes: '00', description: '', includeExtra: false, extraHours: '0', extraMinutes: '00' });
         setShowTimeLogModal(true);
         return;
     }
@@ -132,9 +121,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     e.preventDefault();
     if (!currentUser) return;
     const duration = (parseInt(logForm.hours) || 0) * 60 + (parseInt(logForm.minutes) || 0);
+    const extraDuration = logForm.includeExtra ? (parseInt(logForm.extraHours) || 0) * 60 + (parseInt(logForm.extraMinutes) || 0) : 0;
+    
     await addTimeEntry({
       userId: currentUser.id, projectId: logForm.projectId === 'NO_PROJECT' ? '' : logForm.projectId,
       task: logForm.task, date: formatDateISO(new Date()), durationMinutes: duration,
+      extraMinutes: extraDuration,
       description: logForm.description, status: 'Pending', isBillable: true
     });
     setShowTimeLogModal(false);
@@ -151,7 +143,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   const openEditModal = (record: AttendanceRecord) => {
       setEditingRecord(record);
-      // Native time input expects HH:mm (24h) string
       const cin = record.checkInTime ? new Date(record.checkInTime).toTimeString().substring(0, 5) : '';
       const cout = record.checkOutTime ? new Date(record.checkOutTime).toTimeString().substring(0, 5) : '';
       setEditForm({ checkIn: cin, checkOut: cout });
@@ -165,67 +156,26 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       const newCheckInISO = editForm.checkIn ? new Date(`${datePart}T${editForm.checkIn}:00`).toISOString() : undefined;
       const newCheckOutISO = editForm.checkOut ? new Date(`${datePart}T${editForm.checkOut}:00`).toISOString() : undefined;
       const fmtTime = (iso: string | undefined) => iso ? formatTime12(new Date(iso)) : '--:--';
-
-      const updatedRecord: AttendanceRecord = {
-          ...editingRecord,
-          checkIn: fmtTime(newCheckInISO), checkInTime: newCheckInISO,
-          checkOut: fmtTime(newCheckOutISO), checkOutTime: newCheckOutISO,
-          status: editingRecord.status
-      };
-      if (newCheckInISO && newCheckOutISO) {
-          if (((new Date(newCheckOutISO).getTime() - new Date(newCheckInISO).getTime()) / (1000 * 60 * 60)) >= 9) updatedRecord.status = 'Present';
-      }
+      const updatedRecord: AttendanceRecord = { ...editingRecord, checkIn: fmtTime(newCheckInISO), checkInTime: newCheckInISO, checkOut: fmtTime(newCheckOutISO), checkOutTime: newCheckOutISO };
       await updateAttendanceRecord(updatedRecord);
       setShowEditModal(false);
       setEditingRecord(null);
   };
 
-  const processedRecords = useMemo(() => {
-      let baseRecords = records;
-      if (searchName) baseRecords = baseRecords.filter(r => r.employeeName.toLowerCase().includes(searchName.toLowerCase()));
-      let employeesToDisplay: { id: string, name: string, workLocation?: string }[] = [];
-      if (!isHR) {
-          if (currentUser) {
-              const emp = employees.find(e => e.id === currentUser.id);
-              employeesToDisplay = [emp ? { id: emp.id, name: `${emp.firstName} ${emp.lastName}`, workLocation: emp.workLocation } : { id: currentUser.id, name: currentUser.name, workLocation: currentUser.workLocation }];
-          }
-      } else {
-          let srcEmps = employees;
-          if (searchName) srcEmps = srcEmps.filter(e => `${e.firstName} ${e.lastName}`.toLowerCase().includes(searchName.toLowerCase()));
-          employeesToDisplay = srcEmps.map(e => ({ id: e.id, name: `${e.firstName} ${e.lastName}`, workLocation: e.workLocation }));
-      }
-
-      let finalRows: any[] = [];
-      const sDate = startDate || formatDateISO(new Date());
-      const eDate = endDate || formatDateISO(new Date());
-      const rangeDates = getAllDatesInRange(sDate, eDate);
-      const todayStr = formatDateISO(new Date());
-      const recordMap: Record<string, Record<string, AttendanceRecord>> = {};
-      baseRecords.forEach(r => { if (!recordMap[r.date]) recordMap[r.date] = {}; recordMap[r.date][r.employeeId] = r; });
-
-      rangeDates.forEach(dateStr => {
-          const isPast = dateStr < todayStr;
-          employeesToDisplay.forEach(emp => {
-              const existing = recordMap[dateStr]?.[emp.id];
-              if (existing) finalRows.push(existing);
-              else if (isPast) finalRows.push({ id: `absent-${dateStr}-${emp.id}`, employeeId: emp.id, employeeName: emp.name, date: dateStr, checkIn: '--:--', checkOut: '--:--', status: 'Absent', workLocation: emp.workLocation || 'Office HQ India', isGhost: true } as AttendanceRecord);
-          });
-      });
-      return finalRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [records, startDate, endDate, searchName, isHR, currentUser, employees]);
-
-  useEffect(() => { setCurrentPage(1); }, [searchName, startDate, endDate, itemsPerPage]);
-  const totalPages = Math.ceil(processedRecords.length / itemsPerPage);
-  const paginatedRecords = processedRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedRecords = useMemo(() => {
+    let filtered = records;
+    if (searchName) filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(searchName.toLowerCase()));
+    if (!isHR && currentUser) filtered = filtered.filter(r => r.employeeId === currentUser.id);
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [records, searchName, isHR, currentUser, currentPage, itemsPerPage]);
 
   return (
     <div className="space-y-6">
+      {/* Clock & Status Section */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col lg:flex-row justify-between items-center gap-6">
          <div className="text-center lg:text-left">
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Attendance Tracker</h2>
-            <p className="text-slate-500 dark:text-slate-400">Manage your daily work hours.</p>
-            <div className="mt-2 text-3xl font-mono text-slate-700 dark:text-slate-200 font-semibold tracking-wider uppercase">
-               {/* 12-hour format clock */}
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Attendance</h2>
+            <div className="mt-2 text-3xl font-mono text-slate-700 dark:text-slate-200 font-semibold uppercase">
                {currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).toLowerCase()}
             </div>
             <p className="text-sm text-slate-400">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
@@ -233,91 +183,152 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
          <div className="flex flex-col items-center gap-3">
              {!todayRecord ? (
-                <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-emerald-50 dark:bg-emerald-900/30 rounded-full border-4 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:scale-105 transition-all group cursor-pointer shadow-sm">
-                   <PlayCircle size={48} className="text-emerald-600 dark:text-emerald-400 mb-2 group-hover:text-emerald-700 dark:group-hover:text-emerald-300" />
-                   <span className="font-bold text-emerald-700 dark:text-emerald-400">Check In</span>
+                <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-36 h-36 bg-emerald-50 dark:bg-emerald-900/30 rounded-full border-4 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer">
+                   <PlayCircle size={40} className="text-emerald-600 mb-2" />
+                   <span className="font-bold text-emerald-700">Check In</span>
                 </button>
              ) : todayRecord.checkOut ? (
-                <div className="flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 bg-gray-50 dark:bg-slate-700/50 rounded-full border-4 border-gray-100 dark:border-slate-600">
-                   <CheckCircle2 size={48} className="text-emerald-500 dark:text-emerald-400 mb-2" />
-                   <span className="font-bold text-gray-500 dark:text-gray-400">Completed</span>
-                   <span className="text-xs text-gray-400 dark:text-gray-500">Day finalized</span>
+                <div className="flex flex-col items-center justify-center w-36 h-36 bg-gray-50 dark:bg-slate-700/50 rounded-full border-4 border-gray-100">
+                   <CheckCircle2 size={40} className="text-emerald-500 mb-2" />
+                   <span className="font-bold text-gray-500">Done</span>
                 </div>
              ) : (
-                <button onClick={handleCheckOutClick} className={`flex flex-col items-center justify-center w-36 h-36 md:w-40 md:h-40 rounded-full border-4 hover:scale-105 transition-all group cursor-pointer shadow-sm ${isEarlyLogout ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800 hover:bg-amber-100' : 'bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800 hover:bg-red-100'}`}>
-                   <StopCircle size={48} className={`mb-2 ${isEarlyLogout ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`} />
-                   <span className={`font-bold ${isEarlyLogout ? 'text-amber-700' : 'text-red-700'}`}>{isEarlyLogout ? 'Early Logout' : 'Check Out'}</span>
+                <button onClick={handleCheckOutClick} className={`flex flex-col items-center justify-center w-36 h-36 rounded-full border-4 hover:scale-105 transition-all cursor-pointer ${isEarlyLogout ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'}`}>
+                   <StopCircle size={40} className={`${isEarlyLogout ? 'text-amber-600' : 'text-red-600'} mb-2`} />
+                   <span className="font-bold">{isEarlyLogout ? 'Early Out' : 'Check Out'}</span>
                    <span className="text-xs text-slate-500">{Math.floor(elapsedHours)}h {Math.floor((elapsedHours % 1) * 60)}m</span>
                 </button>
              )}
          </div>
 
-         <div className="w-full lg:w-auto bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600 min-w-[200px]">
-            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2 uppercase">Today's Session</h4>
+         <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border min-w-[200px]">
+            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Today</h4>
             <div className="space-y-2 text-sm">
-               <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Check In:</span><span className="font-medium text-slate-800 dark:text-white uppercase">{todayRecord?.checkIn || '--:--'}</span></div>
-               <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Check Out:</span><span className="font-medium text-slate-800 dark:text-white uppercase">{todayRecord?.checkOut || '--:--'}</span></div>
-               <div className="flex justify-between border-t border-slate-200 dark:border-slate-600 pt-2 mt-2"><span className="text-slate-500 dark:text-slate-400">Status:</span><span className={`font-bold ${todayRecord?.checkOut ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{todayRecord?.checkOut ? 'Completed' : (todayRecord ? 'Active' : 'Pending')}</span></div>
+               <div className="flex justify-between"><span>Check In:</span><span className="font-bold uppercase">{todayRecord?.checkIn || '--:--'}</span></div>
+               <div className="flex justify-between"><span>Check Out:</span><span className="font-bold uppercase">{todayRecord?.checkOut || '--:--'}</span></div>
             </div>
          </div>
       </div>
 
-      <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Update Attendance Record" width="max-w-md">
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Check In Time</label><input type="time" required className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} /></div>
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Check Out Time</label><input type="time" required className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} /></div>
-              <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-slate-600 rounded-lg text-sm">Cancel</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Update Record</button></div>
+      {/* Checkout Time Log Modal - Standardized with scrollbars and subtask logic */}
+      <DraggableModal 
+        isOpen={showTimeLogModal} 
+        onClose={() => setShowTimeLogModal(false)} 
+        title="Quick Time Log" 
+        width="max-w-lg"
+      >
+          <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-start gap-2 mb-6">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
+              <p className="text-xs text-amber-800">You must log your work hours before checking out.</p>
+          </div>
+          <form onSubmit={handleQuickLogSubmit} className="space-y-5">
+              <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Project</label>
+                  <select required className="w-full px-3 py-2.5 border rounded-xl text-sm outline-none dark:bg-slate-700 bg-white dark:text-white transition shadow-sm" value={logForm.projectId} onChange={e => setLogForm({...logForm, projectId: e.target.value, task: ''})}>
+                    <option value="" disabled>Choose project...</option>
+                    {userProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    <option value="NO_PROJECT">General / Administration</option>
+                  </select>
+              </div>
+              <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Work Done (Subtask)</label>
+                  <select required className="w-full px-3 py-2.5 border rounded-xl text-sm outline-none dark:bg-slate-700 bg-white dark:text-white transition shadow-sm" value={logForm.task} onChange={e => setLogForm({...logForm, task: e.target.value})}>
+                    <option value="" disabled>Select subtask...</option>
+                    {selectedProjectTasks.map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="Other">Other (Custom)</option>
+                  </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Standard Hours</label>
+                    <div className="flex gap-2">
+                        <input type="number" min="0" className="w-full px-2 py-2 border rounded-xl text-center dark:bg-slate-700" value={logForm.hours} onChange={e => setLogForm({...logForm, hours: e.target.value})} />
+                        <span className="self-center">:</span>
+                        <select className="w-full border rounded-xl px-2 py-2 dark:bg-slate-700" value={logForm.minutes} onChange={e => setLogForm({...logForm, minutes: e.target.value})}>
+                           <option value="00">00</option><option value="30">30</option>
+                        </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center pt-5">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                         <input type="checkbox" checked={logForm.includeExtra} onChange={(e) => setLogForm({...logForm, includeExtra: e.target.checked})} className="w-4 h-4 text-purple-600 rounded" />
+                         <span className="text-xs font-bold text-slate-500">Overtime?</span>
+                      </label>
+                  </div>
+              </div>
+              {logForm.includeExtra && (
+                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 dark:bg-purple-900/20 dark:border-purple-800 animate-in slide-in-from-top-2">
+                     <label className="block text-[10px] font-bold text-purple-600 uppercase mb-2">Overtime Duration</label>
+                     <div className="flex gap-4">
+                        <input type="number" placeholder="HH" className="w-full px-3 py-2 border rounded-lg text-center dark:bg-slate-800 dark:text-white" value={logForm.extraHours} onChange={e => setLogForm({...logForm, extraHours: e.target.value})} />
+                        <select className="w-full border rounded-lg px-2 py-2 dark:bg-slate-800 dark:text-white" value={logForm.extraMinutes} onChange={e => setLogForm({...logForm, extraMinutes: e.target.value})}>
+                           <option value="00">00</option><option value="30">30</option>
+                        </select>
+                     </div>
+                  </div>
+              )}
+              <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Effort Description</label>
+                  <textarea 
+                    required 
+                    rows={5} 
+                    className="w-full px-4 py-3 border rounded-xl text-sm outline-none dark:bg-slate-700 bg-white dark:text-white resize-none custom-scrollbar" 
+                    value={logForm.description} 
+                    onChange={e => setLogForm({...logForm, description: e.target.value})}
+                    placeholder="Provide details about your achievements today..."
+                  />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+                  <button type="button" onClick={() => setShowTimeLogModal(false)} className="px-4 py-2 text-slate-400 font-bold hover:text-slate-600">Cancel</button>
+                  <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg hover:bg-emerald-700 transition">Save & Checkout</button>
+              </div>
           </form>
       </DraggableModal>
 
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-        <div className="sm:col-span-2">
-           <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Search Employee</label>
-           <div className="relative">
-             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-             <input type="text" placeholder="Search by name..." value={searchName} onChange={(e) => setSearchName(e.target.value)} disabled={!isHR} className={`w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white ${!isHR ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 cursor-not-allowed' : ''}`} />
-           </div>
-        </div>
-        <div><label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Start Date</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" /></div>
-        <div><label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">End Date</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white" /></div>
-      </div>
+      {/* Early Logout Modal */}
+      <DraggableModal isOpen={showEarlyReasonModal} onClose={() => setShowEarlyReasonModal(false)} title="Early Checkout" width="max-w-md">
+          <div className="text-center mb-6">
+              <Hourglass className="text-amber-500 mx-auto mb-4" />
+              <p className="text-sm text-slate-600 dark:text-slate-400">Please provide a reason for leaving before the 9-hour mark.</p>
+          </div>
+          <form onSubmit={handleEarlyReasonSubmit} className="space-y-4">
+              <textarea required rows={3} className="w-full px-4 py-3 border rounded-xl text-sm dark:bg-slate-700 bg-white dark:text-white" placeholder="Reason for early departure..." value={earlyReason} onChange={e => setEarlyReason(e.target.value)} />
+              <button type="submit" className="w-full py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-colors">Submit & Checkout</button>
+          </form>
+      </DraggableModal>
 
+      {/* Attendance Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
+          <table className="w-full text-left min-w-[800px]">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold">
-                <th className="px-6 py-4">Employee</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Check In</th><th className="px-6 py-4">Check Out</th><th className="px-6 py-4">Total Hours</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-center">Action</th>
+              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-xs uppercase border-b">
+                <th className="px-6 py-4">Employee</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Session</th><th className="px-6 py-4">Duration</th><th className="px-6 py-4 text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {paginatedRecords.map((record, index) => {
-                const isGhost = (record as any).isGhost;
-                return (
-                <tr key={record.id || index} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isGhost ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {paginatedRecords.map((record, index) => (
+                <tr key={record.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{record.employeeName}</td>
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{record.date}</td>
-                  <td className="px-6 py-4"><div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 uppercase">{!isGhost && <div className="w-2 h-2 rounded-full bg-emerald-500"></div>}<span>{record.checkIn}</span></div></td>
-                  <td className="px-6 py-4"><div className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 uppercase">{record.checkOut && !isGhost ? (<><div className="w-2 h-2 rounded-full bg-orange-400"></div><span>{record.checkOut}</span></>) : !isGhost ? (<span className="text-slate-400 text-xs italic">Active</span>) : (<span>--:--</span>)}</div></td>
+                  <td className="px-6 py-4 uppercase text-xs text-slate-700 dark:text-slate-300">{record.checkIn} - {record.checkOut || '--:--'}</td>
                   <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">{calculateDuration(record)}</td>
-                  <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-semibold ${record.status === 'Present' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{record.status}</span></td>
-                  <td className="px-6 py-4 text-center">{(isHR || (formatDateISO(new Date(record.date)) === formatDateISO(new Date()))) ? (<button onClick={() => openEditModal(record)} className="p-1.5 text-slate-500 hover:text-emerald-600 rounded"><Edit2 size={16} /></button>) : <Lock size={16} className="text-slate-300 mx-auto"/>}</td>
+                  <td className="px-6 py-4 text-center">{isHR ? <button onClick={() => openEditModal(record)} className="p-1.5 text-slate-400 hover:text-emerald-600"><Edit2 size={16} /></button> : '-'}</td>
                 </tr>
-              )})}
+              ))}
             </tbody>
           </table>
         </div>
-        <div className="flex justify-between items-center p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-             <span>Show</span><select value={itemsPerPage} onChange={(e) => setItemsPerPage(Number(e.target.value))} className="border rounded p-1 bg-white dark:bg-slate-800"><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select><span>per page</span>
-           </div>
-           <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded border border-slate-300 disabled:opacity-50"><ChevronLeft size={16} /></button>
-              <span className="text-xs font-medium px-2">Page {currentPage} of {totalPages || 1}</span>
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="p-1.5 rounded border border-slate-300 disabled:opacity-50"><ChevronRight size={16} /></button>
-           </div>
-        </div>
       </div>
+
+      {/* Manual Edit Modal */}
+      <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Record" width="max-w-md">
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div><label className="block text-sm font-medium">Check In</label><input type="time" className="w-full p-2 border rounded" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} /></div>
+              <div><label className="block text-sm font-medium">Check Out</label><input type="time" className="w-full p-2 border rounded" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} /></div>
+              <button type="submit" className="w-full py-2 bg-emerald-600 text-white rounded font-bold">Update</button>
+          </form>
+      </DraggableModal>
     </div>
   );
 };
