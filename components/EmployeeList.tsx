@@ -272,7 +272,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       onUpdateEmployee(updatedData);
       closeModal();
     } else {
-      const nextId = employees.length > 0 ? Math.max(...employees.map(e => Number(e.id))) + 1 : 1001;
+      // Robust nextId calculation that handles potential non-numeric string IDs
+      const numericIds = employees.map(emp => Number(emp.id)).filter(id => !isNaN(id));
+      const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+      
       const newPassword = generatePassword();
       const newEmployee: Employee = {
         id: nextId,

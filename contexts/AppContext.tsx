@@ -167,11 +167,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     password: 'ms-auth-user', 
                     role: 'Employee',
                     department: 'General',
+                    departmentId: '', // Default empty for required SQL field
+                    projectIds: [],   // Default empty for required SQL field
+                    managerId: '',    // Default empty for required SQL field
                     joinDate: new Date().toISOString().split('T')[0],
                     status: EmployeeStatus.ACTIVE,
                     salary: 0,
                     avatar: `https://i.pravatar.cc/150?u=${email}`,
-                    jobTitle: 'New Joiner (SSO)'
+                    jobTitle: 'New Joiner (SSO)',
+                    phone: '',
+                    workLocation: 'Office HQ India'
                 };
                 await db.addEmployee(newEmp);
                 targetUser = newEmp;
