@@ -1,19 +1,19 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Calendar, Trash2, Plus, Edit2, UploadCloud, FileSpreadsheet, Info, Sun, Moon, ChevronDown, X, Clock, PartyPopper, BookOpen } from 'lucide-react';
+import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
-import { read, utils } from 'xlsx';
 import DraggableModal from './DraggableModal';
 
 const getDateParts = (dateStr: string) => {
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return { day: '?', month: '???', full: 'Invalid Date', dayName: '' };
+    if (isNaN(date.getTime())) return { day: '?', month: '???', full: 'Invalid Date', dayName: '', dayOfWeek: -1 };
     return {
         day: date.getDate(),
         month: date.toLocaleString('default', { month: 'short' }).toUpperCase(),
         full: date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-        dayName: date.toLocaleDateString('en-US', { weekday: 'long' })
+        dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
+        dayOfWeek: date.getDay()
     };
 };
 
@@ -72,12 +72,27 @@ const Holidays = () => {
   const nextHoliday = upcomingHolidays[0];
 
   const stats = useMemo(() => {
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    
     const thisYearHolidays = holidays.filter(h => new Date(h.date).getFullYear() === currentYear);
+    
     return {
-      public: thisYearHolidays.filter(h => h.type === 'Public').length,
-      company: thisYearHolidays.filter(h => h.type === 'Company').length,
-      remaining: upcomingHolidays.length
+      total: thisYearHolidays.length,
+      upcoming: upcomingHolidays.length,
+      thisMonth: thisYearHolidays.filter(h => {
+        const d = new Date(h.date);
+        return d.getMonth() === currentMonth;
+      }).length,
+      weekdays: thisYearHolidays.filter(h => {
+        const day = new Date(h.date).getDay();
+        return day >= 1 && day <= 5;
+      }).length,
+      weekends: thisYearHolidays.filter(h => {
+        const day = new Date(h.date).getDay();
+        return day === 0 || day === 6;
+      }).length
     };
   }, [holidays, upcomingHolidays]);
 
@@ -106,7 +121,7 @@ const Holidays = () => {
        </div>
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-           {/* Main Column - Holiday List */}
+           {/* Main Column - Holiday List (Scrollable) */}
            <div className="lg:col-span-2 space-y-4">
                <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                  <Calendar className="text-emerald-600" size={20} />
@@ -118,7 +133,7 @@ const Holidays = () => {
                     <p className="text-slate-500 font-medium">No holidays scheduled yet.</p>
                  </div>
                ) : (
-                 <div className="space-y-4">
+                 <div className="max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar space-y-4">
                     {sortedHolidays.map(holiday => (
                         <HolidayCard key={holiday.id} holiday={holiday} isHR={isHR} onDelete={deleteHoliday} />
                     ))}
@@ -126,60 +141,80 @@ const Holidays = () => {
                )}
            </div>
 
-           {/* Side Column - Insights and Next Holiday */}
+           {/* Side Column - Metrics and Insights */}
            <div className="space-y-6">
-               {/* Next Holiday Card */}
+               {/* Next Holiday Card (Visual Highlight) */}
                {nextHoliday && (
-                 <div className="bg-emerald-600 rounded-2xl p-6 text-white shadow-lg shadow-emerald-200 dark:shadow-none relative overflow-hidden group transition-transform hover:scale-[1.02]">
-                    <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all"></div>
+                 <div className="bg-emerald-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
+                    <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
                     <div className="relative z-10">
                         <div className="flex items-center gap-2 mb-4">
                             <div className="p-2 bg-white/20 rounded-lg">
                                 <PartyPopper size={18} />
                             </div>
-                            <span className="text-xs font-bold uppercase tracking-wider opacity-90">Coming Up Next</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">Coming Up Next</span>
                         </div>
-                        <h4 className="text-2xl font-bold mb-1">{nextHoliday.name}</h4>
+                        <h4 className="text-2xl font-bold mb-1 leading-tight">{nextHoliday.name}</h4>
                         <p className="text-emerald-100 text-sm font-medium flex items-center gap-2">
                            <Clock size={14} />
-                           {new Date(nextHoliday.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', weekday: 'long' })}
+                           {new Date(nextHoliday.date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
                         </p>
                     </div>
                  </div>
                )}
 
-               {/* Summary Stats */}
+               {/* Calendar Summary Dashboard */}
                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-                    <BookOpen size={16} className="text-emerald-600" />
-                    2025 Calendar Summary
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                    <Calculator size={14} className="text-emerald-600" />
+                    2025 Holiday Analytics
                   </h4>
-                  <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                          <span className="text-sm text-slate-600 dark:text-slate-400">Public Holidays</span>
-                          <span className="font-bold text-slate-800 dark:text-white">{stats.public}</span>
+                  <div className="space-y-3">
+                      <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                          <span className="text-sm text-slate-600 dark:text-slate-400">Total Holidays</span>
+                          <span className="font-bold text-slate-800 dark:text-white text-lg">{stats.total}</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                          <span className="text-sm text-slate-600 dark:text-slate-400">Company Holidays</span>
-                          <span className="font-bold text-slate-800 dark:text-white">{stats.company}</span>
+                      <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                          <span className="text-sm text-slate-600 dark:text-slate-400">Upcoming This Year</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 text-lg">{stats.upcoming}</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30">
-                          <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">Remaining Holidays</span>
-                          <span className="font-bold text-emerald-700 dark:text-emerald-400">{stats.remaining}</span>
+                      <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                          <span className="text-sm text-slate-600 dark:text-slate-400">Occurring This Month</span>
+                          <span className="font-bold text-blue-600 dark:text-blue-400 text-lg">{stats.thisMonth}</span>
                       </div>
                   </div>
                </div>
 
+               {/* Weekday vs Weekend cards */}
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30 p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                          <CalendarDays size={16} className="text-blue-600 dark:text-blue-400" />
+                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-tighter">Weekdays</span>
+                      </div>
+                      <div className="text-2xl font-bold text-blue-800 dark:text-blue-100">{stats.weekdays}</div>
+                      <p className="text-[10px] text-blue-600/60 dark:text-blue-400/60 mt-1 font-medium">Mon - Fri</p>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-900/30 p-5 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                          <CalendarRange size={16} className="text-amber-600 dark:text-amber-400" />
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tighter">Weekends</span>
+                      </div>
+                      <div className="text-2xl font-bold text-amber-800 dark:text-amber-100">{stats.weekends}</div>
+                      <p className="text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1 font-medium">Sat & Sun</p>
+                  </div>
+               </div>
+
                {/* Info Card */}
-               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30 p-6">
+               <div className="bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
                   <div className="flex items-start gap-3">
-                      <Info className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" size={18} />
+                      <Info className="text-slate-400 mt-0.5 shrink-0" size={18} />
                       <div>
-                          <h4 className="text-sm font-bold text-blue-900 dark:text-blue-300 mb-2">Holiday Policy</h4>
-                          <ul className="text-xs text-blue-700 dark:text-blue-200 space-y-2 list-disc pl-4">
-                              <li>Public holidays are observed based on regional calendar.</li>
-                              <li>Company holidays are fixed corporate off-days.</li>
-                              <li>If a holiday falls on a weekend, no compensatory off is provided unless announced.</li>
+                          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">Holiday Policy</h4>
+                          <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-2 list-disc pl-4 leading-relaxed">
+                              <li>Public holidays follow regional calendar updates.</li>
+                              <li>Weekend holidays do not carry over unless officially notified.</li>
+                              <li>Company holidays are fixed and mandatory for all departments.</li>
                           </ul>
                       </div>
                   </div>
