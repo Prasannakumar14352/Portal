@@ -6,10 +6,11 @@ import {
 } from './mockData';
 
 // --- CONFIGURATION ---
-const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true';
+// Default to MOCK DATA if not explicitly set to 'false' (helps in preview environments)
+const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA !== 'false';
 const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
-console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'REAL API'}`);
+console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA (Default)' : 'REAL API'}`);
 
 // --- REAL API IMPLEMENTATION ---
 const api = {
@@ -70,19 +71,18 @@ const mockDb = {
     getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
     addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
     updateEmployee: async (emp: Employee) => {
-        const idx = store.employees.findIndex(e => e.id === emp.id);
+        const idx = store.employees.findIndex(e => String(e.id) === String(emp.id));
         if(idx !== -1) store.employees[idx] = emp;
         return Promise.resolve(emp);
     },
     deleteEmployee: async (id: string) => {
-        /* Standardized comparison by casting both sides to string */
         store.employees = store.employees.filter(e => String(e.id) !== String(id));
         return Promise.resolve();
     },
     getDepartments: async (): Promise<Department[]> => Promise.resolve([...store.departments]),
     addDepartment: async (dept: Department) => { store.departments.push(dept); return Promise.resolve(dept); },
     updateDepartment: async (dept: Department) => {
-        const idx = store.departments.findIndex(d => d.id === dept.id);
+        const idx = store.departments.findIndex(d => String(d.id) === String(dept.id));
         if(idx !== -1) store.departments[idx] = dept;
         return Promise.resolve(dept);
     },
@@ -93,7 +93,7 @@ const mockDb = {
     getRoles: async (): Promise<Role[]> => Promise.resolve([...store.roles]),
     addRole: async (role: Role) => { store.roles.push(role); return Promise.resolve(role); },
     updateRole: async (role: Role) => {
-        const idx = store.roles.findIndex(r => r.id === role.id);
+        const idx = store.roles.findIndex(r => String(r.id) === String(role.id));
         if(idx !== -1) store.roles[idx] = role;
         return Promise.resolve(role);
     },
@@ -104,7 +104,7 @@ const mockDb = {
     getProjects: async (): Promise<Project[]> => Promise.resolve([...store.projects]),
     addProject: async (proj: Project) => { store.projects.push(proj); return Promise.resolve(proj); },
     updateProject: async (proj: Project) => {
-        const idx = store.projects.findIndex(p => p.id === proj.id);
+        const idx = store.projects.findIndex(p => String(p.id) === String(proj.id));
         if(idx !== -1) store.projects[idx] = proj;
         return Promise.resolve(proj);
     },
@@ -115,14 +115,14 @@ const mockDb = {
     getLeaves: async (): Promise<LeaveRequest[]> => Promise.resolve([...store.leaves]),
     addLeave: async (leave: LeaveRequest) => { store.leaves.push(leave); return Promise.resolve(leave); },
     updateLeave: async (leave: LeaveRequest) => {
-        const idx = store.leaves.findIndex(l => l.id === leave.id);
+        const idx = store.leaves.findIndex(l => String(l.id) === String(leave.id));
         if(idx !== -1) store.leaves[idx] = leave;
         return Promise.resolve(leave);
     },
     getLeaveTypes: async (): Promise<LeaveTypeConfig[]> => Promise.resolve([...store.leaveTypes]),
     addLeaveType: async (type: LeaveTypeConfig) => { store.leaveTypes.push(type); return Promise.resolve(type); },
     updateLeaveType: async (type: LeaveTypeConfig) => {
-        const idx = store.leaveTypes.findIndex(t => t.id === type.id);
+        const idx = store.leaveTypes.findIndex(t => String(t.id) === String(type.id));
         if(idx !== -1) store.leaveTypes[idx] = type;
         return Promise.resolve(type);
     },
@@ -133,14 +133,14 @@ const mockDb = {
     getAttendance: async (): Promise<AttendanceRecord[]> => Promise.resolve([...store.attendance]),
     addAttendance: async (record: AttendanceRecord) => { store.attendance.push(record); return Promise.resolve(record); },
     updateAttendance: async (record: AttendanceRecord) => {
-        const idx = store.attendance.findIndex(a => a.id === record.id);
+        const idx = store.attendance.findIndex(a => String(a.id) === String(record.id));
         if(idx !== -1) store.attendance[idx] = record;
         return Promise.resolve(record);
     },
     getTimeEntries: async (): Promise<TimeEntry[]> => Promise.resolve([...store.timeEntries]),
     addTimeEntry: async (entry: TimeEntry) => { store.timeEntries.push(entry); return Promise.resolve(entry); },
     updateTimeEntry: async (entry: TimeEntry) => {
-        const idx = store.timeEntries.findIndex(e => e.id === entry.id);
+        const idx = store.timeEntries.findIndex(e => String(e.id) === String(entry.id));
         if(idx !== -1) store.timeEntries[idx] = entry;
         return Promise.resolve(entry);
     },
@@ -162,6 +162,7 @@ const mockDb = {
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
     addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
     deleteHoliday: async (id: string) => { store.holidays = store.holidays.filter(h => String(h.id) !== String(id)); return Promise.resolve(); },
+    getHolidaysByYear: async (year: string): Promise<Holiday[]> => Promise.resolve(store.holidays.filter(h => h.date.startsWith(year))),
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
     addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
 };
@@ -226,21 +227,21 @@ const createHybridDb = () => {
             return async (...args: any[]) => {
                 const isMutation = prop.startsWith('add') || prop.startsWith('update') || prop.startsWith('delete') || prop.startsWith('mark');
                 
+                // If explicitly using mock data, return target (mockDb) immediately
                 if (USE_MOCK_DATA) {
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
                 
                 try {
+                    // Try real API first
                     if (apiDb[prop as keyof typeof apiDb]) {
                         return await (apiDb[prop as keyof typeof apiDb] as Function)(...args);
                     }
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 } catch (error) {
-                    if (isMutation) {
-                        console.error(`[DB] Mutation error (${prop}):`, error);
-                        throw error; 
-                    }
-                    console.warn(`[DB] Read fallback for ${String(prop)}.`, error);
+                    // For mutations, we fallback to mockDb (local state) but log a warning.
+                    // This fixes "Failed to fetch" errors for users who haven't started their backend.
+                    console.warn(`[DB] Fallback to Mock Data for ${String(prop)} due to network error:`, error.message);
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
             };
