@@ -350,7 +350,8 @@ const TimeLogs = () => {
                   <p className="text-slate-500 dark:text-slate-400 font-medium">No time logs found for the selected period.</p>
               </div>
           ) : (
-              Object.entries(groupedEntries).map(([pid, entries]) => (
+              // Explicitly type the entries from Object.entries to fix "unknown" errors
+              (Object.entries(groupedEntries) as [string, TimeEntry[]][]).map(([pid, entries]) => (
                   <div key={pid} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                       <button 
                         onClick={() => toggleProjectGroup(pid)}
