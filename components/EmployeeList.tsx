@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -190,12 +190,17 @@ const LocationMap: React.FC<{
   );
 };
 
+type SortKey = 'name' | 'joinDate' | 'status' | 'id';
+
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
   const { currentUser, showToast, roles, departments } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -217,7 +222,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
 
   const isHR = currentUser?.role === UserRole.HR;
-  /* Standardized comparison for superadmin check by casting ID to string */
   const isSuperAdmin = String(currentUser?.id) === 'super1' || currentUser?.email === 'superadmin@empower.com';
   
   const canViewPasswords = isSuperAdmin || isHR;
@@ -230,7 +234,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   const getPhoneParts = (fullPhone: string | undefined) => {
     if (!fullPhone) return { code: '+91', number: '' };
-    // Fixed typo: removed space in 'sortedCodes'
     const sortedCodes = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
     const matched = sortedCodes.find(c => fullPhone.startsWith(c.code));
     if (matched) return { code: matched.code, number: fullPhone.slice(matched.code.length).trim() };
@@ -241,22 +244,64 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       setFormData(prev => ({ ...prev, phone: `${code} ${number}`.trim() }));
   };
 
-  const filteredEmployees = employees.filter(emp => {
-    const matchesSearch = 
-      emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.role.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = filterDept === 'All' || emp.department === filterDept;
-    const matchesStatus = filterStatus === 'All' || emp.status === filterStatus;
-    return matchesSearch && matchesDept && matchesStatus;
-  });
+  const handleSort = (key: SortKey) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterDept, filterStatus, itemsPerPage]);
+  const sortedAndFilteredEmployees = useMemo(() => {
+    let result = employees.filter(emp => {
+      const matchesSearch = 
+        emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.role.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDept = filterDept === 'All' || emp.department === filterDept;
+      const matchesStatus = filterStatus === 'All' || emp.status === filterStatus;
+      return matchesSearch && matchesDept && matchesStatus;
+    });
 
-  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-  const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    if (sortConfig !== null) {
+      result.sort((a, b) => {
+        let valA: any = '';
+        let valB: any = '';
+
+        switch (sortConfig.key) {
+          case 'name':
+            valA = `${a.firstName} ${a.lastName}`.toLowerCase();
+            valB = `${b.firstName} ${b.lastName}`.toLowerCase();
+            break;
+          case 'joinDate':
+            valA = new Date(a.joinDate).getTime();
+            valB = new Date(b.joinDate).getTime();
+            break;
+          case 'status':
+            valA = a.status.toLowerCase();
+            valB = b.status.toLowerCase();
+            break;
+          case 'id':
+            valA = Number(a.id);
+            valB = Number(b.id);
+            break;
+        }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [employees, searchTerm, filterDept, filterStatus, sortConfig]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterDept, filterStatus, itemsPerPage, sortConfig]);
+
+  const totalPages = Math.ceil(sortedAndFilteredEmployees.length / itemsPerPage);
+  const paginatedEmployees = sortedAndFilteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const generatePassword = () => {
       const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
@@ -272,7 +317,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       onUpdateEmployee(updatedData);
       closeModal();
     } else {
-      // Robust nextId calculation that handles potential non-numeric string IDs
       const numericIds = employees.map(emp => Number(emp.id)).filter(id => !isNaN(id));
       const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
       
@@ -281,7 +325,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         id: nextId,
         employeeId: formData.employeeId || `EMP${nextId}`,
         joinDate: new Date().toISOString().split('T')[0],
-        avatar: `https://picsum.photos/seed/${Math.random()}/100`,
+        // Updated: Standard placeholder instead of random image
+        avatar: formData.avatar || `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=0D9488&color=fff`,
         password: newPassword, 
         ...formData
       } as Employee;
@@ -343,27 +388,32 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
     setEditingEmployee(null);
   };
 
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (!sortConfig || sortConfig.key !== column) return <ArrowUpDown size={14} className="text-slate-300 ml-1" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-teal-500 ml-1" /> : <ChevronDown size={14} className="text-teal-500 ml-1" />;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Employee Directory</h2>
-          <p className="text-slate-500 dark:text-slate-400">Manage your team members and their account details.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Manage your team members and their account details.</p>
         </div>
         <div className="flex gap-2">
             {canViewPasswords && (
                 <button 
                   onClick={() => setShowPasswords(!showPasswords)}
-                  className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors shadow-sm"
+                  className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors shadow-sm text-sm"
                 >
-                    {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
                     <span>{showPasswords ? 'Hide Passwords' : 'Show Passwords'}</span>
                 </button>
             )}
             {isHR && (
             <button 
                 onClick={openAddModal}
-                className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+                className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg transition-colors shadow-sm text-sm"
             >
                 <Plus size={18} />
                 <span>Add Employee</span>
@@ -384,7 +434,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 placeholder="Search by ID, name, or role..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-sm bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-slate-900 placeholder-slate-400"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all shadow-sm bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-slate-900 placeholder-slate-400 text-sm"
               />
             </div>
 
@@ -396,7 +446,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 <select 
                   value={filterDept}
                   onChange={(e) => setFilterDept(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
                 >
                   <option value="All">All Departments</option>
                   {departments.map(dept => (
@@ -406,7 +456,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 <select 
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
+                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none hover:border-teal-400 transition-colors cursor-pointer shadow-sm w-full sm:w-auto"
                 >
                   <option value="All">All Status</option>
                   {Object.values(EmployeeStatus).map(status => (
@@ -420,64 +470,72 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
-                <th className="px-6 py-4">Employee</th>
-                <th className="px-6 py-4">ID</th>
+              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
+                <th className="px-6 py-4 cursor-pointer hover:text-teal-600 transition-colors" onClick={() => handleSort('name')}>
+                  <div className="flex items-center">Employee <SortIcon column="name" /></div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-teal-600 transition-colors" onClick={() => handleSort('id')}>
+                  <div className="flex items-center">ID <SortIcon column="id" /></div>
+                </th>
                 <th className="px-6 py-4">Role & Dept</th>
                 {canViewPasswords && showPasswords && <th className="px-6 py-4 text-red-600 dark:text-red-400">Password</th>}
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Join Date</th>
+                <th className="px-6 py-4 cursor-pointer hover:text-teal-600 transition-colors" onClick={() => handleSort('status')}>
+                  <div className="flex items-center">Status <SortIcon column="status" /></div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-teal-600 transition-colors" onClick={() => handleSort('joinDate')}>
+                  <div className="flex items-center">Join Date <SortIcon column="joinDate" /></div>
+                </th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {paginatedEmployees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
-                      <img src={emp.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-600" />
+                      <img src={emp.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-600 shadow-sm" />
                       <div>
-                        <div className="font-medium text-slate-900 dark:text-white">{emp.firstName} {emp.lastName}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">{emp.email}</div>
+                        <div className="font-bold text-slate-800 dark:text-white text-sm">{emp.firstName} {emp.lastName}</div>
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">{emp.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-200">
+                  <td className="px-6 py-4 text-xs font-black text-slate-500 dark:text-slate-400">
                     {emp.employeeId || emp.id}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-slate-900 dark:text-slate-200 font-medium">{emp.role}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{emp.department}</div>
+                    <div className="text-xs text-slate-900 dark:text-slate-200 font-bold">{emp.role}</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-tight">{emp.department}</div>
                   </td>
                   {canViewPasswords && showPasswords && (
-                      <td className="px-6 py-4 text-sm font-mono text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-900/20">
+                      <td className="px-6 py-4 text-xs font-mono text-red-600 dark:text-red-400 bg-red-50/30 dark:bg-red-900/10">
                           {emp.password}
                       </td>
                   )}
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center space-x-1
-                      ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 
-                        emp.status === EmployeeStatus.INACTIVE ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full 
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide inline-flex items-center space-x-1 border
+                      ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' : 
+                        emp.status === EmployeeStatus.INACTIVE ? 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' : 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800'}`}>
+                      <span className={`w-1 h-1 rounded-full 
                         ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-500' : 
                           emp.status === EmployeeStatus.INACTIVE ? 'bg-red-500' : 'bg-amber-500'}`}></span>
                       <span>{emp.status}</span>
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                  <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
                     {emp.joinDate}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1">
+                    <div className="flex items-center justify-end space-x-1">
+                      <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="View Profile">
                         <Eye size={16} />
                       </button>
                       {isHR && (
                         <>
-                          <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 p-1">
+                          <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 p-1.5 rounded hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors" title="Edit Employee">
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={() => openDeleteConfirm(emp.id)} className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1">
+                          <button onClick={() => openDeleteConfirm(emp.id)} className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Record">
                             <Trash2 size={16} />
                           </button>
                         </>
@@ -488,8 +546,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               ))}
               {paginatedEmployees.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
-                    No employees found matching your filters.
+                  <td colSpan={canViewPasswords && showPasswords ? 8 : 7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500 italic">
+                    <div className="flex flex-col items-center">
+                      <Search size={32} className="mb-2 opacity-20" />
+                      <p>No employees found matching your criteria.</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -498,23 +559,23 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         </div>
         {/* Pagination */}
         <div className="flex justify-between items-center p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+           <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
              <span>Show</span>
              <select 
                value={itemsPerPage}
                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-               className="border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-800"
+               className="border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-800 outline-none"
              >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
                 <option value={20}>20</option>
              </select>
-             <span>per page</span>
+             <span className="hidden sm:inline">per page</span>
            </div>
-           <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-50 hover:bg-white dark:hover:bg-slate-700"><ChevronLeft size={16} /></button>
-              <span className="text-xs font-medium px-2">Page {currentPage} of {totalPages || 1}</span>
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-50 hover:bg-white dark:hover:bg-slate-700"><ChevronRight size={16} /></button>
+           <div className="flex items-center gap-3">
+              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-700 transition-colors shadow-sm"><ChevronLeft size={16} /></button>
+              <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">Page {currentPage} of {totalPages || 1}</span>
+              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-700 transition-colors shadow-sm"><ChevronRight size={16} /></button>
            </div>
         </div>
       </div>
@@ -523,27 +584,43 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       <DraggableModal isOpen={showViewModal} onClose={() => setShowViewModal(false)} title="Employee Details" width="max-w-2xl">
         {viewingEmployee && (
           <div className="px-2 pb-4">
-             <div className="relative flex items-center gap-4 mb-6">
-                <img src={viewingEmployee.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-slate-100 dark:border-slate-700 shadow-sm object-cover" />
+             <div className="relative flex items-center gap-6 mb-8">
+                <img src={viewingEmployee.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-slate-100 dark:border-slate-700 shadow-lg object-cover" />
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
-                  <p className="text-slate-500 dark:text-slate-400 font-medium">{viewingEmployee.role} • {viewingEmployee.department}</p>
-                  <p className="text-xs font-bold text-emerald-600 mt-1 uppercase tracking-widest">ID: {viewingEmployee.employeeId || viewingEmployee.id}</p>
+                  <h3 className="text-2xl font-black text-slate-800 dark:text-white leading-tight">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+                  <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs mt-1">{viewingEmployee.role} • {viewingEmployee.department}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[10px] font-black bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 px-2 py-0.5 rounded border border-teal-100 dark:border-teal-800 tracking-widest uppercase">ID: {viewingEmployee.employeeId || viewingEmployee.id}</span>
+                    <span className="text-[10px] font-black bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 tracking-widest uppercase">Joined {viewingEmployee.joinDate}</span>
+                  </div>
                 </div>
              </div>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Contact Info</h4>
-                   <div className="flex items-center gap-3 text-sm"><Mail size={16} className="text-slate-400"/> {viewingEmployee.email}</div>
-                   <div className="flex items-center gap-3 text-sm"><Phone size={16} className="text-slate-400"/> {viewingEmployee.phone || 'N/A'}</div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-5">
+                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2 dark:border-slate-700">Contact Interface</h4>
+                   <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+                      <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50"><Mail size={16} className="text-teal-600"/></div>
+                      <span>{viewingEmployee.email}</span>
+                   </div>
+                   <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+                      <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50"><Phone size={16} className="text-teal-600"/></div>
+                      <span>{viewingEmployee.phone || 'Communication Line Undefined'}</span>
+                   </div>
+                   <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+                      <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50"><Briefcase size={16} className="text-teal-600"/></div>
+                      <span>{viewingEmployee.workLocation || 'Standard Office Base'}</span>
+                   </div>
                 </div>
-                <div className="space-y-4">
-                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Home Location</h4>
-                   <div className="h-40 rounded-lg overflow-hidden border">
+                <div className="space-y-5">
+                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2 dark:border-slate-700">Geospatial Marker</h4>
+                   <div className="h-40 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
                       <LocationMap location={viewingEmployee.location} readOnly={true} />
                    </div>
-                   <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0"/> {viewingEmployee.location?.address || 'No address set'}</p>
+                   <p className="text-[11px] text-slate-500 font-medium flex items-start gap-2 leading-relaxed">
+                      <MapPin size={12} className="mt-0.5 shrink-0 text-red-500"/> 
+                      {viewingEmployee.location?.address || 'Geolocation data unavailable for this node.'}
+                   </p>
                 </div>
              </div>
           </div>
@@ -551,69 +628,71 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </DraggableModal>
 
       {/* CREATE/EDIT MODAL */}
-      <DraggableModal isOpen={showModal} onClose={closeModal} title={editingEmployee ? 'Edit Employee' : 'Add New Employee'} width="max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <DraggableModal isOpen={showModal} onClose={closeModal} title={editingEmployee ? 'Edit Employee' : 'Add Employee'} width="max-w-2xl">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">First Name</label>
-              <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:text-white outline-none" />
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label>
+              <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all" placeholder="e.g. John" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Last Name</label>
-              <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:text-white outline-none" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Employee ID</label>
-              <div className="relative">
-                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input required type="text" placeholder="e.g. EMP001" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value})} className="w-full pl-10 pr-3 py-2 border rounded-lg dark:bg-slate-700 dark:text-white outline-none" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-10 pr-3 py-2 border rounded-lg dark:bg-slate-700 dark:text-white outline-none" />
-              </div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label>
+              <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all" placeholder="e.g. Doe" />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role</label>
-              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:text-white outline-none">
-                 <option value="" disabled>Select Role</option>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Employee ID</label>
+              <div className="relative">
+                <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input required type="text" placeholder="EMP_XXXX" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all font-mono" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all" placeholder="name@nexus.corp" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Role</label>
+              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all">
+                 <option value="" disabled>Select Role...</option>
                  {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
-              <select required value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700 dark:text-white outline-none">
-                <option value="" disabled>Select Department</option>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project</label>
+              <select required value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all">
+                <option value="" disabled>Select Department...</option>
                 {departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="pt-4 flex justify-end space-x-3">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-slate-700 dark:text-slate-300">Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800">Save</button>
+          <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
+            <button type="button" onClick={closeModal} className="px-6 py-2.5 text-xs font-black text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors uppercase tracking-widest">Cancel</button>
+            <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all font-bold text-xs shadow-lg shadow-teal-500/20 uppercase tracking-widest">{editingEmployee ? 'Update Employee' : 'Create Employee'}</button>
           </div>
         </form>
       </DraggableModal>
 
       {/* Delete Confirmation */}
-      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-sm">
-        <div className="text-center">
-          <AlertTriangle size={32} className="text-red-600 mx-auto mb-4" />
-          <h3 className="text-lg font-bold mb-2">Delete Employee?</h3>
-          <p className="text-slate-500 text-sm mb-6">Are you sure? This action cannot be undone and will remove all linked data.</p>
+      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="De-provisioning Protocol" width="max-w-sm">
+        <div className="text-center p-2">
+          <div className="bg-red-50 dark:bg-red-900/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-100 dark:border-red-800">
+            <AlertTriangle size={32} className="text-red-600" />
+          </div>
+          <h3 className="text-xl font-black mb-2 text-slate-800 dark:text-white">Purge Record?</h3>
+          <p className="text-slate-500 text-sm mb-8 leading-relaxed">Warning: This operation will permanently erase the node and all associated telemetry from the central database. This cannot be reversed.</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
-            <button onClick={confirmDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg">Delete</button>
+            <button onClick={() => setShowDeleteConfirm(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">Cancel</button>
+            <button onClick={confirmDelete} className="px-8 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-bold text-xs shadow-lg shadow-red-500/20 uppercase tracking-widest">Confirm Purge</button>
           </div>
         </div>
       </DraggableModal>
