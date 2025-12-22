@@ -193,7 +193,9 @@ const Holidays = () => {
                     className="pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none w-full shadow-sm"
                   >
                       <option value="All">All Years</option>
-                      {allAvailableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                      {/* Dynamically generate year options */}
+                      {/* Sort years in ascending order */}
+                      {allAvailableYears.sort((a, b) => a - b).map(y => <option key={y} value={y}>{y}</option>)}
                       {!allAvailableYears.includes(new Date().getFullYear().toString()) && (
                         <option value={new Date().getFullYear().toString()}>{new Date().getFullYear()}</option>
                       )}
