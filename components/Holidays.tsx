@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange } from 'lucide-react';
+import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, FileText } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
 import DraggableModal from './DraggableModal';
+import { read, utils } from 'xlsx';
 
 const getDateParts = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -53,9 +54,10 @@ const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean, isHR: boolean
 };
 
 const Holidays = () => {
-  const { holidays, addHoliday, deleteHoliday, currentUser } = useAppContext();
+  const { holidays, addHoliday, addHolidays, deleteHoliday, currentUser, showToast } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '', type: 'Public' as 'Public' | 'Company' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isHR = currentUser?.role === UserRole.HR;
 
@@ -106,6 +108,51 @@ const Holidays = () => {
       setNewHoliday({ name: '', date: '', type: 'Public' });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json(worksheet) as any[];
+
+      const mappedHolidays = jsonData.map(row => {
+        // Handle Excel date serial or string
+        let dateValue = row.Date;
+        if (typeof dateValue === 'number') {
+            // Excel serial date to JS Date
+            const date = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
+            dateValue = date.toISOString().split('T')[0];
+        } else if (dateValue) {
+            const d = new Date(dateValue);
+            if (!isNaN(d.getTime())) {
+                dateValue = d.toISOString().split('T')[0];
+            }
+        }
+
+        return {
+          name: row.Holiday || 'Unnamed Holiday',
+          date: dateValue || new Date().toISOString().split('T')[0],
+          type: 'Public' as const
+        };
+      });
+
+      if (mappedHolidays.length > 0) {
+        await addHolidays(mappedHolidays);
+        showToast(`Successfully imported ${mappedHolidays.length} holidays`, 'success');
+      } else {
+        showToast('No valid holiday records found in file', 'warning');
+      }
+    } catch (error) {
+      console.error('Excel Import Error:', error);
+      showToast('Failed to parse Excel file. Ensure it matches the required format.', 'error');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -114,9 +161,27 @@ const Holidays = () => {
             <p className="text-slate-500 dark:text-slate-400 text-sm">View company holidays and plan your time off</p>
           </div>
           {isHR && (
-            <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm font-medium text-sm">
-                <Plus size={16} /> Add Holiday
-            </button>
+            <div className="flex gap-2">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".xlsx, .xls" 
+                  onChange={handleFileUpload}
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm font-medium text-sm"
+                >
+                    <UploadCloud size={16} /> Import Excel
+                </button>
+                <button 
+                  onClick={() => setShowModal(true)} 
+                  className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm font-medium text-sm"
+                >
+                    <Plus size={16} /> Add Holiday
+                </button>
+            </div>
           )}
        </div>
 
@@ -204,6 +269,43 @@ const Holidays = () => {
                       <p className="text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1 font-medium">Sat & Sun</p>
                   </div>
                </div>
+
+               {/* Import Instructions & Example */}
+               {isHR && (
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800 p-5 shadow-sm">
+                   <div className="flex items-center gap-2 mb-3">
+                      <FileSpreadsheet size={16} className="text-emerald-600" />
+                      <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Excel Import Guide</h4>
+                   </div>
+                   <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mb-4 leading-relaxed">
+                      To bulk upload holidays, use an Excel file with the following column structure. All imports are set as <strong>Public</strong> holidays.
+                   </p>
+                   
+                   <div className="bg-white dark:bg-slate-800 rounded-lg border border-emerald-100 dark:border-emerald-700 overflow-hidden text-[10px]">
+                      <table className="w-full text-left">
+                        <thead>
+                           <tr className="bg-emerald-100/50 dark:bg-emerald-900/40 border-b border-emerald-100 dark:border-emerald-700 font-bold text-emerald-800 dark:text-emerald-200">
+                              <th className="px-2 py-1.5 border-r border-emerald-100 dark:border-emerald-700">Holiday</th>
+                              <th className="px-2 py-1.5 border-r border-emerald-100 dark:border-emerald-700">Date</th>
+                              <th className="px-2 py-1.5">Day</th>
+                           </tr>
+                        </thead>
+                        <tbody className="text-slate-600 dark:text-slate-400">
+                           <tr className="border-b border-slate-50 dark:border-slate-700">
+                              <td className="px-2 py-1.5 border-r border-slate-50 dark:border-slate-700">Christmas Day</td>
+                              <td className="px-2 py-1.5 border-r border-slate-50 dark:border-slate-700">2025-12-25</td>
+                              <td className="px-2 py-1.5">Thursday</td>
+                           </tr>
+                           <tr>
+                              <td className="px-2 py-1.5 border-r border-slate-50 dark:border-slate-700">New Year</td>
+                              <td className="px-2 py-1.5 border-r border-slate-50 dark:border-slate-700">2026-01-01</td>
+                              <td className="px-2 py-1.5">Thursday</td>
+                           </tr>
+                        </tbody>
+                      </table>
+                   </div>
+                </div>
+               )}
 
                {/* Info Card */}
                <div className="bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
