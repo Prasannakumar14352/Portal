@@ -77,8 +77,9 @@ const Holidays = () => {
     return groups;
   }, [holidays]);
 
+  // Changed to Ascending Order as per user request
   const allAvailableYears = useMemo(() => 
-    Object.keys(groupedHolidays).sort((a, b) => parseInt(b) - parseInt(a)), 
+    Object.keys(groupedHolidays).sort((a, b) => parseInt(a) - parseInt(b)), 
     [groupedHolidays]
   );
 

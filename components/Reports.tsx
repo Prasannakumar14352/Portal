@@ -58,7 +58,7 @@ const Reports = () => {
   const projectTimeAllocation = useMemo(() => {
     const allocation: Record<string, number> = {};
     timeEntries.forEach(e => {
-        const projName = projects.find(p => p.id === e.projectId)?.name || 'General';
+        const projName = projects.find(p => String(p.id) === String(e.projectId))?.name || 'General';
         allocation[projName] = (allocation[projName] || 0) + e.durationMinutes + (e.extraMinutes || 0);
     });
     return Object.keys(allocation).map(name => ({ 
@@ -71,8 +71,9 @@ const Reports = () => {
   const teamContributionData = useMemo(() => {
     const contrib: Record<string, { normal: number, extra: number }> = {};
     timeEntries.forEach(e => {
-        const user = users.find(u => u.id === e.userId);
-        const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown';
+        // Fix: Use String comparison to avoid undefined user match
+        const user = users.find(u => String(u.id) === String(e.userId));
+        const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
         if (!contrib[name]) contrib[name] = { normal: 0, extra: 0 };
         
         contrib[name].normal += e.durationMinutes;
@@ -114,8 +115,8 @@ const Reports = () => {
             filename = 'time_logs_report';
             dataToExport = timeEntries.map(t => ({ 
                 Date: t.date, 
-                Project: projects.find(p => p.id === t.projectId)?.name || 'N/A', 
-                User: users.find(u => u.id === t.userId)?.firstName || 'Unknown', 
+                Project: projects.find(p => String(p.id) === String(t.projectId))?.name || 'N/A', 
+                User: users.find(u => String(u.id) === String(t.userId))?.firstName || 'Unknown', 
                 Task: t.task,
                 NormalHours: (t.durationMinutes/60).toFixed(2),
                 ExtraHours: ((t.extraMinutes || 0)/60).toFixed(2),
@@ -139,6 +140,11 @@ const Reports = () => {
                 { Metric: 'Normal Hours', Value: extraHoursDistribution[0].value },
                 { Metric: 'Extra Hours', Value: extraHoursDistribution[1].value }
              ];
+    }
+
+    if (dataToExport.length === 0) {
+        showToast("No data available to export.", "warning");
+        return;
     }
 
     if (format === 'pdf') {
