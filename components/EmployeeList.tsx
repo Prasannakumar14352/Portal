@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
+import { read, utils } from 'xlsx';
 
 interface EmployeeListProps {
   employees: Employee[];
@@ -210,6 +211,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const [showViewModal, setShowViewModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); 
+  const [showImportGuide, setShowImportGuide] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | number | null>(null);
 
   const [generatedCreds, setGeneratedCreds] = useState<{email: string, password: string} | null>(null);
@@ -225,6 +227,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const isSuperAdmin = String(currentUser?.id) === 'super1' || currentUser?.email === 'superadmin@empower.com';
   
   const canViewPasswords = isSuperAdmin || isHR;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -310,6 +313,70 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       return password;
   };
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        showToast("Excel file is empty", "error");
+        return;
+      }
+
+      let importedCount = 0;
+      const currentNumericIds = employees.map(emp => Number(emp.id)).filter(id => !isNaN(id));
+      let nextId = currentNumericIds.length > 0 ? Math.max(...currentNumericIds) + 1 : 1001;
+
+      for (const row of jsonData) {
+        // Basic mapping logic
+        const fName = row['First Name'] || row['firstName'];
+        const lName = row['Last Name'] || row['lastName'];
+        const email = row['Email'] || row['email'];
+        
+        if (!fName || !lName || !email) continue;
+
+        const role = row['Role'] || row['role'] || (roles.length > 0 ? roles[0].name : 'Employee');
+        const dept = row['Department'] || row['department'] || (departments.length > 0 ? departments[0].name : 'General');
+        const salary = parseFloat(row['Salary'] || row['salary'] || '0');
+        const empId = row['Employee ID'] || row['employeeId'] || `EMP${nextId}`;
+
+        const newEmp: Employee = {
+          id: nextId,
+          employeeId: empId,
+          firstName: fName,
+          lastName: lName,
+          email: email,
+          password: generatePassword(),
+          role: role,
+          department: dept,
+          joinDate: new Date().toISOString().split('T')[0],
+          status: EmployeeStatus.ACTIVE,
+          salary: isNaN(salary) ? 0 : salary,
+          avatar: `https://ui-avatars.com/api/?name=${fName}+${lName}&background=0D9488&color=fff`,
+          phone: row['Phone'] || row['phone'] || '',
+          workLocation: row['Work Location'] || row['workLocation'] || WORK_LOCATIONS[0],
+          projectIds: []
+        } as Employee;
+
+        onAddEmployee(newEmp);
+        nextId++;
+        importedCount++;
+      }
+
+      showToast(`Successfully imported ${importedCount} employees`, "success");
+    } catch (err) {
+      console.error("Import error:", err);
+      showToast("Failed to process Excel file", "error");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingEmployee) {
@@ -325,7 +392,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         id: nextId,
         employeeId: formData.employeeId || `EMP${nextId}`,
         joinDate: new Date().toISOString().split('T')[0],
-        // Updated: Standard placeholder instead of random image
         avatar: formData.avatar || `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=0D9488&color=fff`,
         password: newPassword, 
         ...formData
@@ -400,24 +466,34 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Employee Directory</h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm">Manage your team members and their account details.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
             {canViewPasswords && (
                 <button 
                   onClick={() => setShowPasswords(!showPasswords)}
                   className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors shadow-sm text-sm"
                 >
                     {showPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
-                    <span>{showPasswords ? 'Hide Passwords' : 'Show Passwords'}</span>
+                    <span className="hidden sm:inline">{showPasswords ? 'Hide Passwords' : 'Show Passwords'}</span>
                 </button>
             )}
             {isHR && (
-            <button 
-                onClick={openAddModal}
-                className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg transition-colors shadow-sm text-sm"
-            >
-                <Plus size={18} />
-                <span>Add Employee</span>
-            </button>
+              <>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
+                <button 
+                    onClick={() => setShowImportGuide(true)}
+                    className="flex items-center space-x-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm text-sm font-medium"
+                >
+                    <UploadCloud size={18} className="text-teal-600" />
+                    <span>Import Excel</span>
+                </button>
+                <button 
+                    onClick={openAddModal}
+                    className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg transition-colors shadow-sm text-sm"
+                >
+                    <Plus size={18} />
+                    <span>Add Employee</span>
+                </button>
+              </>
             )}
         </div>
       </div>
@@ -579,6 +655,69 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
            </div>
         </div>
       </div>
+
+      {/* IMPORT GUIDE MODAL */}
+      <DraggableModal isOpen={showImportGuide} onClose={() => setShowImportGuide(false)} title="Excel Import Guide" width="max-w-2xl">
+          <div className="space-y-6">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl p-4 flex items-start gap-3">
+                  <Info className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" size={20} />
+                  <div>
+                      <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-1">How to import employees</h4>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                          Please ensure your Excel file contains the following columns in the exact order or with matching headers. <b>First Name</b>, <b>Last Name</b>, and <b>Email</b> are required.
+                      </p>
+                  </div>
+              </div>
+
+              <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <FileSpreadsheet size={14} className="text-teal-600" />
+                      Required Excel Format (Sample)
+                  </h4>
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
+                      <table className="w-full text-[10px] text-left">
+                          <thead className="bg-slate-50 dark:bg-slate-900 font-bold text-slate-600 dark:text-slate-300 uppercase tracking-tight border-b border-slate-200 dark:border-slate-700">
+                              <tr>
+                                  <th className="px-3 py-2 border-r border-slate-200 dark:border-slate-700">First Name</th>
+                                  <th className="px-3 py-2 border-r border-slate-200 dark:border-slate-700">Last Name</th>
+                                  <th className="px-3 py-2 border-r border-slate-200 dark:border-slate-700">Email</th>
+                                  <th className="px-3 py-2 border-r border-slate-200 dark:border-slate-700">Role</th>
+                                  <th className="px-3 py-2">Dept</th>
+                              </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium">
+                              <tr className="border-b border-slate-100 dark:border-slate-700">
+                                  <td className="px-3 py-2 border-r border-slate-100 dark:border-slate-700">John</td>
+                                  <td className="px-3 py-2 border-r border-slate-100 dark:border-slate-700">Doe</td>
+                                  <td className="px-3 py-2 border-r border-slate-100 dark:border-slate-700">john.doe@nexus.com</td>
+                                  <td className="px-3 py-2 border-r border-slate-100 dark:border-slate-700">Engineer</td>
+                                  <td className="px-3 py-2">IT</td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl space-y-2">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Note:</h5>
+                  <ul className="text-xs text-slate-500 dark:text-slate-400 list-disc pl-5 space-y-1">
+                      <li>Passwords will be automatically generated and can be viewed in the directory after import.</li>
+                      <li>Existing email addresses will be skipped to prevent duplicates.</li>
+                      <li>Optional columns: <b>Employee ID</b>, <b>Salary</b>, <b>Phone</b>, <b>Work Location</b>.</li>
+                  </ul>
+              </div>
+
+              <div className="flex justify-end pt-4 gap-3 border-t dark:border-slate-700">
+                  <button onClick={() => setShowImportGuide(false)} className="px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest">Close</button>
+                  <button 
+                    onClick={() => { setShowImportGuide(false); fileInputRef.current?.click(); }}
+                    className="bg-teal-600 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition flex items-center gap-2 uppercase tracking-widest"
+                  >
+                    <UploadCloud size={16} /> Select File Now
+                  </button>
+              </div>
+          </div>
+      </DraggableModal>
 
       {/* VIEW MODAL */}
       <DraggableModal isOpen={showViewModal} onClose={() => setShowViewModal(false)} title="Employee Details" width="max-w-2xl">
