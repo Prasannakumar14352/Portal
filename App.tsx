@@ -57,6 +57,7 @@ const App: React.FC = () => {
     login,
     logout,
     employees, 
+    departments,
     leaves, 
     leaveTypes, 
     attendance, 
@@ -135,7 +136,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard employees={employees} />;
+        return <Dashboard employees={employees} leaves={leaves} departments={departments} />;
       case 'organization':
         return <Organization />;
       case 'time-logs':
@@ -169,7 +170,7 @@ const App: React.FC = () => {
       case 'ai-assistant':
         return <HRAssistant />;
       default:
-        return <Dashboard employees={employees} />;
+        return <Dashboard employees={employees} leaves={leaves} departments={departments} />;
     }
   };
 

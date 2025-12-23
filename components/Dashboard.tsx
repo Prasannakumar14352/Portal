@@ -1,14 +1,16 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { Users, UserCheck, CalendarOff, TrendingUp } from 'lucide-react';
-import { Employee, EmployeeStatus } from '../types';
+import { Employee, EmployeeStatus, LeaveRequest, LeaveStatus, Department } from '../types';
 
 interface DashboardProps {
   employees: Employee[];
+  leaves: LeaveRequest[];
+  departments: Department[];
 }
 
 // Teal-based palette
@@ -29,11 +31,46 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string,
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
+const Dashboard: React.FC<DashboardProps> = ({ employees, leaves, departments }) => {
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === EmployeeStatus.ACTIVE).length;
   const onLeaveEmployees = employees.filter(e => e.status === EmployeeStatus.ON_LEAVE).length;
   
+  // --- DYNAMIC SUBTEXT CALCULATIONS ---
+  
+  // 1. New Hires this month
+  const newHiresThisMonth = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    return employees.filter(emp => {
+      const joinDate = new Date(emp.joinDate);
+      return joinDate.getMonth() === currentMonth && joinDate.getFullYear() === currentYear;
+    }).length;
+  }, [employees]);
+
+  // 2. Active Workforce Percentage
+  const activePercentage = useMemo(() => {
+    if (totalEmployees === 0) return 0;
+    return Math.round((activeEmployees / totalEmployees) * 100);
+  }, [activeEmployees, totalEmployees]);
+
+  // 3. Approved Leaves for Today
+  const approvedLeavesToday = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return leaves.filter(leave => {
+      if (leave.status !== LeaveStatus.APPROVED) return false;
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      return today >= start && today <= end;
+    }).length;
+  }, [leaves]);
+
+  // 4. Department Count for Open Positions (Positions usually tied to departments)
+  const deptCount = departments.length;
+
   // Data for Department Chart
   const deptCounts = employees.reduce((acc, curr) => {
     acc[curr.department] = (acc[curr.department] || 0) + 1;
@@ -70,28 +107,28 @@ const Dashboard: React.FC<DashboardProps> = ({ employees }) => {
           value={totalEmployees} 
           icon={Users} 
           color="bg-teal-600"
-          subtext="+4 new this month"
+          subtext={`+${newHiresThisMonth} new this month`}
         />
         <StatCard 
           title="Active Now" 
           value={activeEmployees} 
           icon={UserCheck} 
           color="bg-emerald-500"
-          subtext="92% of total workforce"
+          subtext={`${activePercentage}% of total workforce`}
         />
         <StatCard 
           title="On Leave" 
           value={onLeaveEmployees} 
           icon={CalendarOff} 
           color="bg-amber-500"
-          subtext="Approved leave requests"
+          subtext={`${approvedLeavesToday} approved for today`}
         />
         <StatCard 
           title="Open Positions" 
           value="8" 
           icon={TrendingUp} 
           color="bg-violet-500"
-          subtext="Across 3 departments"
+          subtext={`Across ${deptCount} departments`}
         />
       </div>
 
