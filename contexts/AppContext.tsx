@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role, Position } from '../types';
 
 // Robust helper to get YYYY-MM-DD regardless of locale
 const formatDateISO = (date: Date) => {
@@ -26,6 +26,7 @@ interface AppContextType {
   users: Employee[]; 
   departments: Department[];
   roles: Role[];
+  positions: Position[];
   projects: Project[];
   leaves: LeaveRequest[];
   leaveTypes: LeaveTypeConfig[];
@@ -53,6 +54,9 @@ interface AppContextType {
   addDepartment: (dept: Omit<Department, 'id'>) => Promise<void>;
   updateDepartment: (id: string | number, data: Partial<Department>) => Promise<void>;
   deleteDepartment: (id: string | number) => Promise<void>;
+  addPosition: (pos: Omit<Position, 'id'>) => Promise<void>;
+  updatePosition: (id: string | number, data: Partial<Position>) => Promise<void>;
+  deletePosition: (id: string | number) => Promise<void>;
   addRole: (role: Omit<Role, 'id'>) => Promise<void>;
   updateRole: (id: string | number, data: Partial<Role>) => Promise<void>;
   deleteRole: (id: string | number) => Promise<void>;
@@ -89,6 +93,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
@@ -105,14 +110,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshData = async () => {
     try {
-      const [empData, deptData, roleData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
-        db.getEmployees(), db.getDepartments(), db.getRoles(), db.getProjects(),
+      const [empData, deptData, roleData, posData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
+        db.getEmployees(), db.getDepartments(), db.getRoles(), db.getPositions(), db.getProjects(),
         db.getLeaves(), db.getLeaveTypes(), db.getAttendance(), db.getTimeEntries(),
         db.getNotifications(), db.getHolidays(), db.getPayslips()
       ]);
       setEmployees(empData);
       setDepartments(deptData);
       setRoles(roleData);
+      setPositions(posData);
       setProjects(projData);
       setLeaves(leaveData);
       setLeaveTypes(typeData);
@@ -158,13 +164,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 
                 const newEmp: Employee = {
                     id: nextId,
-                    employeeId: `${nextId}`, // Numeric strictly
+                    employeeId: `${nextId}`, 
                     firstName: name.split(' ')[0],
                     lastName: name.split(' ').slice(1).join(' ') || 'User',
                     email: email,
                     password: 'ms-auth-user', 
                     role: 'Employee',
-                    position: 'New Joiner',
+                    position: 'Consultant',
                     department: 'General',
                     departmentId: '', 
                     projectIds: [],   
@@ -248,7 +254,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const forgotPassword = async (email: string): Promise<boolean> => { showToast('Reset link sent to your email', 'success'); return true; };
 
-  // Fix: implement toggleTheme
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -290,6 +295,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (existing) { await db.updateDepartment({ ...existing, ...data }); setDepartments(await db.getDepartments()); showToast('Department updated', 'success'); }
   };
   const deleteDepartment = async (id: string | number) => { await db.deleteDepartment(id.toString()); setDepartments(await db.getDepartments()); showToast('Department deleted', 'info'); };
+
+  const addPosition = async (pos: Omit<Position, 'id'>) => { await db.addPosition({ ...pos, id: Math.random().toString(36).substr(2, 9) }); setPositions(await db.getPositions()); showToast('Position created', 'success'); };
+  const updatePosition = async (id: string | number, data: Partial<Position>) => {
+    const existing = positions.find(p => p.id === id);
+    if (existing) { await db.updatePosition({ ...existing, ...data }); setPositions(await db.getPositions()); showToast('Position updated', 'success'); }
+  };
+  const deletePosition = async (id: string | number) => { await db.deletePosition(id.toString()); setPositions(await db.getPositions()); showToast('Position deleted', 'info'); };
 
   const addRole = async (role: Omit<Role, 'id'>) => { await db.addRole({ ...role, id: Math.random().toString(36).substr(2, 9) }); setRoles(await db.getRoles()); showToast('Role created', 'success'); };
   const updateRole = async (id: string | number, data: Partial<Role>) => {
@@ -427,10 +439,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const value = {
-    employees, users: employees, departments, roles, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
+    employees, users: employees, departments, roles, positions, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
     login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     addEmployee, updateEmployee, updateUser, deleteEmployee, addDepartment, updateDepartment, deleteDepartment,
+    addPosition, updatePosition, deletePosition,
     addRole, updateRole, deleteRole, addProject, updateProject, deleteProject, addLeave, addLeaves, updateLeave, updateLeaveStatus,
     addLeaveType, updateLeaveType, deleteLeaveType, addTimeEntry, updateTimeEntry, deleteTimeEntry,
     checkIn, checkOut, updateAttendanceRecord, getTodayAttendance, notify, markNotificationRead, markAllRead,

@@ -1,18 +1,15 @@
 
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role, Position } from '../types';
 import { 
   mockEmployees, mockDepartments, mockProjects, mockLeaves, mockLeaveTypes, 
   mockAttendance, mockTimeEntries, mockNotifications, mockHolidays, mockPayslips, mockRoles
 } from './mockData';
 
-// --- CONFIGURATION ---
-// Default to MOCK DATA if not explicitly set to 'false' (helps in preview environments)
 const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA !== 'false';
 const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
 console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA (Default)' : 'REAL API'}`);
 
-// --- REAL API IMPLEMENTATION ---
 const api = {
     get: async (endpoint: string) => {
         const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -51,11 +48,11 @@ const api = {
     }
 };
 
-// --- MOCK DATA STORE ---
 const store = {
     employees: [...mockEmployees],
     departments: [...mockDepartments],
     roles: [...mockRoles],
+    positions: [] as Position[],
     projects: [...mockProjects],
     leaves: [...mockLeaves],
     leaveTypes: [...mockLeaveTypes],
@@ -66,7 +63,6 @@ const store = {
     payslips: [...mockPayslips]
 };
 
-// --- MOCK DB IMPLEMENTATION ---
 const mockDb = {
     getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
     addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
@@ -88,6 +84,17 @@ const mockDb = {
     },
     deleteDepartment: async (id: string) => {
         store.departments = store.departments.filter(d => String(d.id) !== String(id));
+        return Promise.resolve();
+    },
+    getPositions: async (): Promise<Position[]> => Promise.resolve([...store.positions]),
+    addPosition: async (pos: Position) => { store.positions.push(pos); return Promise.resolve(pos); },
+    updatePosition: async (pos: Position) => {
+        const idx = store.positions.findIndex(p => String(p.id) === String(pos.id));
+        if(idx !== -1) store.positions[idx] = pos;
+        return Promise.resolve(pos);
+    },
+    deletePosition: async (id: string) => {
+        store.positions = store.positions.filter(p => String(p.id) !== String(id));
         return Promise.resolve();
     },
     getRoles: async (): Promise<Role[]> => Promise.resolve([...store.roles]),
@@ -162,12 +169,10 @@ const mockDb = {
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
     addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
     deleteHoliday: async (id: string) => { store.holidays = store.holidays.filter(h => String(h.id) !== String(id)); return Promise.resolve(); },
-    getHolidaysByYear: async (year: string): Promise<Holiday[]> => Promise.resolve(store.holidays.filter(h => h.date.startsWith(year))),
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
     addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
 };
 
-// --- REAL API DB IMPLEMENTATION ---
 const apiDb = {
   getEmployees: () => api.get('/employees'),
   addEmployee: (emp: Employee) => api.post('/employees', emp),
@@ -178,6 +183,11 @@ const apiDb = {
   addDepartment: (dept: Department) => api.post('/departments', dept),
   updateDepartment: (dept: Department) => api.put(`/departments/${dept.id}`, dept),
   deleteDepartment: (id: string) => api.delete(`/departments/${id}`),
+
+  getPositions: () => api.get('/positions'),
+  addPosition: (pos: Position) => api.post('/positions', pos),
+  updatePosition: (pos: Position) => api.put(`/positions/${pos.id}`, pos),
+  deletePosition: (id: string) => api.delete(`/positions/${id}`),
 
   getRoles: () => api.get('/roles'),
   addRole: (role: Role) => api.post('/roles', role),
@@ -220,28 +230,20 @@ const apiDb = {
   addPayslip: (payslip: Payslip) => api.post('/payslips', payslip)
 };
 
-// --- HYBRID DB PROXY ---
 const createHybridDb = () => {
     return new Proxy(mockDb, {
         get(target, prop: string) {
             return async (...args: any[]) => {
-                const isMutation = prop.startsWith('add') || prop.startsWith('update') || prop.startsWith('delete') || prop.startsWith('mark');
-                
-                // If explicitly using mock data, return target (mockDb) immediately
                 if (USE_MOCK_DATA) {
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
-                
                 try {
-                    // Try real API first
                     if (apiDb[prop as keyof typeof apiDb]) {
                         return await (apiDb[prop as keyof typeof apiDb] as Function)(...args);
                     }
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 } catch (error) {
-                    // For mutations, we fallback to mockDb (local state) but log a warning.
-                    // This fixes "Failed to fetch" errors for users who haven't started their backend.
-                    console.warn(`[DB] Fallback to Mock Data for ${String(prop)} due to network error:`, error.message);
+                    console.warn(`[DB] Fallback to Mock Data for ${String(prop)}:`, error.message);
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
             };

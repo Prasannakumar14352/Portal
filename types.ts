@@ -27,6 +27,12 @@ export interface Department {
   managerId: string | number;
 }
 
+export interface Position {
+  id: string | number;
+  title: string;
+  description: string;
+}
+
 export interface Role {
   id: string | number;
   name: string;
@@ -50,7 +56,7 @@ export interface Employee {
   email: string;
   password?: string;
   role: string;
-  position?: string; // New field
+  position?: string;
   department: string; 
   departmentId?: string | number; 
   projectIds?: (string | number)[]; 
@@ -150,7 +156,7 @@ export interface User {
   employeeId: string;
   name: string;
   role: UserRole;
-  position?: string; // New field
+  position?: string;
   avatar: string;
   managerId?: string | number;
   jobTitle?: string;
