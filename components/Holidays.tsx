@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter } from 'lucide-react';
@@ -127,9 +126,9 @@ const Holidays = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+      // Fix: addHoliday expects Omit<Holiday, 'id'>, ID is generated in AppContext
       addHoliday({
-        ...newHoliday,
-        id: Math.random().toString(36).substr(2, 9)
+        ...newHoliday
       });
       setShowModal(false);
       setNewHoliday({ name: '', date: '', type: 'Public' });
