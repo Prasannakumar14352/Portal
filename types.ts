@@ -146,6 +146,7 @@ export interface ChatMessage {
 }
 
 export enum UserRole {
+  ADMIN = 'Admin',
   HR = 'HR Manager',
   MANAGER = 'Team Manager',
   EMPLOYEE = 'Employee'

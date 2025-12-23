@@ -157,7 +157,7 @@ const Organization = () => {
   const [allocForm, setAllocForm] = useState<any>({ departmentId: '', projectIds: [] });
   
   const orgTreeData = useMemo(() => buildOrgTree(employees), [employees]);
-  const isHR = currentUser?.role === UserRole.HR;
+  const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => { setCurrentPage(1); }, [activeTab]);
 
@@ -177,7 +177,6 @@ const Organization = () => {
     setShowPosModal(true);
   };
 
-  // --- Other Handlers omitted for brevity ---
   const handleProjSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const tasks = projForm.tasksString.split(',').map((t: string) => t.trim()).filter((t: string) => t !== '');
@@ -252,7 +251,7 @@ const Organization = () => {
           </form>
        </DraggableModal>
 
-       {/* Other Modals (Project, Allocations) omitted for brevity */}
+       {/* Project Modal */}
        <DraggableModal isOpen={showProjModal} onClose={() => setShowProjModal(false)} title={projForm.id ? "Edit Project" : "Add Project"} width="max-w-md">
           <form onSubmit={handleProjSubmit} className="space-y-4">
               <div>
@@ -297,7 +296,7 @@ const Organization = () => {
        
        {activeTab === 'chart' && <div className="bg-slate-50 dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="p-8 overflow-auto min-h-[500px] flex justify-center bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">{orgTreeData.length === 0 ? <p className="text-slate-400">No data.</p> : <div className="org-tree"><ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul></div>}</div></div>}
        
-       {activeTab === 'departments' && <div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isHR && <button onClick={() => { setDeptForm({ name: '', description: '', managerId: '' }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{departments.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(dept => (<div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { setDeptForm(dept); setShowDeptModal(true); }}><div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4><p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p></div>))}</div><PaginationControls total={departments.length} /></div>}
+       {activeTab === 'departments' && <div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ name: '', description: '', managerId: '' }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{departments.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(dept => (<div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { setDeptForm(dept); setShowDeptModal(true); }}><div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4><p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p></div>))}</div><PaginationControls total={departments.length} /></div>}
        
        {activeTab === 'positions' && (
          <div className="space-y-4">
@@ -305,7 +304,7 @@ const Organization = () => {
               <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <UserSquare className="text-emerald-600" size={20} /> Job Positions
               </h3>
-              {isHR && (
+              {isPowerUser && (
                 <button 
                   onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} 
                   className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 shadow-sm transition-all"
@@ -323,7 +322,7 @@ const Organization = () => {
                       <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 relative z-10">
                         <UserSquare size={20} />
                       </div>
-                      {isHR && (
+                      {isPowerUser && (
                         <div className="flex gap-1 relative z-10">
                            <button onClick={() => openPosEdit(pos)} className="p-1.5 text-slate-400 hover:text-emerald-600 rounded bg-white dark:bg-slate-700 shadow-sm border">
                               <Edit2 size={14} />
@@ -346,7 +345,7 @@ const Organization = () => {
                 <div className="col-span-full py-16 text-center bg-slate-50 dark:bg-slate-900/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
                     <UserSquare size={48} className="mx-auto text-slate-300 mb-4" />
                     <p className="text-slate-500">No positions defined in the registry.</p>
-                    {isHR && <button onClick={() => setShowPosModal(true)} className="mt-4 text-emerald-600 font-bold hover:underline">Create first position</button>}
+                    {isPowerUser && <button onClick={() => setShowPosModal(true)} className="mt-4 text-emerald-600 font-bold hover:underline">Create first position</button>}
                 </div>
              )}
            </div>
@@ -359,7 +358,7 @@ const Organization = () => {
               <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Briefcase className="text-emerald-600" size={20} /> Active Projects
               </h3>
-              {isHR && (
+              {isPowerUser && (
                 <button 
                   onClick={() => { setProjForm({ id: '', name: '', description: '', status: 'Active', tasksString: '' }); setShowProjModal(true); }} 
                   className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"
@@ -383,7 +382,7 @@ const Organization = () => {
                       }`}>
                         {project.status}
                       </span>
-                      {isHR && (
+                      {isPowerUser && (
                         <button onClick={() => deleteProject(project.id)} className="p-1 text-slate-300 hover:text-red-500">
                           <Trash2 size={12}/>
                         </button>
@@ -398,7 +397,7 @@ const Organization = () => {
          </div>
        )}
 
-       {activeTab === 'allocations' && <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700"><tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Department</th><th className="px-6 py-4">Projects</th><th className="px-6 py-4 text-right">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{users.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(user => { const userDept = departments.find(d => d.id === user.departmentId); const userProjects = projects.filter(p => user.projectIds?.includes(p.id)); return (<tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group"><td className="px-6 py-4"><div className="flex items-center gap-3"><img src={user.avatar} className="w-8 h-8 rounded-full border border-slate-100 dark:border-slate-600" /><div><p className="text-sm font-bold text-slate-800 dark:text-white">{user.firstName} {user.lastName}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{user.position || user.role}</p></div></div></td><td className="px-6 py-4"><span className="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full uppercase tracking-widest">{userDept?.name || '-'}</span></td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{userProjects.map(p => (<span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-[10px] font-bold uppercase tracking-tight border border-blue-100 dark:border-blue-800">{p.name}</span>))}</div></td><td className="px-6 py-4 text-right">{isHR && <button onClick={() => { setSelectedUser(user as unknown as Employee); setAllocForm({ departmentId: user.departmentId || '', projectIds: user.projectIds || [] }); setShowAllocModal(true); }} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-bold flex items-center gap-1 justify-end ml-auto"><Edit2 size={12}/> <span>Edit Alloc</span></button>}</td></tr>); })}</tbody></table></div><PaginationControls total={users.length} /></div>}
+       {activeTab === 'allocations' && <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700"><tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Department</th><th className="px-6 py-4">Projects</th><th className="px-6 py-4 text-right">Action</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{users.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(user => { const userDept = departments.find(d => d.id === user.departmentId); const userProjects = projects.filter(p => user.projectIds?.includes(p.id)); return (<tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group"><td className="px-6 py-4"><div className="flex items-center gap-3"><img src={user.avatar} className="w-8 h-8 rounded-full border border-slate-100 dark:border-slate-600" /><div><p className="text-sm font-bold text-slate-800 dark:text-white">{user.firstName} {user.lastName}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{user.position || user.role}</p></div></div></td><td className="px-6 py-4"><span className="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full uppercase tracking-widest">{userDept?.name || '-'}</span></td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{userProjects.map(p => (<span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-[10px] font-bold uppercase tracking-tight border border-blue-100 dark:border-blue-800">{p.name}</span>))}</div></td><td className="px-6 py-4 text-right">{isPowerUser && <button onClick={() => { setSelectedUser(user as unknown as Employee); setAllocForm({ departmentId: user.departmentId || '', projectIds: user.projectIds || [] }); setShowAllocModal(true); }} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-bold flex items-center gap-1 justify-end ml-auto"><Edit2 size={12}/> <span>Edit Alloc</span></button>}</td></tr>); })}</tbody></table></div><PaginationControls total={users.length} /></div>}
     </div>
   );
 };

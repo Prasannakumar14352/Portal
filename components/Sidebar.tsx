@@ -16,7 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
     // Items visible to EVERYONE
     const commonItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'reports', label: 'Reports', icon: BarChart3 }, // Made visible to all
+      { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'holidays', label: 'Holidays', icon: Coffee },
       { id: 'ai-assistant', label: 'HR Assistant', icon: MessageSquareText },
     ];
@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
       ];
     }
 
-    // HR and Manager
+    // Admin, HR and Manager
     return [
       commonItems[0], // Dashboard
       { id: 'organization', label: 'Organization', icon: Building2 },
@@ -61,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
             <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">EmpowerCorp</h1>
         </div>
         {/* Mobile Close Button */}
-        <button onClick={onClose} className="md:hidden text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
+        <button onClick={onClose} className="md:hidden text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:white transition-colors">
             <X size={24} />
         </button>
       </div>

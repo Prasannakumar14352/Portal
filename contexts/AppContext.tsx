@@ -132,6 +132,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const getSystemRole = (roleStr: string): UserRole => {
+      const r = roleStr.toLowerCase();
+      if (r.includes('admin')) return UserRole.ADMIN;
+      if (r.includes('hr')) return UserRole.HR;
+      if (r.includes('manager')) return UserRole.MANAGER;
+      return UserRole.EMPLOYEE;
+  };
+
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -191,7 +199,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (targetUser) {
                 setCurrentUser({ 
                     id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
-                    role: targetUser.role.includes('HR') || targetUser.role.includes('Admin') ? UserRole.HR : targetUser.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+                    role: getSystemRole(targetUser.role),
                     position: targetUser.position,
                     avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
                     departmentId: targetUser.departmentId, projectIds: targetUser.projectIds,
@@ -212,7 +220,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (user) {
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
-            role: user.role.includes('HR') || user.role.includes('Admin') ? UserRole.HR : user.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+            role: getSystemRole(user.role),
             position: user.position,
             avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
             departmentId: user.departmentId, projectIds: user.projectIds,

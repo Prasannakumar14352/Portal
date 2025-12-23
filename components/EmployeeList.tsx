@@ -34,10 +34,15 @@ const WORK_LOCATIONS = [
   'USA'
 ];
 
-// Optimized Location Map Component omitted for brevity
+const SYSTEM_PERMISSIONS = [
+    UserRole.EMPLOYEE,
+    UserRole.MANAGER,
+    UserRole.HR,
+    UserRole.ADMIN
+];
 
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
-  const { currentUser, showToast, roles, departments, positions } = useAppContext();
+  const { currentUser, showToast, departments, positions } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -60,13 +65,15 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
 
   const isHR = currentUser?.role === UserRole.HR;
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isPowerUser = isHR || isAdmin;
   const isSuperAdmin = String(currentUser?.id) === 'super1' || currentUser?.email === 'superadmin@empower.com';
   
-  const canViewPasswords = isSuperAdmin || isHR;
+  const canViewPasswords = isSuperAdmin || isPowerUser;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Employee>>({
-    firstName: '', lastName: '', email: '', role: '', department: '', employeeId: '',
+    firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE, department: '', employeeId: '',
     status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: { latitude: 0, longitude: 0, address: '' }, workLocation: '',
     position: '' 
   });
@@ -122,7 +129,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
     setEditingEmployee(null);
     setFormData({
       firstName: '', lastName: '', email: '', employeeId: '',
-      role: roles.length > 0 ? roles[0].name : '', 
+      role: UserRole.EMPLOYEE, 
       department: departments.length > 0 ? departments[0].name : '',
       status: EmployeeStatus.ACTIVE, salary: 0, phone: '', location: undefined,
       workLocation: WORK_LOCATIONS[0],
@@ -156,7 +163,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                     <span>{showPasswords ? 'Hide' : 'Show'} Passwords</span>
                 </button>
             )}
-            {isHR && (
+            {isPowerUser && (
                 <button onClick={openAddModal} className="flex items-center space-x-2 bg-teal-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm">
                     <Plus size={18} />
                     <span>Add Employee</span>
@@ -166,7 +173,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        {/* Filters Omitted for Brevity */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -201,7 +207,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end space-x-1">
                       <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 transition-colors"><Eye size={16} /></button>
-                      {isHR && <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 transition-colors"><Edit2 size={16} /></button>}
+                      {isPowerUser && <button onClick={() => openEditModal(emp)} className="text-slate-400 hover:text-teal-600 transition-colors"><Edit2 size={16} /></button>}
                     </div>
                   </td>
                 </tr>
@@ -215,13 +221,13 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit Employee' : 'Add Employee'} width="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all" /></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white" /></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Numeric Employee ID</label><div className="relative"><Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="number" placeholder="1001" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm font-mono" /></div></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm" /></div></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Numeric Employee ID</label><div className="relative"><Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="number" placeholder="1001" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm font-mono dark:text-white" /></div></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white" /></div></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -231,7 +237,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 required 
                 value={formData.position} 
                 onChange={(e) => setFormData({...formData, position: e.target.value})} 
-                className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all"
+                className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all dark:text-white"
               >
                  <option value="" disabled>Select Position...</option>
                  {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
@@ -240,19 +246,25 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">System Permissions</label>
-              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm">
-                 <option value="" disabled>Select Role...</option>
-                 {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+              <select 
+                required 
+                value={formData.role} 
+                onChange={(e) => setFormData({...formData, role: e.target.value})} 
+                className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white"
+              >
+                 {SYSTEM_PERMISSIONS.map(role => (
+                   <option key={role} value={role}>{role}</option>
+                 ))}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project/Department</label><select required value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm">{departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}</select></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project/Department</label><select required value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white">{departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}</select></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white" /></div>
           </div>
 
-          <div className="pt-6 flex justify-end space-x-3 border-t">
+          <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
             <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest">{editingEmployee ? 'Update' : 'Create'} Employee</button>
           </div>
