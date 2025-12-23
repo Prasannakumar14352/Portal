@@ -120,7 +120,6 @@ const initDb = async () => {
                 const colCheck = await request.query(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'employees' AND COLUMN_NAME = 'employeeId'`);
                 if (colCheck.recordset.length > 0 && colCheck.recordset[0].DATA_TYPE !== 'int') {
                     console.log("[DB] Migrating employeeId column back to INT...");
-                    // Try to cast existing data, though alphanumeric IDs might cause errors here if not cleaned
                     await request.query(`ALTER TABLE employees ALTER COLUMN employeeId INT`);
                 }
             } else {
@@ -153,7 +152,7 @@ apiRouter.post('/employees', async (req, res) => {
         const e = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(e.id));
-        request.input('employeeId', sql.Int, toInt(e.employeeId)); // Cast to INT
+        request.input('employeeId', sql.Int, toInt(e.employeeId));
         request.input('firstName', sql.NVarChar, toStr(e.firstName));
         request.input('lastName', sql.NVarChar, toStr(e.lastName));
         request.input('email', sql.NVarChar, toStr(e.email));
@@ -182,10 +181,15 @@ apiRouter.put('/employees/:id', async (req, res) => {
     try {
         const e = req.body;
         const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('employeeId', sql.Int, toInt(e.employeeId)); // Cast to INT
+        
+        // Ensure ID is passed as string for the WHERE clause
+        const targetId = toStr(req.params.id);
+        request.input('id', sql.NVarChar, targetId);
+        
+        request.input('employeeId', sql.Int, toInt(e.employeeId));
         request.input('firstName', sql.NVarChar, toStr(e.firstName));
         request.input('lastName', sql.NVarChar, toStr(e.lastName));
+        request.input('email', sql.NVarChar, toStr(e.email)); // Fixed: Include email in updates
         request.input('role', sql.NVarChar, toStr(e.role));
         request.input('department', sql.NVarChar, toStr(e.department));
         request.input('departmentId', sql.NVarChar, toStr(e.departmentId));
@@ -199,9 +203,24 @@ apiRouter.put('/employees/:id', async (req, res) => {
         request.input('jobTitle', sql.NVarChar, toStr(e.jobTitle));
         request.input('workLocation', sql.NVarChar, toStr(e.workLocation));
 
-        await request.query(`UPDATE employees SET employeeId=@employeeId, firstName=@firstName, lastName=@lastName, role=@role, department=@department, departmentId=@departmentId, projectIds=@projectIds, status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, phone=@phone, jobTitle=@jobTitle, workLocation=@workLocation WHERE id=@id`);
+        const result = await request.query(`UPDATE employees SET 
+            employeeId=@employeeId, firstName=@firstName, lastName=@lastName, email=@email,
+            role=@role, department=@department, departmentId=@departmentId, projectIds=@projectIds, 
+            status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, 
+            location=@location, phone=@phone, jobTitle=@jobTitle, workLocation=@workLocation 
+            WHERE id=@id`);
+        
+        if (result.rowsAffected[0] === 0) {
+            console.warn(`[SQL] No employee found with id: ${targetId}`);
+            return res.status(404).json({ error: 'Employee not found in database.' });
+        }
+        
+        console.log(`[SQL] Successfully updated employee id: ${targetId}`);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error(`[SQL ERROR] Update failed:`, err.message);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 apiRouter.delete('/employees/:id', async (req, res) => {
