@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -130,6 +130,68 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
   );
 };
 
+const EmployeePicker: React.FC<{ 
+  selectedIds: (string | number)[], 
+  onToggle: (id: string | number) => void,
+  allEmployees: Employee[]
+}> = ({ selectedIds, onToggle, allEmployees }) => {
+  const [query, setQuery] = useState('');
+  
+  const filtered = useMemo(() => {
+    return allEmployees.filter(e => 
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
+      (e.position || '').toLowerCase().includes(query.toLowerCase())
+    );
+  }, [allEmployees, query]);
+
+  return (
+    <div className="space-y-3">
+       <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Search employees to assign..." 
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+       </div>
+       <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl divide-y divide-slate-50 dark:divide-slate-700/50">
+          {filtered.map(emp => {
+            const isSelected = selectedIds.includes(emp.id);
+            return (
+              <div 
+                key={emp.id} 
+                onClick={() => onToggle(emp.id)}
+                className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <img src={emp.avatar} className="w-8 h-8 rounded-full border border-slate-100 dark:border-slate-600 shadow-sm" alt="" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-none mb-1">{emp.firstName} {emp.lastName}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-tight">{emp.position || emp.role}</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 scale-110' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700'}`}>
+                  {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="p-8 text-center text-slate-400 text-xs italic">No matching employees found.</div>
+          )}
+       </div>
+       <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedIds.length} Selected</span>
+          {selectedIds.length > 0 && (
+            <button onClick={(e) => { e.preventDefault(); selectedIds.forEach(id => onToggle(id)); }} className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-widest">Clear All</button>
+          )}
+       </div>
+    </div>
+  );
+};
+
 const Organization = () => {
   const { 
     currentUser, departments, projects, users, notify, updateUser, 
@@ -149,9 +211,9 @@ const Organization = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
   
-  const [deptForm, setDeptForm] = useState<any>({ name: '', description: '', managerId: '' });
+  const [deptForm, setDeptForm] = useState<any>({ id: '', name: '', description: '', managerId: '', employeeIds: [] });
   const [posForm, setPosForm] = useState<any>({ id: '', title: '', description: '' });
-  const [projForm, setProjForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasksString: '' });
+  const [projForm, setProjForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasksString: '', employeeIds: [] });
   
   const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
   const [allocForm, setAllocForm] = useState<any>({ departmentId: '', projectIds: [] });
@@ -161,7 +223,41 @@ const Organization = () => {
 
   useEffect(() => { setCurrentPage(1); }, [activeTab]);
 
-  // --- Handlers for Positions ---
+  // --- Submission Handlers with assignment logic ---
+
+  const handleDeptSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let targetDeptId = deptForm.id;
+    
+    // 1. Create or Update Department
+    if (deptForm.id) {
+      await updateDepartment(deptForm.id, { name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
+    } else {
+      const newId = Math.random().toString(36).substr(2, 9);
+      await addDepartment({ id: newId, name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId } as any);
+      targetDeptId = newId;
+    }
+
+    // 2. Batch Update Employee Assignments
+    // We update employees concurrently where possible
+    const updates = employees.map(emp => {
+      const isSelected = deptForm.employeeIds.includes(emp.id);
+      const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
+      
+      if (isSelected && !currentlyInDept) {
+        return updateUser(emp.id, { departmentId: targetDeptId, department: deptForm.name });
+      } else if (!isSelected && currentlyInDept) {
+        return updateUser(emp.id, { departmentId: '', department: 'General' });
+      }
+      return null;
+    }).filter(p => p !== null);
+
+    await Promise.all(updates);
+    
+    notify(`Department ${deptForm.name} saved and ${deptForm.employeeIds.length} members assigned.`);
+    setShowDeptModal(false);
+  };
+
   const handlePosSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (posForm.id) {
@@ -172,37 +268,66 @@ const Organization = () => {
     setShowPosModal(false);
   };
 
-  const openPosEdit = (p: Position) => {
-    setPosForm(p);
-    setShowPosModal(true);
-  };
-
-  const handleProjSubmit = (e: React.FormEvent) => {
+  const handleProjSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tasks = projForm.tasksString.split(',').map((t: string) => t.trim()).filter((t: string) => t !== '');
-    const data = { name: projForm.name, description: projForm.description, status: projForm.status, tasks };
-    if (projForm.id) updateProject(projForm.id, data);
-    else addProject(data as any);
+    let targetProjId = projForm.id;
+
+    if (projForm.id) {
+      await updateProject(projForm.id, { name: projForm.name, description: projForm.description, status: projForm.status, tasks });
+    } else {
+      const newId = Math.random().toString(36).substr(2, 9);
+      await addProject({ id: newId, name: projForm.name, description: projForm.description, status: projForm.status, tasks } as any);
+      targetProjId = newId;
+    }
+
+    // 2. Batch Update Employee Project Assignments
+    const updates = employees.map(emp => {
+      const isSelected = projForm.employeeIds.includes(emp.id);
+      const currentProjects = emp.projectIds || [];
+      const hasProject = currentProjects.includes(targetProjId);
+
+      if (isSelected && !hasProject) {
+        return updateUser(emp.id, { projectIds: [...currentProjects, targetProjId] });
+      } else if (!isSelected && hasProject) {
+        return updateUser(emp.id, { projectIds: currentProjects.filter(id => String(id) !== String(targetProjId)) });
+      }
+      return null;
+    }).filter(p => p !== null);
+
+    await Promise.all(updates);
+    
+    notify(`Project ${projForm.name} updated. ${projForm.employeeIds.length} members assigned.`);
     setShowProjModal(false);
   };
 
-  const openProjEdit = (p: Project) => {
-    setProjForm({ id: p.id, name: p.name, description: p.description || '', status: p.status, tasksString: (p.tasks || []).join(', ') });
+  // Fix: Added openPosEdit helper function
+  const openPosEdit = (pos: Position) => {
+    setPosForm({ id: pos.id, title: pos.title, description: pos.description });
+    setShowPosModal(true);
+  };
+
+  // Fix: Added openProjEdit helper function
+  const openProjEdit = (proj: Project & { employeeIds: (string | number)[] }) => {
+    setProjForm({
+      id: proj.id,
+      name: proj.name,
+      description: proj.description || '',
+      status: proj.status,
+      tasksString: (proj.tasks || []).join(', '),
+      employeeIds: proj.employeeIds || []
+    });
     setShowProjModal(true);
   };
 
-  const toggleProjectInAlloc = (projId: string | number) => {
-    setAllocForm((prev: any) => {
-      const current = prev.projectIds || [];
-      const exists = current.includes(projId);
-      if (exists) return { ...prev, projectIds: current.filter((id: any) => id !== projId) };
-      return { ...prev, projectIds: [...current, projId] };
+  const toggleEmpInForm = (formType: 'dept' | 'proj', empId: string | number) => {
+    const setter = formType === 'dept' ? setDeptForm : setProjForm;
+    setter((prev: any) => {
+      const current = prev.employeeIds || [];
+      const exists = current.includes(empId);
+      if (exists) return { ...prev, employeeIds: current.filter((id: any) => id !== empId) };
+      return { ...prev, employeeIds: [...current, empId] };
     });
-  };
-
-  const handleAllocSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowConfirmAlloc(true);
   };
 
   const finalizeAllocation = () => {
@@ -233,6 +358,45 @@ const Organization = () => {
     <div className="space-y-6 animate-fade-in relative">
        <style>{`.org-tree ul{padding-top:20px;position:relative;display:flex;justify-content:center}.org-tree li{float:left;text-align:center;list-style-type:none;position:relative;padding:20px 5px 0 5px}.org-tree li::before,.org-tree li::after{content:'';position:absolute;top:0;right:50%;border-top:1px solid #cbd5e1;width:50%;height:20px}.org-tree li::after{right:auto;left:50%;border-left:1px solid #cbd5e1}.org-tree li:first-child::before,.org-tree li:last-child::after{border:0 none}.org-tree li:only-child::after,.org-tree li:only-child::before{display:none}.org-tree li:only-child{padding-top:0}.org-tree ul ul::before{content:'';position:absolute;top:0;left:50%;border-left:1px solid #cbd5e1;width:0;height:20px}`}</style>
 
+       {/* Department Modal */}
+       <DraggableModal isOpen={showDeptModal} onClose={() => setShowDeptModal(false)} title={deptForm.id ? "Edit Department" : "Add Department"} width="max-w-2xl">
+          <form onSubmit={handleDeptSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Dept Name</label>
+                      <input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" placeholder="e.g. GIS Development" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label>
+                      <textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" rows={3} placeholder="Department goals..." value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Manager</label>
+                      <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
+                        <option value="" disabled>Select Head...</option>
+                        {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Assign Members</label>
+                    <EmployeePicker 
+                      selectedIds={deptForm.employeeIds} 
+                      onToggle={(id) => toggleEmpInForm('dept', id)} 
+                      allEmployees={employees}
+                    />
+                  </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+                <button type="button" onClick={() => setShowDeptModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase tracking-widest text-xs">Cancel</button>
+                <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">Save Department</button>
+              </div>
+          </form>
+       </DraggableModal>
+
        {/* Position Modal */}
        <DraggableModal isOpen={showPosModal} onClose={() => setShowPosModal(false)} title={posForm.id ? "Edit Position" : "Add Position"} width="max-w-md">
           <form onSubmit={handlePosSubmit} className="space-y-4">
@@ -252,31 +416,45 @@ const Organization = () => {
        </DraggableModal>
 
        {/* Project Modal */}
-       <DraggableModal isOpen={showProjModal} onClose={() => setShowProjModal(false)} title={projForm.id ? "Edit Project" : "Add Project"} width="max-w-md">
-          <form onSubmit={handleProjSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project Name</label>
-                <input required type="text" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" value={projForm.name} onChange={e => setProjForm({...projForm, name: e.target.value})} />
+       <DraggableModal isOpen={showProjModal} onClose={() => setShowProjModal(false)} title={projForm.id ? "Edit Project" : "Add Project"} width="max-w-2xl">
+          <form onSubmit={handleProjSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project Name</label>
+                      <input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={projForm.name} onChange={e => setProjForm({...projForm, name: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label>
+                      <textarea className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" rows={2} value={projForm.description} onChange={e => setProjForm({...projForm, description: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
+                      <select className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={projForm.status} onChange={e => setProjForm({...projForm, status: e.target.value as any})}>
+                        <option value="Active">Active</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tasks (Comma Separated)</label>
+                      <input type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Analysis, Design, Implementation..." value={projForm.tasksString} onChange={e => setProjForm({...projForm, tasksString: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Project Team Members</label>
+                    <EmployeePicker 
+                      selectedIds={projForm.employeeIds} 
+                      onToggle={(id) => toggleEmpInForm('proj', id)} 
+                      allEmployees={employees}
+                    />
+                  </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label>
-                <textarea className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" rows={2} value={projForm.description} onChange={e => setProjForm({...projForm, description: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
-                <select className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" value={projForm.status} onChange={e => setProjForm({...projForm, status: e.target.value as any})}>
-                  <option value="Active">Active</option>
-                  <option value="On Hold">On Hold</option>
-                  <option value="Completed">Completed</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tasks (Comma Separated)</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" placeholder="Analysis, Design, Implementation..." value={projForm.tasksString} onChange={e => setProjForm({...projForm, tasksString: e.target.value})} />
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+              
+              <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
                 <button type="button" onClick={() => setShowProjModal(false)} className="px-4 py-2 text-slate-400 font-bold uppercase tracking-widest text-xs">Cancel</button>
-                <button type="submit" className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold uppercase tracking-widest">Save Project</button>
+                <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">Save Project</button>
               </div>
           </form>
        </DraggableModal>
@@ -296,7 +474,7 @@ const Organization = () => {
        
        {activeTab === 'chart' && <div className="bg-slate-50 dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="p-8 overflow-auto min-h-[500px] flex justify-center bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">{orgTreeData.length === 0 ? <p className="text-slate-400">No data.</p> : <div className="org-tree"><ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul></div>}</div></div>}
        
-       {activeTab === 'departments' && <div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ name: '', description: '', managerId: '' }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{departments.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(dept => (<div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { setDeptForm(dept); setShowDeptModal(true); }}><div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4><p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p></div>))}</div><PaginationControls total={departments.length} /></div>}
+       {activeTab === 'departments' && <div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{departments.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(dept => (<div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { const deptMembers = employees.filter(e => String(e.departmentId) === String(dept.id)).map(e => e.id); setDeptForm({ ...dept, employeeIds: deptMembers }); setShowDeptModal(true); }}><div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4><p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p></div>))}</div><PaginationControls total={departments.length} /></div>}
        
        {activeTab === 'positions' && (
          <div className="space-y-4">
@@ -360,7 +538,7 @@ const Organization = () => {
               </h3>
               {isPowerUser && (
                 <button 
-                  onClick={() => { setProjForm({ id: '', name: '', description: '', status: 'Active', tasksString: '' }); setShowProjModal(true); }} 
+                  onClick={() => { setProjForm({ id: '', name: '', description: '', status: 'Active', tasksString: '', employeeIds: [] }); setShowProjModal(true); }} 
                   className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"
                 >
                   <Plus size={16} /> Add Project
@@ -369,7 +547,7 @@ const Organization = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {projects.map(project => (
-                <div key={project.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition">
+                <div key={project.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition cursor-pointer" onClick={() => { const projMembers = employees.filter(e => e.projectIds?.includes(project.id)).map(e => e.id); openProjEdit({ ...project, employeeIds: projMembers } as any); }}>
                   <div className="flex justify-between items-start mb-4">
                     <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                       <Briefcase size={20} />
@@ -383,7 +561,7 @@ const Organization = () => {
                         {project.status}
                       </span>
                       {isPowerUser && (
-                        <button onClick={() => deleteProject(project.id)} className="p-1 text-slate-300 hover:text-red-500">
+                        <button onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }} className="p-1 text-slate-300 hover:text-red-500">
                           <Trash2 size={12}/>
                         </button>
                       )}
@@ -391,6 +569,10 @@ const Organization = () => {
                   </div>
                   <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{project.name}</h4>
                   <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2 mb-4">{project.description}</p>
+                  <div className="pt-3 border-t border-slate-50 dark:border-slate-700/50 flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{employees.filter(e => e.projectIds?.includes(project.id)).length} Members</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">Edit Project &raquo;</span>
+                  </div>
                 </div>
               ))}
             </div>
