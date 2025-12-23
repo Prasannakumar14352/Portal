@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -42,10 +42,11 @@ const SYSTEM_PERMISSIONS = [
 ];
 
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee }) => {
-  const { currentUser, showToast, departments, positions } = useAppContext();
+  const { currentUser, showToast, departments, positions, syncAzureUsers } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,6 +102,12 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   const totalPages = Math.ceil(sortedAndFilteredEmployees.length / itemsPerPage);
   const paginatedEmployees = sortedAndFilteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleAzureSync = async () => {
+    setIsSyncing(true);
+    await syncAzureUsers();
+    setIsSyncing(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,10 +171,20 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 </button>
             )}
             {isPowerUser && (
-                <button onClick={openAddModal} className="flex items-center space-x-2 bg-teal-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm">
-                    <Plus size={18} />
-                    <span>Add Employee</span>
-                </button>
+                <>
+                  <button 
+                    onClick={handleAzureSync} 
+                    disabled={isSyncing}
+                    className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50"
+                  >
+                      <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+                      <span>{isSyncing ? 'Syncing...' : 'Sync Azure'}</span>
+                  </button>
+                  <button onClick={openAddModal} className="flex items-center space-x-2 bg-teal-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm">
+                      <Plus size={18} />
+                      <span>Add Employee</span>
+                  </button>
+                </>
             )}
         </div>
       </div>

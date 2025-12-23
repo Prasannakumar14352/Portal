@@ -2,9 +2,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
+import { microsoftGraphService, AzureUser } from '../services/microsoftGraphService';
 import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role, Position } from '../types';
 
-// Robust helper to get YYYY-MM-DD regardless of locale
 const formatDateISO = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -12,7 +12,6 @@ const formatDateISO = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-// Robust helper for 12h time (h:mm am/pm)
 const formatTime12 = (date: Date) => {
   return date.toLocaleTimeString('en-US', { 
     hour: 'numeric', 
@@ -50,6 +49,7 @@ interface AppContextType {
   addEmployee: (emp: Employee) => Promise<void>;
   updateEmployee: (emp: Employee) => Promise<void>;
   updateUser: (id: string | number, data: Partial<Employee>) => Promise<void>; 
+  bulkUpdateEmployees: (updates: { id: string | number, data: Partial<Employee> }[]) => Promise<void>;
   deleteEmployee: (id: string | number) => Promise<void>;
   addDepartment: (dept: Omit<Department, 'id'>) => Promise<void>;
   updateDepartment: (id: string | number, data: Partial<Department>) => Promise<void>;
@@ -85,6 +85,7 @@ interface AppContextType {
   deleteHoliday: (id: string | number) => Promise<void>;
   generatePayslips: (month: string) => Promise<void>;
   manualAddPayslip: (payslip: Payslip) => Promise<void>;
+  syncAzureUsers: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -133,7 +134,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const getSystemRole = (roleStr: string): UserRole => {
-      const r = roleStr.toLowerCase();
+      const r = (roleStr || '').toLowerCase();
       if (r.includes('admin')) return UserRole.ADMIN;
       if (r.includes('hr')) return UserRole.HR;
       if (r.includes('manager')) return UserRole.MANAGER;
@@ -183,10 +184,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     departmentId: '', 
                     projectIds: [],   
                     managerId: '',    
-                    joinDate: new Date().toISOString().split('T')[0],
+                    joinDate: formatDateISO(new Date()),
                     status: EmployeeStatus.ACTIVE,
                     salary: 0,
-                    avatar: `https://i.pravatar.cc/150?u=${email}`,
+                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D9488&color=fff`,
                     jobTitle: 'New Joiner (SSO)',
                     phone: '',
                     workLocation: 'Office HQ India'
@@ -260,6 +261,79 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Logged out successfully', 'info'); 
   };
 
+  const syncAzureUsers = async () => {
+    if (!msalInstance || !currentUser) return;
+    
+    try {
+      showToast("Acquiring directory token...", "info");
+      const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+      if (!account) {
+        showToast("No active Microsoft session found.", "error");
+        return;
+      }
+
+      const tokenResponse = await msalInstance.acquireTokenSilent({
+        scopes: ["User.Read.All"],
+        account: account
+      });
+
+      showToast("Fetching users from Azure Entra ID...", "info");
+      const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
+      
+      const currentEmails = new Set(employees.map(e => e.email.toLowerCase()));
+      const newUsers = azureUsers.filter(au => au.mail && !currentEmails.has(au.mail.toLowerCase()));
+
+      if (newUsers.length === 0) {
+        showToast("Directory is already up to date.", "success");
+        return;
+      }
+
+      showToast(`Importing ${newUsers.length} new users...`, "info");
+      
+      const currentEmployees = await db.getEmployees();
+      const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+      let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+
+      for (const au of newUsers) {
+        const newEmp: Employee = {
+          id: nextId,
+          employeeId: `AZ-${nextId}`,
+          firstName: au.givenName || au.displayName.split(' ')[0],
+          lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User',
+          email: au.mail || au.userPrincipalName,
+          password: 'ms-auth-user',
+          role: 'Employee',
+          position: au.jobTitle || 'Consultant',
+          department: au.department || 'General',
+          departmentId: '',
+          projectIds: [],
+          managerId: '',
+          joinDate: formatDateISO(new Date()),
+          status: EmployeeStatus.ACTIVE,
+          salary: 0,
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
+          jobTitle: au.jobTitle || 'Team Member',
+          phone: '',
+          workLocation: 'Office HQ India'
+        };
+        await db.addEmployee(newEmp);
+        nextId++;
+      }
+
+      await refreshData();
+      showToast(`Imported ${newUsers.length} users successfully!`, "success");
+
+    } catch (err: any) {
+      console.error("Azure Sync Error:", err);
+      if (err.name === "InteractionRequiredAuthError") {
+        showToast("Permission required. Redirecting to consent...", "warning");
+        msalInstance.acquireTokenRedirect({ scopes: ["User.Read.All"] });
+      } else {
+        showToast(err.message || "Failed to sync with Azure.", "error");
+      }
+    }
+  };
+
   const forgotPassword = async (email: string): Promise<boolean> => { showToast('Reset link sent to your email', 'success'); return true; };
 
   const toggleTheme = () => {
@@ -285,6 +359,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateUser = async (id: string | number, data: Partial<Employee>) => {
     const existing = employees.find(e => String(e.id) === String(id));
     if (existing) { await db.updateEmployee({ ...existing, ...data }); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Profile updated', 'success'); }
+  };
+  const bulkUpdateEmployees = async (updates: { id: string | number, data: Partial<Employee> }[]) => {
+    for (const update of updates) {
+      const existing = employees.find(e => String(e.id) === String(update.id));
+      if (existing) await db.updateEmployee({ ...existing, ...update.data });
+    }
+    await refreshData();
   };
   const deleteEmployee = async (id: string | number) => { 
     try {
@@ -450,12 +531,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     employees, users: employees, departments, roles, positions, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
     login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
-    addEmployee, updateEmployee, updateUser, deleteEmployee, addDepartment, updateDepartment, deleteDepartment,
+    addEmployee, updateEmployee, updateUser, bulkUpdateEmployees, deleteEmployee, addDepartment, updateDepartment, deleteDepartment,
     addPosition, updatePosition, deletePosition,
     addRole, updateRole, deleteRole, addProject, updateProject, deleteProject, addLeave, addLeaves, updateLeave, updateLeaveStatus,
     addLeaveType, updateLeaveType, deleteLeaveType, addTimeEntry, updateTimeEntry, deleteTimeEntry,
     checkIn, checkOut, updateAttendanceRecord, getTodayAttendance, notify, markNotificationRead, markAllRead,
-    addHoliday, addHolidays, deleteHoliday, generatePayslips, manualAddPayslip
+    addHoliday, addHolidays, deleteHoliday, generatePayslips, manualAddPayslip, syncAzureUsers
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

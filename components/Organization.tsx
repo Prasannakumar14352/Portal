@@ -194,7 +194,7 @@ const EmployeePicker: React.FC<{
 
 const Organization = () => {
   const { 
-    currentUser, departments, projects, users, notify, updateUser, 
+    currentUser, departments, projects, users, notify, updateUser, bulkUpdateEmployees,
     addDepartment, updateDepartment, deleteDepartment, 
     positions, addPosition, updatePosition, deletePosition,
     employees, addEmployee, updateEmployee, deleteEmployee,
@@ -223,13 +223,10 @@ const Organization = () => {
 
   useEffect(() => { setCurrentPage(1); }, [activeTab]);
 
-  // --- Submission Handlers with assignment logic ---
-
   const handleDeptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetDeptId = deptForm.id;
     
-    // 1. Create or Update Department
     if (deptForm.id) {
       await updateDepartment(deptForm.id, { name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
     } else {
@@ -238,21 +235,19 @@ const Organization = () => {
       targetDeptId = newId;
     }
 
-    // 2. Batch Update Employee Assignments
-    // We update employees concurrently where possible
-    const updates = employees.map(emp => {
+    const updates: { id: string | number, data: Partial<Employee> }[] = [];
+    employees.forEach(emp => {
       const isSelected = deptForm.employeeIds.includes(emp.id);
       const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
       
       if (isSelected && !currentlyInDept) {
-        return updateUser(emp.id, { departmentId: targetDeptId, department: deptForm.name });
+        updates.push({ id: emp.id, data: { departmentId: targetDeptId, department: deptForm.name } });
       } else if (!isSelected && currentlyInDept) {
-        return updateUser(emp.id, { departmentId: '', department: 'General' });
+        updates.push({ id: emp.id, data: { departmentId: '', department: 'General' } });
       }
-      return null;
-    }).filter(p => p !== null);
+    });
 
-    await Promise.all(updates);
+    if (updates.length > 0) await bulkUpdateEmployees(updates);
     
     notify(`Department ${deptForm.name} saved and ${deptForm.employeeIds.length} members assigned.`);
     setShowDeptModal(false);
@@ -281,33 +276,30 @@ const Organization = () => {
       targetProjId = newId;
     }
 
-    // 2. Batch Update Employee Project Assignments
-    const updates = employees.map(emp => {
+    const updates: { id: string | number, data: Partial<Employee> }[] = [];
+    employees.forEach(emp => {
       const isSelected = projForm.employeeIds.includes(emp.id);
       const currentProjects = emp.projectIds || [];
       const hasProject = currentProjects.includes(targetProjId);
 
       if (isSelected && !hasProject) {
-        return updateUser(emp.id, { projectIds: [...currentProjects, targetProjId] });
+        updates.push({ id: emp.id, data: { projectIds: [...currentProjects, targetProjId] } });
       } else if (!isSelected && hasProject) {
-        return updateUser(emp.id, { projectIds: currentProjects.filter(id => String(id) !== String(targetProjId)) });
+        updates.push({ id: emp.id, data: { projectIds: currentProjects.filter(id => String(id) !== String(targetProjId)) } });
       }
-      return null;
-    }).filter(p => p !== null);
+    });
 
-    await Promise.all(updates);
+    if (updates.length > 0) await bulkUpdateEmployees(updates);
     
     notify(`Project ${projForm.name} updated. ${projForm.employeeIds.length} members assigned.`);
     setShowProjModal(false);
   };
 
-  // Fix: Added openPosEdit helper function
   const openPosEdit = (pos: Position) => {
     setPosForm({ id: pos.id, title: pos.title, description: pos.description });
     setShowPosModal(true);
   };
 
-  // Fix: Added openProjEdit helper function
   const openProjEdit = (proj: Project & { employeeIds: (string | number)[] }) => {
     setProjForm({
       id: proj.id,
