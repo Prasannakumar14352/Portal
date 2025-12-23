@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
 
   // Filter notifications for the current user
   const myNotifications = notifications
-    .filter(n => n.userId === user.id)
+    .filter(n => String(n.userId) === String(user.id))
     .sort((a, b) => {
         if (a.read === b.read) return 0;
         return a.read ? 1 : -1;
@@ -139,8 +139,8 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
               className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-600 object-cover flex-shrink-0" 
             />
             <div className="hidden md:block text-left">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{user.name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{user.name}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{user.position || user.role}</p>
             </div>
             <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
           </button>
@@ -149,7 +149,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 duration-200 z-50">
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 mb-1 bg-slate-50/50 dark:bg-slate-900/50">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{user.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.role}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.position || user.role}</p>
               </div>
               <button 
                 onClick={() => {

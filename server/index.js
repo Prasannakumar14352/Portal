@@ -65,7 +65,7 @@ const parseJSON = (str) => {
 
 const toInt = (val) => {
     if (val === null || val === undefined || val === '') return 0;
-    // Strip any non-numeric characters if they accidentally come from frontend
+    // Strip any non-numeric characters if they accidentally come from frontend as string
     const cleaned = String(val).replace(/\D/g, '');
     const n = parseInt(cleaned);
     return isNaN(n) ? 0 : n;
@@ -88,7 +88,7 @@ const initDb = async () => {
         console.log("[DB] Initializing schema and migrations...");
 
         const tables = [
-            { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, employeeId INT, firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100))` },
+            { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, employeeId INT, firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100), position NVARCHAR(100))` },
             { name: 'departments', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U') CREATE TABLE departments (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), managerId NVARCHAR(50))` },
             { name: 'projects', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='projects' AND xtype='U') CREATE TABLE projects (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), status NVARCHAR(50), tasks NVARCHAR(MAX), dueDate NVARCHAR(50))` },
             { name: 'leaves', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U') CREATE TABLE leaves (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(100), type NVARCHAR(50), startDate NVARCHAR(50), endDate NVARCHAR(50), reason NVARCHAR(MAX), status NVARCHAR(50), attachmentUrl NVARCHAR(MAX), managerConsent BIT, notifyUserIds NVARCHAR(MAX), approverId NVARCHAR(50), isUrgent BIT, managerComment NVARCHAR(MAX), hrComment NVARCHAR(MAX), createdAt NVARCHAR(50))` },
@@ -110,6 +110,7 @@ const initDb = async () => {
             { table: 'employees', column: 'workLocation', type: 'NVARCHAR(100)' },
             { table: 'employees', column: 'jobTitle', type: 'NVARCHAR(100)' },
             { table: 'employees', column: 'phone', type: 'NVARCHAR(50)' },
+            { table: 'employees', column: 'position', type: 'NVARCHAR(100)' }, // Position migration
             { table: 'attendance', column: 'workLocation', type: 'NVARCHAR(100)' },
             { table: 'time_entries', column: 'isExtra', type: 'BIT DEFAULT 0' },
             { table: 'time_entries', column: 'extraMinutes', type: 'INT DEFAULT 0' }
@@ -119,7 +120,7 @@ const initDb = async () => {
             if (m.column === 'employeeId') {
                 const colCheck = await request.query(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'employees' AND COLUMN_NAME = 'employeeId'`);
                 if (colCheck.recordset.length > 0 && colCheck.recordset[0].DATA_TYPE !== 'int') {
-                    console.log("[DB] Migrating employeeId column back to INT...");
+                    console.log("[DB] Migrating employeeId column to INT...");
                     await request.query(`ALTER TABLE employees ALTER COLUMN employeeId INT`);
                 }
             } else {
@@ -158,6 +159,7 @@ apiRouter.post('/employees', async (req, res) => {
         request.input('email', sql.NVarChar, toStr(e.email));
         request.input('password', sql.NVarChar, toStr(e.password));
         request.input('role', sql.NVarChar, toStr(e.role));
+        request.input('position', sql.NVarChar, toStr(e.position)); // Add position
         request.input('department', sql.NVarChar, toStr(e.department));
         request.input('departmentId', sql.NVarChar, toStr(e.departmentId));
         request.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds || []));
@@ -171,8 +173,8 @@ apiRouter.post('/employees', async (req, res) => {
         request.input('jobTitle', sql.NVarChar, toStr(e.jobTitle));
         request.input('workLocation', sql.NVarChar, toStr(e.workLocation));
 
-        await request.query(`INSERT INTO employees (id, employeeId, firstName, lastName, email, password, role, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, phone, jobTitle, workLocation) 
-            VALUES (@id, @employeeId, @firstName, @lastName, @email, @password, @role, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @phone, @jobTitle, @workLocation)`);
+        await request.query(`INSERT INTO employees (id, employeeId, firstName, lastName, email, password, role, position, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, phone, jobTitle, workLocation) 
+            VALUES (@id, @employeeId, @firstName, @lastName, @email, @password, @role, @position, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @phone, @jobTitle, @workLocation)`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -186,11 +188,12 @@ apiRouter.put('/employees/:id', async (req, res) => {
         const targetId = toStr(req.params.id);
         request.input('id', sql.NVarChar, targetId);
         
-        request.input('employeeId', sql.Int, toInt(e.employeeId));
+        request.input('employeeId', sql.Int, toInt(e.employeeId)); // Cast to INT
         request.input('firstName', sql.NVarChar, toStr(e.firstName));
         request.input('lastName', sql.NVarChar, toStr(e.lastName));
-        request.input('email', sql.NVarChar, toStr(e.email)); // Fixed: Include email in updates
+        request.input('email', sql.NVarChar, toStr(e.email)); 
         request.input('role', sql.NVarChar, toStr(e.role));
+        request.input('position', sql.NVarChar, toStr(e.position)); // Add position
         request.input('department', sql.NVarChar, toStr(e.department));
         request.input('departmentId', sql.NVarChar, toStr(e.departmentId));
         request.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds || []));
@@ -205,7 +208,7 @@ apiRouter.put('/employees/:id', async (req, res) => {
 
         const result = await request.query(`UPDATE employees SET 
             employeeId=@employeeId, firstName=@firstName, lastName=@lastName, email=@email,
-            role=@role, department=@department, departmentId=@departmentId, projectIds=@projectIds, 
+            role=@role, position=@position, department=@department, departmentId=@departmentId, projectIds=@projectIds, 
             status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, 
             location=@location, phone=@phone, jobTitle=@jobTitle, workLocation=@workLocation 
             WHERE id=@id`);

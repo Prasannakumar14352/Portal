@@ -153,23 +153,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
             if (!targetUser) {
-                console.log(`[Auth] Auto-provisioning new Azure user: ${email}`);
-                // Robust nextId calculation that handles potential string IDs in existing records
                 const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
                 const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
                 
                 const newEmp: Employee = {
                     id: nextId,
-                    employeeId: `EMP${nextId}`,
+                    employeeId: `${nextId}`, // Numeric strictly
                     firstName: name.split(' ')[0],
                     lastName: name.split(' ').slice(1).join(' ') || 'User',
                     email: email,
                     password: 'ms-auth-user', 
                     role: 'Employee',
+                    position: 'New Joiner',
                     department: 'General',
-                    departmentId: '', // Default empty for required SQL field
-                    projectIds: [],   // Default empty for required SQL field
-                    managerId: '',    // Default empty for required SQL field
+                    departmentId: '', 
+                    projectIds: [],   
+                    managerId: '',    
                     joinDate: new Date().toISOString().split('T')[0],
                     status: EmployeeStatus.ACTIVE,
                     salary: 0,
@@ -187,6 +186,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 setCurrentUser({ 
                     id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
                     role: targetUser.role.includes('HR') || targetUser.role.includes('Admin') ? UserRole.HR : targetUser.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+                    position: targetUser.position,
                     avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
                     departmentId: targetUser.departmentId, projectIds: targetUser.projectIds,
                     location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
@@ -200,15 +200,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
-  const toggleTheme = () => {
-    setTheme(prev => {
-        const newTheme = prev === 'light' ? 'dark' : 'light';
-        localStorage.setItem('theme', newTheme);
-        newTheme === 'dark' ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark');
-        return newTheme;
-    });
-  };
-
   const login = async (email: string, password: string): Promise<boolean> => {
     const currentEmployees = await db.getEmployees();
     let user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
@@ -216,6 +207,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
             role: user.role.includes('HR') || user.role.includes('Admin') ? UserRole.HR : user.role.includes('Manager') ? UserRole.MANAGER : UserRole.EMPLOYEE,
+            position: user.position,
             avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
             departmentId: user.departmentId, projectIds: user.projectIds,
             location: user.location, workLocation: user.workLocation, hireDate: user.joinDate
@@ -226,7 +218,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Invalid email or password.', 'error');
     return false;
   };
-
+  
   const loginWithMicrosoft = async (): Promise<boolean> => {
     if (!msalInstance) return false;
     try {
@@ -256,6 +248,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const forgotPassword = async (email: string): Promise<boolean> => { showToast('Reset link sent to your email', 'success'); return true; };
 
+  // Fix: implement toggleTheme
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
     setToasts(prev => [...prev, { id, message, type }]);
@@ -266,7 +270,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addEmployee = async (emp: Employee) => { await db.addEmployee(emp); setEmployees(await db.getEmployees()); showToast('Employee added', 'success'); };
   const updateEmployee = async (emp: Employee) => { await db.updateEmployee(emp); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Employee updated', 'success'); };
   const updateUser = async (id: string | number, data: Partial<Employee>) => {
-    const existing = employees.find(e => e.id === id);
+    const existing = employees.find(e => String(e.id) === String(id));
     if (existing) { await db.updateEmployee({ ...existing, ...data }); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Profile updated', 'success'); }
   };
   const deleteEmployee = async (id: string | number) => { 

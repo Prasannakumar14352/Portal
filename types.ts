@@ -1,5 +1,4 @@
 
-
 export enum DepartmentType {
   IT = 'IT',
   HR = 'HR',
@@ -44,14 +43,14 @@ export interface Project {
 }
 
 export interface Employee {
-  /* Updated id to support both string and number */
   id: number | string;
-  employeeId: string; // Business ID like EMP001
+  employeeId: string; 
   firstName: string;
   lastName: string;
   email: string;
   password?: string;
   role: string;
+  position?: string; // New field
   department: string; 
   departmentId?: string | number; 
   projectIds?: (string | number)[]; 
@@ -147,11 +146,11 @@ export enum UserRole {
 }
 
 export interface User {
-  /* Updated id to support both string and number */
   id: number | string;
   employeeId: string;
   name: string;
   role: UserRole;
+  position?: string; // New field
   avatar: string;
   managerId?: string | number;
   jobTitle?: string;
