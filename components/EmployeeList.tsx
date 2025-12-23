@@ -261,7 +261,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(emp.employeeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.role.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDept = filterDept === 'All' || emp.department === filterDept;
       const matchesStatus = filterStatus === 'All' || emp.status === filterStatus;
@@ -343,11 +343,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         const role = row['Role'] || row['role'] || (roles.length > 0 ? roles[0].name : 'Employee');
         const dept = row['Department'] || row['department'] || (departments.length > 0 ? departments[0].name : 'General');
         const salary = parseFloat(row['Salary'] || row['salary'] || '0');
-        const empId = row['Employee ID'] || row['employeeId'] || `EMP${nextId}`;
+        const empId = row['Employee ID'] || row['employeeId'] || nextId;
 
         const newEmp: Employee = {
           id: nextId,
-          employeeId: empId,
+          employeeId: String(empId).replace(/\D/g, ''), // Ensure numeric
           firstName: fName,
           lastName: lName,
           email: email,
@@ -361,7 +361,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           phone: row['Phone'] || row['phone'] || '',
           workLocation: row['Work Location'] || row['workLocation'] || WORK_LOCATIONS[0],
           projectIds: []
-        } as Employee;
+        } as unknown as Employee;
 
         onAddEmployee(newEmp);
         nextId++;
@@ -390,12 +390,12 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       const newPassword = generatePassword();
       const newEmployee: Employee = {
         id: nextId,
-        employeeId: formData.employeeId || `EMP${nextId}`,
+        employeeId: formData.employeeId || nextId.toString(), // Removed 'EMP' prefix
         joinDate: new Date().toISOString().split('T')[0],
         avatar: formData.avatar || `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=0D9488&color=fff`,
         password: newPassword, 
         ...formData
-      } as Employee;
+      } as unknown as Employee;
       onAddEmployee(newEmployee);
       setGeneratedCreds({ email: newEmployee.email, password: newPassword });
       setShowModal(false);
@@ -703,7 +703,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   <ul className="text-xs text-slate-500 dark:text-slate-400 list-disc pl-5 space-y-1">
                       <li>Passwords will be automatically generated and can be viewed in the directory after import.</li>
                       <li>Existing email addresses will be skipped to prevent duplicates.</li>
-                      <li>Optional columns: <b>Employee ID</b>, <b>Salary</b>, <b>Phone</b>, <b>Work Location</b>.</li>
+                      <li>Optional columns: <b>Employee ID (Numeric)</b>, <b>Salary</b>, <b>Phone</b>, <b>Work Location</b>.</li>
                   </ul>
               </div>
 
@@ -782,10 +782,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Employee ID</label>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Numeric Employee ID</label>
               <div className="relative">
                 <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input required type="text" placeholder="EMP_XXXX" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all font-mono" />
+                <input required type="number" placeholder="1001" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all font-mono" />
               </div>
             </div>
             <div>

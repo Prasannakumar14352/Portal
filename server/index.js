@@ -65,7 +65,9 @@ const parseJSON = (str) => {
 
 const toInt = (val) => {
     if (val === null || val === undefined || val === '') return 0;
-    const n = parseInt(val);
+    // Strip any non-numeric characters if they accidentally come from frontend
+    const cleaned = String(val).replace(/\D/g, '');
+    const n = parseInt(cleaned);
     return isNaN(n) ? 0 : n;
 };
 
@@ -104,7 +106,7 @@ const initDb = async () => {
         }
         
         const migrations = [
-            { table: 'employees', column: 'employeeId', type: 'INT' },
+            { table: 'employees', column: 'employeeId', type: 'INT' }, 
             { table: 'employees', column: 'workLocation', type: 'NVARCHAR(100)' },
             { table: 'employees', column: 'jobTitle', type: 'NVARCHAR(100)' },
             { table: 'employees', column: 'phone', type: 'NVARCHAR(50)' },
@@ -114,7 +116,16 @@ const initDb = async () => {
         ];
 
         for (const m of migrations) {
-            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'${m.column}' AND Object_ID = Object_ID(N'${m.table}')) ALTER TABLE ${m.table} ADD ${m.column} ${m.type}`);
+            if (m.column === 'employeeId') {
+                const colCheck = await request.query(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'employees' AND COLUMN_NAME = 'employeeId'`);
+                if (colCheck.recordset.length > 0 && colCheck.recordset[0].DATA_TYPE !== 'int') {
+                    console.log("[DB] Migrating employeeId column back to INT...");
+                    // Try to cast existing data, though alphanumeric IDs might cause errors here if not cleaned
+                    await request.query(`ALTER TABLE employees ALTER COLUMN employeeId INT`);
+                }
+            } else {
+                await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'${m.column}' AND Object_ID = Object_ID(N'${m.table}')) ALTER TABLE ${m.table} ADD ${m.column} ${m.type}`);
+            }
         }
 
         console.log("✅ [DB] Initialization complete.");
@@ -142,7 +153,7 @@ apiRouter.post('/employees', async (req, res) => {
         const e = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(e.id));
-        request.input('employeeId', sql.Int, toInt(e.employeeId));
+        request.input('employeeId', sql.Int, toInt(e.employeeId)); // Cast to INT
         request.input('firstName', sql.NVarChar, toStr(e.firstName));
         request.input('lastName', sql.NVarChar, toStr(e.lastName));
         request.input('email', sql.NVarChar, toStr(e.email));
@@ -172,6 +183,7 @@ apiRouter.put('/employees/:id', async (req, res) => {
         const e = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(req.params.id));
+        request.input('employeeId', sql.Int, toInt(e.employeeId)); // Cast to INT
         request.input('firstName', sql.NVarChar, toStr(e.firstName));
         request.input('lastName', sql.NVarChar, toStr(e.lastName));
         request.input('role', sql.NVarChar, toStr(e.role));
@@ -187,7 +199,7 @@ apiRouter.put('/employees/:id', async (req, res) => {
         request.input('jobTitle', sql.NVarChar, toStr(e.jobTitle));
         request.input('workLocation', sql.NVarChar, toStr(e.workLocation));
 
-        await request.query(`UPDATE employees SET firstName=@firstName, lastName=@lastName, role=@role, department=@department, departmentId=@departmentId, projectIds=@projectIds, status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, phone=@phone, jobTitle=@jobTitle, workLocation=@workLocation WHERE id=@id`);
+        await request.query(`UPDATE employees SET employeeId=@employeeId, firstName=@firstName, lastName=@lastName, role=@role, department=@department, departmentId=@departmentId, projectIds=@projectIds, status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, location=@location, phone=@phone, jobTitle=@jobTitle, workLocation=@workLocation WHERE id=@id`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
