@@ -185,7 +185,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (activeAccount) {
             const email = activeAccount.username;
             const tokenResponse = await pca.acquireTokenSilent({
-              scopes: ["User.Read"],
+              scopes: ["User.Read", "User.ReadWrite.All"],
               account: activeAccount
             });
             const azureProfile = await microsoftGraphService.fetchMe(tokenResponse.accessToken);
@@ -505,18 +505,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Employee added locally', 'success'); 
   };
 
-  const updateEmployee = async (emp: Employee) => { await db.updateEmployee(emp); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Employee updated', 'success'); };
+  const updateEmployee = async (emp: Employee) => { 
+    await db.updateEmployee(emp); 
+    // Trigger Azure Update if it's an SSO account
+    if (emp.password === 'ms-auth-user') {
+      await bulkUpdateEmployees([{ id: emp.id, data: emp }]);
+    } else {
+      setEmployees(await db.getEmployees()); 
+      setAttendance(await db.getAttendance()); 
+      showToast('Employee updated locally', 'success'); 
+    }
+  };
+
   const updateUser = async (id: string | number, data: Partial<Employee>) => {
     const existing = employees.find(e => String(e.id) === String(id));
-    if (existing) { await db.updateEmployee({ ...existing, ...data }); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Profile updated', 'success'); }
+    if (existing) { 
+      await db.updateEmployee({ ...existing, ...data }); 
+      // Push to Azure if SSO
+      if (existing.password === 'ms-auth-user') {
+         await bulkUpdateEmployees([{ id: id, data: data }]);
+      } else {
+        setEmployees(await db.getEmployees()); 
+        setAttendance(await db.getAttendance()); 
+        showToast('Profile updated', 'success'); 
+      }
+    }
   };
+
   const bulkUpdateEmployees = async (updates: { id: string | number, data: Partial<Employee> }[]) => {
+    // 1. Perform Local DB Updates
     for (const update of updates) {
       const existing = employees.find(e => String(e.id) === String(update.id));
       if (existing) await db.updateEmployee({ ...existing, ...update.data });
     }
+
+    // 2. Sync to Azure Portal (Requires permission and active session)
+    if (msalInstance && currentUser && (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN)) {
+      try {
+        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+        if (account) {
+          const tokenResponse = await msalInstance.acquireTokenSilent({
+            scopes: ["User.ReadWrite.All"],
+            account: account
+          });
+          
+          let azureSyncCount = 0;
+          for (const update of updates) {
+            const emp = employees.find(e => String(e.id) === String(update.id));
+            // Only sync employees who are marked as MS-AUTH (meaning they came from Azure)
+            if (emp && emp.password === 'ms-auth-user') {
+              try {
+                await microsoftGraphService.updateUser(tokenResponse.accessToken, emp.email, update.data);
+                azureSyncCount++;
+              } catch (e) {
+                console.error(`Azure sync failed for ${emp.email}:`, e);
+              }
+            }
+          }
+          if (azureSyncCount > 0) {
+            showToast(`Synced ${azureSyncCount} user(s) to Azure Portal.`, 'success');
+          }
+        }
+      } catch (err) {
+        console.warn("Permission missing or session expired for Azure Sync. Local changes saved only.");
+      }
+    }
+
     await refreshData();
   };
+
   const deleteEmployee = async (id: string | number) => { 
     try {
       await db.deleteEmployee(id.toString()); setEmployees(await db.getEmployees()); showToast('Employee and all linked records deleted', 'success'); 

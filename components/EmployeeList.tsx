@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw, Share2, Send, CheckCircle, Clock, XCircle, Calendar, UserCheck } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw, Share2, Send, CheckCircle, Clock, XCircle, Calendar, UserCheck, Cloud } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -71,15 +71,16 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   const totalPages = Math.ceil((activeTab === 'active' ? filteredEmployees.length : filteredInvitations.length) / itemsPerPage);
 
-  const handleAzureSync = async () => {
+  const handleAzureSyncFromPortal = async () => {
     setIsSyncing(true);
-    await syncAzureUsers();
+    await syncAzureUsers(); // Pulls from Azure
     setIsSyncing(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingEmployee) {
+      // Logic inside AppContext will detect if this is an Azure user and push changes UP to the portal
       onUpdateEmployee({ ...editingEmployee, ...formData } as Employee);
       setShowModal(false);
     } else {
@@ -129,18 +130,18 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Directory Management</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Onboard new team members and manage active employees.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Manage employees and external directory synchronization.</p>
         </div>
         <div className="flex flex-wrap gap-2">
             {isPowerUser && (
                 <>
                   <button 
-                    onClick={handleAzureSync} 
+                    onClick={handleAzureSyncFromPortal} 
                     disabled={isSyncing}
                     className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50"
                   >
                       <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-                      <span>Sync Azure</span>
+                      <span>Sync FROM Azure</span>
                   </button>
                   <button onClick={openAddModal} className="flex items-center space-x-2 bg-teal-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold active:scale-95 transition-transform">
                       <Send size={16} />
@@ -199,7 +200,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Employee' : 'Invitee'}</th>
-                <th className="px-6 py-4">{activeTab === 'active' ? 'Employee ID' : 'Invited On'}</th>
+                <th className="px-6 py-4">{activeTab === 'active' ? 'ID' : 'Invited On'}</th>
                 <th className="px-6 py-4">Position</th>
                 <th className="px-6 py-4">Department</th>
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Status' : 'Azure Sync'}</th>
@@ -214,7 +215,12 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                         <div className="flex items-center space-x-3">
                           <img src={emp.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" />
                           <div>
-                            <div className="font-bold text-slate-800 dark:text-white text-sm">{emp.firstName} {emp.lastName}</div>
+                            <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-white text-sm">
+                                {emp.firstName} {emp.lastName}
+                                {emp.password === 'ms-auth-user' && (
+                                    <Cloud size={14} className="text-blue-500" title="Synced with Azure Portal" />
+                                )}
+                            </div>
                             <div className="text-[11px] text-slate-400 font-medium">{emp.email}</div>
                           </div>
                         </div>
@@ -227,8 +233,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>{emp.status}</span></td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-1">
-                          <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-2"><Eye size={16} /></button>
-                          {isPowerUser && <button onClick={() => { setEditingEmployee(emp); setFormData({ ...emp, managerId: emp.managerId || '' }); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2"><Edit2 size={16} /></button>}
+                          <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-2" title="View Profile"><Eye size={16} /></button>
+                          {isPowerUser && <button onClick={() => { setEditingEmployee(emp); setFormData({ ...emp, managerId: emp.managerId || '' }); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2" title="Edit & Sync"><Edit2 size={16} /></button>}
                         </div>
                       </td>
                     </tr>
@@ -256,7 +262,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <td className="px-6 py-4">
                         {inv.provisionInAzure ? (
                             <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase">
-                                <RefreshCw size={12}/> Will Provision
+                                <Cloud size={12}/> Provisioning
                             </span>
                         ) : (
                             <span className="text-slate-400 text-[10px] font-bold uppercase">Local Only</span>
@@ -267,14 +273,12 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                            <button 
                              onClick={() => acceptInvitation(inv.id)}
                              className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"
-                             title="HR can simulate the employee clicking accept here"
                            >
                              <CheckCircle size={12}/> Accept (Demo)
                            </button>
                            <button 
                              onClick={() => revokeInvitation(inv.id)}
                              className="text-slate-400 hover:text-red-600 p-2"
-                             title="Revoke Invite"
                            >
                              <XCircle size={18} />
                            </button>
@@ -297,7 +301,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           <div className="space-y-6">
             <div className="flex flex-col items-center text-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                <img src={viewingEmployee.avatar} className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 shadow-xl mb-4 object-cover" alt="" />
-               <h3 className="text-xl font-black text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+               <div className="flex items-center gap-2 justify-center">
+                   <h3 className="text-xl font-black text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+                   {viewingEmployee.password === 'ms-auth-user' && <Cloud className="text-blue-500" size={18} />}
+               </div>
                <p className="text-teal-600 dark:text-teal-400 font-bold uppercase tracking-widest text-xs mt-1">{viewingEmployee.position || 'Consultant'}</p>
                <div className="mt-4 flex gap-2">
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${viewingEmployee.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{viewingEmployee.status}</span>
@@ -329,17 +336,31 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       </DraggableModal>
 
       {/* INVITE / EDIT MODAL */}
-      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit Employee' : 'Send New Invitation'} width="max-w-2xl">
+      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Send New Invitation'} width="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {editingEmployee && editingEmployee.password === 'ms-auth-user' && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex items-start gap-4">
+                  <div className="bg-blue-600 text-white p-2 rounded-lg">
+                      <Cloud size={20} />
+                  </div>
+                  <div>
+                      <p className="text-sm font-bold text-blue-900 dark:text-blue-200 uppercase tracking-tight">Active SSO Directory Link</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
+                          This employee is managed via Azure. Changes to <strong>Name, Position, and Department</strong> will be automatically pushed to the Azure Portal upon saving.
+                      </p>
+                  </div>
+              </div>
+          )}
+
           {!editingEmployee && (
               <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-xl border border-teal-100 dark:border-teal-800 flex items-start gap-4">
                   <div className="bg-teal-600 text-white p-2 rounded-lg">
                       <Mail size={20} />
                   </div>
                   <div>
-                      <p className="text-sm font-bold text-teal-900 dark:text-teal-200">How invitations work</p>
+                      <p className="text-sm font-bold text-teal-900 dark:text-teal-200 uppercase tracking-tight">Onboarding Invitation</p>
                       <p className="text-xs text-teal-700 dark:text-teal-400 leading-relaxed">
-                          We will send an email to this address. Once they accept, they will be added to the portal and (if selected) automatically provisioned in Azure.
+                          We will send an invitation email. Once they accept, they will be added to the directory and synced with Azure (if enabled).
                       </p>
                   </div>
               </div>
@@ -384,7 +405,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 >
                     <option value="">No Manager Assigned (Direct Report to HQ)</option>
                     {employees
-                      .filter(emp => String(emp.id) !== String(editingEmployee?.id)) // Prevent self-reporting
+                      .filter(emp => String(emp.id) !== String(editingEmployee?.id)) 
                       .map(emp => (
                         <option key={emp.id} value={emp.id}>{emp.firstName} {emp.lastName} ({emp.position || emp.role})</option>
                       ))
@@ -397,10 +418,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           {!editingEmployee && (
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                   <Share2 className="text-blue-600" size={20} />
+                   <Cloud className="text-blue-600" size={20} />
                    <div>
-                       <p className="text-sm font-bold text-blue-900 dark:text-teal-200 leading-tight">Provision in Azure Portal</p>
-                       <p className="text-[10px] text-blue-600 dark:text-teal-400 font-medium">Create user in Azure Entra ID when they accept.</p>
+                       <p className="text-sm font-bold text-blue-900 dark:text-blue-200 leading-tight">Provision in Azure Portal</p>
+                       <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">Create user in Azure Entra ID when they accept.</p>
                    </div>
                 </div>
                 <div 
@@ -414,7 +435,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
           <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
-            <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest">{editingEmployee ? 'Update' : 'Send Invitation'}</button>
+            <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest">{editingEmployee ? (editingEmployee.password === 'ms-auth-user' ? 'Update & Sync' : 'Update Locally') : 'Send Invitation'}</button>
           </div>
         </form>
       </DraggableModal>

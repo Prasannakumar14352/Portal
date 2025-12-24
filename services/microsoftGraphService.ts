@@ -53,30 +53,60 @@ export const microsoftGraphService = {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || "Failed to fetch profile from Azure");
+      throw new Error(error.error?.message || "Failed to profile from Azure");
     }
 
     return await response.json();
   },
 
   /**
+   * Updates an existing user in the Azure Portal
+   * Requires User.ReadWrite.All
+   */
+  updateUser: async (accessToken: string, userPrincipalName: string, data: any): Promise<void> => {
+    const endpoint = `https://graph.microsoft.com/v1.0/users/${userPrincipalName}`;
+    
+    // Construct payload based on local employee fields
+    const body: any = {};
+    if (data.department) body.department = data.department;
+    if (data.position || data.jobTitle) body.jobTitle = data.position || data.jobTitle;
+    if (data.firstName) body.givenName = data.firstName;
+    if (data.lastName) body.surname = data.lastName;
+    if (data.firstName && data.lastName) body.displayName = `${data.firstName} ${data.lastName}`;
+    if (data.employeeId) body.employeeId = String(data.employeeId);
+
+    const response = await fetch(endpoint, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || "Azure Update Failed");
+    }
+  },
+
+  /**
    * Creates a new user in the Azure Portal
-   * Requires User.ReadWrite.All or Directory.ReadWrite.All
+   * Requires User.ReadWrite.All
    */
   createUser: async (accessToken: string, userData: any): Promise<any> => {
     const endpoint = "https://graph.microsoft.com/v1.0/users";
     
-    // Azure requires a specific structure for user creation
     const body = {
       accountEnabled: true,
       displayName: `${userData.firstName} ${userData.lastName}`,
       mailNickname: userData.firstName.toLowerCase(),
-      userPrincipalName: userData.email, // Should be user@yourtenant.onmicrosoft.com
+      userPrincipalName: userData.email,
       passwordProfile: {
         forceChangePasswordNextSignIn: true,
-        password: userData.password || "TempPass123!" // Initial temp password
+        password: userData.password || "TempPass123!"
       },
-      jobTitle: userData.jobTitle,
+      jobTitle: userData.jobTitle || userData.position,
       department: userData.department,
       employeeId: String(userData.employeeId),
       givenName: userData.firstName,
