@@ -123,6 +123,47 @@ const initDb = async () => {
 
 const apiRouter = express.Router();
 
+// --- ROLES ---
+apiRouter.get('/roles', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM roles");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.post('/roles', async (req, res) => {
+    try {
+        const r = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(r.id));
+        request.input('name', sql.NVarChar, toStr(r.name));
+        request.input('description', sql.NVarChar, toStr(r.description));
+        await request.query("INSERT INTO roles (id, name, description) VALUES (@id, @name, @description)");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.put('/roles/:id', async (req, res) => {
+    try {
+        const r = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(req.params.id));
+        request.input('name', sql.NVarChar, toStr(r.name));
+        request.input('description', sql.NVarChar, toStr(r.description));
+        await request.query("UPDATE roles SET name=@name, description=@description WHERE id=@id");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.delete('/roles/:id', async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(req.params.id));
+        await request.query("DELETE FROM roles WHERE id=@id");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- POSITIONS ---
 apiRouter.get('/positions', async (req, res) => {
     try {
@@ -251,9 +292,6 @@ apiRouter.delete('/employees/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-// --- OTHER CRUD ROUTES (DEPARTMENTS, PROJECTS, LEAVES, ETC.) ---
-// (Remain unchanged from previous version)
 
 apiRouter.get('/departments', async (req, res) => {
     try {

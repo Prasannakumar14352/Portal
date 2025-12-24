@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw, Share2, Send, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw, Share2, Send, CheckCircle, Clock, XCircle, Calendar } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -50,6 +50,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(emp.employeeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
         (emp.position || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDept = filterDept === 'All' || emp.department === filterDept;
       return matchesSearch && matchesDept;
@@ -82,7 +83,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       onUpdateEmployee({ ...editingEmployee, ...formData } as Employee);
       setShowModal(false);
     } else {
-      // New logic: send invitation instead of direct add
       await inviteEmployee({
           ...formData,
           provisionInAzure: provisionInAzure
@@ -105,6 +105,23 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
     });
     setShowModal(true);
   };
+
+  const openViewModal = (emp: Employee) => {
+    setViewingEmployee(emp);
+    setShowViewModal(true);
+  };
+
+  const DetailRow = ({ icon: Icon, label, value }: { icon: any, label: string, value: string | number }) => (
+    <div className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+      <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-teal-600 dark:text-teal-400">
+        <Icon size={16} />
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{label}</p>
+        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{value || 'N/A'}</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -181,7 +198,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Employee' : 'Invitee'}</th>
-                <th className="px-6 py-4">{activeTab === 'active' ? 'ID' : 'Invited On'}</th>
+                <th className="px-6 py-4">{activeTab === 'active' ? 'Employee ID' : 'Invited On'}</th>
                 <th className="px-6 py-4">Position & Role</th>
                 <th className="px-6 py-4">Department</th>
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Status' : 'Azure Sync'}</th>
@@ -201,7 +218,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-black text-slate-500">{emp.employeeId || emp.id}</td>
+                      <td className="px-6 py-4 text-xs font-black text-slate-500">{emp.employeeId}</td>
                       <td className="px-6 py-4">
                         <div className="text-xs text-slate-900 dark:text-slate-200 font-bold">{emp.position || 'Consultant'}</div>
                         <div className="text-[10px] text-slate-400 uppercase tracking-tight">{emp.role}</div>
@@ -210,7 +227,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>{emp.status}</span></td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-1">
-                          <button className="text-slate-400 hover:text-blue-600 p-2"><Eye size={16} /></button>
+                          <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-2"><Eye size={16} /></button>
                           {isPowerUser && <button onClick={() => { setEditingEmployee(emp); setFormData(emp); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2"><Edit2 size={16} /></button>}
                         </div>
                       </td>
@@ -273,6 +290,36 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           </table>
         </div>
       </div>
+
+      {/* VIEW DETAILS MODAL */}
+      <DraggableModal isOpen={showViewModal} onClose={() => setShowViewModal(false)} title="Employee Profile" width="max-w-xl">
+        {viewingEmployee && (
+          <div className="space-y-6">
+            <div className="flex flex-col items-center text-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+               <img src={viewingEmployee.avatar} className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 shadow-xl mb-4 object-cover" alt="" />
+               <h3 className="text-xl font-black text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+               <p className="text-teal-600 dark:text-teal-400 font-bold uppercase tracking-widest text-xs mt-1">{viewingEmployee.position || 'Consultant'}</p>
+               <div className="mt-4 flex gap-2">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${viewingEmployee.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{viewingEmployee.status}</span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">{viewingEmployee.department}</span>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailRow icon={Hash} label="Employee ID" value={viewingEmployee.employeeId} />
+                <DetailRow icon={Mail} label="Email Address" value={viewingEmployee.email} />
+                <DetailRow icon={Phone} label="Contact Number" value={viewingEmployee.phone || 'Not Provided'} />
+                <DetailRow icon={Calendar} label="Join Date" value={viewingEmployee.joinDate} />
+                <DetailRow icon={MapPin} label="Work Location" value={viewingEmployee.workLocation || 'Office HQ India'} />
+                <DetailRow icon={Briefcase} label="System Role" value={viewingEmployee.role} />
+            </div>
+
+            <div className="pt-6 border-t dark:border-slate-700 flex justify-end">
+               <button onClick={() => setShowViewModal(false)} className="px-8 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest">Close Profile</button>
+            </div>
+          </div>
+        )}
+      </DraggableModal>
 
       {/* INVITE MODAL */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit Employee' : 'Send New Invitation'} width="max-w-2xl">
