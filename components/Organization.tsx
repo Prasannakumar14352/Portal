@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2 } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2, Calendar, MoreVertical } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -13,44 +13,24 @@ interface TreeNode extends Employee {
 const buildOrgTree = (employees: Employee[], deptHeadId?: string | number): TreeNode[] => {
   const empMap: Record<string, TreeNode> = {};
   employees.forEach(emp => { empMap[emp.id] = { ...emp, children: [] }; });
-  
   const roots: TreeNode[] = [];
-  
-  // If we have a specific Department Head ID, we want to prioritize them as root
   const headIdStr = deptHeadId ? String(deptHeadId) : null;
 
   employees.forEach(emp => {
     const node = empMap[emp.id];
     const empManagerIdStr = emp.managerId ? String(emp.managerId) : null;
     
-    // Logic: 
-    // 1. If we have a dept head and this is the head, it's a root.
-    // 2. If no head or not the head, and manager exists in current map, add as child.
-    // 3. Otherwise, it's a root.
     if (headIdStr && String(emp.id) === headIdStr) {
         roots.push(node);
     } else if (empManagerIdStr && empMap[empManagerIdStr]) {
-        // Prevent circular reference or head reporting to someone else in same view
-        if (headIdStr && empManagerIdStr === headIdStr) {
-             empMap[empManagerIdStr].children.push(node);
-        } else if (!headIdStr) {
-             empMap[empManagerIdStr].children.push(node);
-        } else {
-             // In dept view, if manager is NOT the head, but is in the list, still link them
-             empMap[empManagerIdStr].children.push(node);
-        }
+        empMap[empManagerIdStr].children.push(node);
     } else {
-        // If we are in dept view and this isn't the head and has no manager in this view
-        if (headIdStr && String(emp.id) !== headIdStr) {
-            roots.push(node);
-        } else if (!headIdStr) {
+        if (!headIdStr || String(emp.id) !== headIdStr) {
             roots.push(node);
         }
     }
   });
 
-  // Filter out any nodes that were added to roots but actually have a parent already in empMap
-  // (This handles cases where the head reports to nobody, but others report to the head)
   return roots.filter(root => {
       const isActuallyAChild = employees.some(e => 
           e.managerId && 
@@ -113,7 +93,6 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   );
 };
 
-// ArcGIS Map component
 const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
   const mapDiv = useRef<HTMLDivElement>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -230,7 +209,7 @@ const EmployeePicker: React.FC<{
             );
           })}
           {filtered.length === 0 && (
-            <div className="p-8 text-center text-slate-400 text-[10px] uppercase font-bold italic">No matching unassigned employees.</div>
+            <div className="p-8 text-center text-slate-400 text-[10px] uppercase font-bold italic">No matching employees.</div>
           )}
        </div>
     </div>
@@ -248,37 +227,34 @@ const Organization = () => {
 
   const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [chartDeptFilter, setChartDeptFilter] = useState<string>('all');
-  const [chartZoom, setChartZoom] = useState<number>(0.85); // Slightly zoomed out by default to fit better
+  const [chartZoom, setChartZoom] = useState<number>(0.85);
   
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showPosModal, setShowPosModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string | number, type: 'department' | 'project' } | null>(null);
   
   const [deptForm, setDeptForm] = useState<any>({ id: '', name: '', description: '', managerId: '', employeeIds: [] });
   const [posForm, setPosForm] = useState<any>({ id: '', title: '', description: '' });
-  const [projectForm, setProjectForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasks: [], dueDate: '', employeeIds: [] });
+  const [projectForm, setProjectForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasks: '', dueDate: '', employeeIds: [] });
   
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const treeContainerRef = useRef<HTMLDivElement>(null);
 
   const orgTreeData = useMemo(() => {
-      // Find the manager of the selected department to act as root
       let deptHeadId: string | number | undefined = undefined;
       if (chartDeptFilter !== 'all') {
           const activeDept = departments.find(d => String(d.id) === chartDeptFilter);
           if (activeDept) deptHeadId = activeDept.managerId;
       }
-
       const filteredEmps = chartDeptFilter === 'all' 
         ? employees 
         : employees.filter(e => String(e.departmentId) === String(chartDeptFilter));
-      
       return buildOrgTree(filteredEmps, deptHeadId);
   }, [employees, chartDeptFilter, departments]);
 
-  const availableEmployeesForPicker = useMemo(() => {
+  const availableEmployeesForDeptPicker = useMemo(() => {
     const validDeptIds = new Set(departments.map(d => String(d.id)));
     return employees.filter(emp => {
       const isInCurrentEditingDept = deptForm.id && String(emp.departmentId) === String(deptForm.id);
@@ -298,7 +274,6 @@ const Organization = () => {
   const handleDeptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetDeptId = deptForm.id;
-    
     if (deptForm.id) {
       await updateDepartment(deptForm.id, { name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
     } else {
@@ -306,22 +281,18 @@ const Organization = () => {
       await addDepartment({ id: newId, name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
       targetDeptId = newId;
     }
-
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
     employees.forEach(emp => {
       const selectedIds = [...(deptForm.employeeIds || [])];
       if (deptForm.managerId && !selectedIds.includes(deptForm.managerId)) selectedIds.push(deptForm.managerId);
-
       const isSelected = selectedIds.includes(emp.id);
       const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
-      
       if (isSelected && !currentlyInDept) {
         updates.push({ id: emp.id, data: { departmentId: targetDeptId, department: deptForm.name } });
       } else if (!isSelected && currentlyInDept) {
         updates.push({ id: emp.id, data: { departmentId: '', department: 'General' } });
       }
     });
-
     if (updates.length > 0) await bulkUpdateEmployees(updates);
     notify(`Department ${deptForm.name} saved.`);
     setShowDeptModal(false);
@@ -341,26 +312,58 @@ const Organization = () => {
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let targetProjId = projectForm.id;
+    const taskList = typeof projectForm.tasks === 'string' ? projectForm.tasks.split(',').map((t: string) => t.trim()).filter(Boolean) : projectForm.tasks;
+    
     if (projectForm.id) {
-        await updateProject(projectForm.id, { ...projectForm });
-        notify(`Project "${projectForm.name}" updated.`);
+        await updateProject(projectForm.id, { ...projectForm, tasks: taskList });
     } else {
-        await addProject({ ...projectForm });
-        notify(`Project "${projectForm.name}" created.`);
+        targetProjId = Math.random().toString(36).substr(2, 9);
+        await addProject({ ...projectForm, id: targetProjId, tasks: taskList });
     }
+
+    const updates: { id: string | number, data: Partial<Employee> }[] = [];
+    employees.forEach(emp => {
+        const isSelected = (projectForm.employeeIds || []).includes(emp.id);
+        const currentProjects = (emp.projectIds || []).map(String);
+        const hasProject = currentProjects.includes(String(targetProjId));
+
+        if (isSelected && !hasProject) {
+            updates.push({ id: emp.id, data: { projectIds: [...currentProjects, targetProjId] } });
+        } else if (!isSelected && hasProject) {
+            updates.push({ id: emp.id, data: { projectIds: currentProjects.filter(p => p !== String(targetProjId)) } });
+        }
+    });
+
+    if (updates.length > 0) await bulkUpdateEmployees(updates);
+    notify(`Project "${projectForm.name}" saved.`);
     setShowProjectModal(false);
   };
 
-  const handleConfirmDeleteDept = (dept: Department) => {
-      setDeptToDelete(dept);
+  const handleConfirmDelete = (id: string | number, type: 'department' | 'project') => {
+      setDeleteTarget({ id, type });
       setShowDeleteConfirm(true);
   };
 
-  const executeDeleteDept = async () => {
-    if (deptToDelete) {
-        await deleteDepartment(deptToDelete.id);
-        notify(`Department "${deptToDelete.name}" deleted.`);
-        setDeptToDelete(null);
+  const executeDelete = async () => {
+    if (deleteTarget) {
+        if (deleteTarget.type === 'department') {
+            await deleteDepartment(deleteTarget.id);
+            notify(`Department deleted.`);
+        } else {
+            // Unassign employees from the project first
+            const affectedEmployees = employees.filter(e => e.projectIds?.map(String).includes(String(deleteTarget.id)));
+            if (affectedEmployees.length > 0) {
+                const updates = affectedEmployees.map(e => ({
+                    id: e.id,
+                    data: { projectIds: (e.projectIds || []).filter(p => String(p) !== String(deleteTarget.id)) }
+                }));
+                await bulkUpdateEmployees(updates);
+            }
+            await deleteProject(deleteTarget.id);
+            notify(`Project deleted.`);
+        }
+        setDeleteTarget(null);
         setShowDeleteConfirm(false);
     }
   };
@@ -371,26 +374,18 @@ const Organization = () => {
       setShowDeptModal(true);
   };
 
-  const openPosEdit = (pos: Position) => {
-      setPosForm(pos);
-      setShowPosModal(true);
+  const openProjectEdit = (project: Project) => {
+      const projMembers = employees.filter(e => e.projectIds?.map(String).includes(String(project.id))).map(e => e.id);
+      setProjectForm({ ...project, employeeIds: projMembers, tasks: project.tasks.join(', ') });
+      setShowProjectModal(true);
   };
 
-  const handleConfirmDeletePos = async (pos: Position) => {
-      if (window.confirm(`Delete position "${pos.title}"?`)) {
-          await deletePosition(pos.id);
-          notify("Position deleted.");
-      }
-  };
-
-  // Auto-fit Logic
   const handleAutoFit = () => {
       if (treeContainerRef.current) {
           const containerWidth = treeContainerRef.current.clientWidth;
           const treeEl = treeContainerRef.current.querySelector('.org-tree') as HTMLElement;
           if (treeEl) {
               const treeWidth = treeEl.scrollWidth;
-              // Add padding consideration
               const optimalZoom = Math.min(1.2, Math.max(0.3, (containerWidth - 40) / treeWidth));
               setChartZoom(optimalZoom);
           }
@@ -413,16 +408,41 @@ const Organization = () => {
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
-       {/* Modals */}
+       {/* Project Modal */}
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={projectForm.id ? "Edit Project" : "Create Project"} width="max-w-3xl">
+           <form onSubmit={handleProjectSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                      <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} /></div>
+                      <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required rows={3} className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label><select className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Due Date</label><input type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} /></div>
+                      </div>
+                      <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tasks (Comma Separated)</label><input type="text" placeholder="e.g. Design, Development, QA" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.tasks} onChange={e => setProjectForm({...projectForm, tasks: e.target.value})} /></div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Project Team</label>
+                      <EmployeePicker selectedIds={projectForm.employeeIds || []} onToggle={(id) => setProjectForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={employees} />
+                  </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+                <button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs">Cancel</button>
+                <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg hover:bg-emerald-700 transition-all">Save Project</button>
+              </div>
+           </form>
+       </DraggableModal>
+
+       {/* Department Modal */}
        <DraggableModal isOpen={showDeptModal} onClose={() => setShowDeptModal(false)} title={deptForm.id ? "Edit Department" : "Add Department"} width="max-w-2xl">
           <form onSubmit={handleDeptSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-4">
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head (Manager)</label>
-                      <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head</label>
+                      <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
                         <option value="" disabled>Select Head...</option>
                         {eligibleManagers.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.jobTitle || e.role})</option>)}
                       </select>
@@ -430,7 +450,7 @@ const Organization = () => {
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Department Members</label>
-                    <EmployeePicker selectedIds={deptForm.employeeIds || []} onToggle={(id) => setDeptForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={availableEmployeesForPicker} />
+                    <EmployeePicker selectedIds={deptForm.employeeIds || []} onToggle={(id) => setDeptForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={availableEmployeesForDeptPicker} />
                   </div>
               </div>
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
@@ -440,47 +460,107 @@ const Organization = () => {
           </form>
        </DraggableModal>
 
-       {/* Position Modal */}
-       <DraggableModal isOpen={showPosModal} onClose={() => setShowPosModal(false)} title={posForm.id ? "Edit Job Position" : "Create New Position"} width="max-w-md">
-           <form onSubmit={handlePosSubmit} className="space-y-5">
-              <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Position Title</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={posForm.title} onChange={e => setPosForm({...posForm, title: e.target.value})} placeholder="e.g. Lead UI Designer" /></div>
-              <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Short Description</label><textarea required rows={3} className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={posForm.description} onChange={e => setPosForm({...posForm, description: e.target.value})} placeholder="Describe key responsibilities..."></textarea></div>
-              <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
-                <button type="button" onClick={() => setShowPosModal(false)} className="px-4 py-2 text-slate-400 font-bold text-xs uppercase tracking-widest">Cancel</button>
-                <button type="submit" className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest shadow-md hover:bg-emerald-700 transition-colors">Save Position</button>
+       {/* Deletion Confirm */}
+       <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-md">
+           <div className="text-center py-4">
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
+                  <AlertTriangle className="text-red-600 dark:text-red-400" size={32} />
               </div>
-           </form>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Are you sure?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm px-4">
+                  Deleting this {deleteTarget?.type} will remove it from the system. Associated assignments will be cleared.
+              </p>
+           </div>
+           <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+              <button onClick={executeDelete} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-red-700">Confirm Delete</button>
+           </div>
        </DraggableModal>
 
-       {/* Header & Navigation */}
+       {/* Tab Navigation */}
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-          <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage structure, hierarchy and roles.</p></div>
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
+          <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage company structure, projects and locations.</p></div>
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto custom-scrollbar">
              {['departments', 'positions', 'projects', 'chart', 'locations', 'employees'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab === 'locations' ? 'Map View' : tab}</button>
+                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab === 'locations' ? 'Map' : tab}</button>
              ))}
           </div>
        </div>
 
-       {/* Tabs Implementation */}
+       {/* Projects Tab Content */}
+       {activeTab === 'projects' && (
+           <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Layout className="text-emerald-600" /> Managed Projects</h3>
+                    {isPowerUser && (
+                        <button onClick={() => { setProjectForm({ id: '', name: '', description: '', status: 'Active', tasks: '', dueDate: '', employeeIds: [] }); setShowProjectModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-bold">
+                            <Plus size={16} /> Add Project
+                        </button>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projects.map(project => {
+                        const projectMemberCount = employees.filter(e => e.projectIds?.map(String).includes(String(project.id))).length;
+                        return (
+                            <div key={project.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
+                                {isPowerUser && (
+                                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => openProjectEdit(project)} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Edit2 size={14}/></button>
+                                        <button onClick={() => handleConfirmDelete(project.id, 'project')} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+                                        <Briefcase size={22} />
+                                    </div>
+                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${project.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : project.status === 'On Hold' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                        {project.status}
+                                    </span>
+                                </div>
+                                <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{project.name}</h4>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2 leading-relaxed">{project.description}</p>
+                                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <Users size={12}/> {projectMemberCount} Members
+                                    </div>
+                                    {project.dueDate && (
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 dark:bg-slate-700/50 px-2 py-1 rounded-md">
+                                            <Calendar size={10} /> {new Date(project.dueDate).toLocaleDateString()}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {projects.length === 0 && (
+                        <div className="col-span-full py-20 text-center bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+                             <Briefcase className="mx-auto text-slate-200 dark:text-slate-700 mb-3" size={48} />
+                             <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">No projects created yet</p>
+                        </div>
+                    )}
+                </div>
+           </div>
+       )}
+
+       {/* Departments Tab */}
        {activeTab === 'departments' && (
            <div className="space-y-4">
-               <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div>
+               <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 font-bold shadow-sm"><Plus size={16} /> Add Dept</button>}</div>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {departments.map(dept => {
                       const activeMembersCount = employees.filter(e => String(e.departmentId) === String(dept.id)).length;
                       return (
-                        <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
+                        <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
                             {isPowerUser && (
                                 <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
-                                    <button onClick={() => handleConfirmDeleteDept(dept)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
+                                    <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Edit2 size={14}/></button>
+                                    <button onClick={() => handleConfirmDelete(dept.id, 'department')} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button>
                                 </div>
                             )}
-                            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 dark:bg-emerald-900/20"><Building2 size={20} /></div>
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={22} /></div>
                             <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2">{dept.description}</p>
-                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> {activeMembersCount} Active Members</div>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2 leading-relaxed">{dept.description}</p>
+                            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Users size={12}/> {activeMembersCount} Members</div>
                         </div>
                       );
                   })}
@@ -488,7 +568,7 @@ const Organization = () => {
            </div>
        )}
 
-       {/* Org Chart Tab with Enhanced Fit & Scale */}
+       {/* Org Chart Tab */}
        {activeTab === 'chart' && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -498,51 +578,56 @@ const Organization = () => {
                         <button key={d.id} onClick={() => { setChartDeptFilter(String(d.id)); setTimeout(handleAutoFit, 100); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === String(d.id) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{d.name}</button>
                     ))}
                 </div>
-                
                 <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <button onClick={() => setChartZoom(prev => Math.max(0.3, prev - 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Zoom Out"><ZoomOut size={16}/></button>
+                    <button onClick={() => setChartZoom(prev => Math.max(0.3, prev - 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><ZoomOut size={16}/></button>
                     <span className="text-[10px] font-black text-slate-400 w-12 text-center">{Math.round(chartZoom * 100)}%</span>
-                    <button onClick={() => setChartZoom(prev => Math.min(1.5, prev + 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Zoom In"><ZoomIn size={16}/></button>
+                    <button onClick={() => setChartZoom(prev => Math.min(1.5, prev + 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><ZoomIn size={16}/></button>
                     <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
-                    <button onClick={handleAutoFit} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Fit to Width"><Maximize2 size={15}/></button>
-                    <button onClick={() => setChartZoom(1)} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Reset Zoom"><RefreshCw size={14}/></button>
+                    <button onClick={handleAutoFit} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><Maximize2 size={15}/></button>
+                    <button onClick={() => setChartZoom(1)} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><RefreshCw size={14}/></button>
                 </div>
             </div>
-
-            <div 
-              ref={treeContainerRef}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-700 overflow-hidden relative group"
-            >
+            <div ref={treeContainerRef} className="bg-white dark:bg-slate-800 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-700 overflow-hidden relative group">
                 <div className="p-4 md:p-8 overflow-auto min-h-[600px] flex justify-center bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] dark:bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:32px_32px] custom-scrollbar">
                     {orgTreeData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-slate-400 pt-20">
                             <Network size={48} className="mb-4 opacity-20" />
-                            <p className="font-bold text-xs uppercase tracking-widest">No hierarchy records found</p>
+                            <p className="font-bold text-xs uppercase tracking-widest">No matching records</p>
                         </div>
                     ) : (
-                        <div 
-                          className="org-tree transition-all duration-300 ease-out origin-top"
-                          style={{ transform: `scale(${chartZoom})` }}
-                        >
+                        <div className="org-tree transition-all duration-300 ease-out origin-top" style={{ transform: `scale(${chartZoom})` }}>
                             <ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul>
                         </div>
                     )}
-                </div>
-                {/* Scale Indicator Overlay */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-slate-800/90 backdrop-blur px-4 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase text-slate-400 tracking-widest pointer-events-none shadow-sm flex items-center gap-2">
-                    <Maximize2 size={10} /> Hierarchy Level: {Math.round(chartZoom * 100)}%
                 </div>
             </div>
           </div>
        )}
 
-       {/* Other Tabs */}
-       {activeTab === 'locations' && <div className="space-y-4"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><MapPin className="text-emerald-600" /> Employee Map</h3><GraphicsLayerMap users={employees} /></div>}
+       {/* Map Tab */}
+       {activeTab === 'locations' && <div className="space-y-4"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><MapPin className="text-emerald-600" /> Employee Global Map</h3><GraphicsLayerMap users={employees} /></div>}
+       
+       {/* Employees Tab */}
        {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
+       
+       {/* Positions Tab */}
        {activeTab === 'positions' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Position</button>}</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">{isPowerUser && <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => openPosEdit(p)} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button><button onClick={() => handleConfirmDeletePos(p)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button></div>}<h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400">{p.description}</p></div>))}</div>
+            <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Roles & Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 font-bold shadow-sm"><Plus size={16} /> Add Position</button>}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {positions.map(p => (
+                    <div key={p.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
+                        {isPowerUser && (
+                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => { setPosForm(p); setShowPosModal(true); }} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Edit2 size={14}/></button>
+                                <button onClick={() => { if(window.confirm('Delete this position?')) deletePosition(p.id); }} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button>
+                            </div>
+                        )}
+                        <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{p.description}</p>
+                    </div>
+                ))}
+            </div>
           </div>
        )}
     </div>
