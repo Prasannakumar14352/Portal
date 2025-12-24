@@ -150,6 +150,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return UserRole.EMPLOYEE;
   };
 
+  const ensurePositionExists = async (title: string, existingPositions: Position[]) => {
+    if (!title) return;
+    const exists = existingPositions.some(p => p.title.toLowerCase() === title.toLowerCase());
+    if (!exists) {
+      const newPos: Position = { id: Math.random().toString(36).substr(2, 9), title, description: 'Automatically created from Azure' };
+      await db.addPosition(newPos);
+      const updated = await db.getPositions();
+      setPositions(updated);
+      return updated;
+    }
+    return existingPositions;
+  };
+
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -177,6 +190,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             });
             const azureProfile = await microsoftGraphService.fetchMe(tokenResponse.accessToken);
             const currentEmployees = await db.getEmployees();
+            let currentPos = await db.getPositions();
+            
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
             const azureJobTitle = azureProfile.jobTitle || 'Team Member';
@@ -184,6 +199,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
             const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
             const mappedDept = azureProfile.department || 'General';
+
+            // Automatic Position Creation
+            currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
 
             if (!targetUser) {
                 const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
@@ -231,6 +249,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
+  const syncAzureUsers = async () => {
+    if (!msalInstance || !currentUser) return;
+    try {
+      showToast("Acquiring directory token...", "info");
+      const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+      if (!account) return;
+      const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.Read.All"], account: account });
+      const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
+      const currentEmails = new Set(employees.map(e => e.email.toLowerCase()));
+      const newUsers = azureUsers.filter(au => au.mail && !currentEmails.has(au.mail.toLowerCase()));
+      
+      if (newUsers.length === 0) {
+        showToast("Directory is already up to date.", "success");
+        return;
+      }
+
+      showToast(`Importing ${newUsers.length} new users...`, "info");
+      const currentEmployees = await db.getEmployees();
+      let currentPos = await db.getPositions();
+      const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+      let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+
+      for (const au of newUsers) {
+        const azureJobTitle = au.jobTitle || 'Team Member';
+        const mappedSystemRole = getSystemRole(azureJobTitle);
+        
+        // Automatic Position Creation during bulk sync
+        currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
+
+        const newEmp: Employee = {
+          id: nextId, employeeId: au.employeeId || `AZ-${nextId}`, firstName: au.givenName || au.displayName.split(' ')[0],
+          lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User', email: au.mail || au.userPrincipalName,
+          password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle,
+          department: au.department || 'General', departmentId: '', projectIds: [], managerId: '',
+          joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
+          salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
+          jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
+        };
+        await db.addEmployee(newEmp);
+        nextId++;
+      }
+      await refreshData();
+      showToast(`Imported ${newUsers.length} users successfully!`, "success");
+    } catch (err: any) {
+      console.error("Azure Sync Error:", err);
+      showToast(err.message || "Failed to sync with Azure.", "error");
+    }
+  };
+
   const inviteEmployee = async (data: Partial<Invitation>) => {
     const id = Math.random().toString(36).substr(2, 9);
     const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -239,7 +306,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       email: data.email!,
       firstName: data.firstName!,
       lastName: data.lastName!,
-      role: data.role!, // This comes from the selection in Invite UI
+      role: data.role!, 
       position: data.position!,
       department: data.department!,
       salary: data.salary || 0,
@@ -277,7 +344,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
         await microsoftGraphService.createUser(tokenResponse.accessToken, {
           ...invite,
-          jobTitle: invite.position, // Mapping position back to jobTitle for Azure
+          jobTitle: invite.position, 
           password: "EmpowerUser2025!"
         });
         showToast("Azure Portal account created.", "success");
@@ -368,47 +435,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     setCurrentUser(null); 
     showToast('Logged out successfully', 'info'); 
-  };
-
-  const syncAzureUsers = async () => {
-    if (!msalInstance || !currentUser) return;
-    try {
-      showToast("Acquiring directory token...", "info");
-      const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-      if (!account) return;
-      const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.Read.All"], account: account });
-      const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
-      const currentEmails = new Set(employees.map(e => e.email.toLowerCase()));
-      const newUsers = azureUsers.filter(au => au.mail && !currentEmails.has(au.mail.toLowerCase()));
-      if (newUsers.length === 0) {
-        showToast("Directory is already up to date.", "success");
-        return;
-      }
-      showToast(`Importing ${newUsers.length} new users...`, "info");
-      const currentEmployees = await db.getEmployees();
-      const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
-      let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-      for (const au of newUsers) {
-        const azureJobTitle = au.jobTitle || 'Team Member';
-        const mappedSystemRole = getSystemRole(azureJobTitle);
-        const newEmp: Employee = {
-          id: nextId, employeeId: au.employeeId || `AZ-${nextId}`, firstName: au.givenName || au.displayName.split(' ')[0],
-          lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User', email: au.mail || au.userPrincipalName,
-          password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle,
-          department: au.department || 'General', departmentId: '', projectIds: [], managerId: '',
-          joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
-          salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
-          jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
-        };
-        await db.addEmployee(newEmp);
-        nextId++;
-      }
-      await refreshData();
-      showToast(`Imported ${newUsers.length} users successfully!`, "success");
-    } catch (err: any) {
-      console.error("Azure Sync Error:", err);
-      showToast(err.message || "Failed to sync with Azure.", "error");
-    }
   };
 
   const forgotPassword = async (email: string): Promise<boolean> => { showToast('Reset link sent to your email', 'success'); return true; };

@@ -199,7 +199,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Employee' : 'Invitee'}</th>
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Employee ID' : 'Invited On'}</th>
-                <th className="px-6 py-4">Position & Role</th>
+                <th className="px-6 py-4">Position</th>
                 <th className="px-6 py-4">Department</th>
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Status' : 'Azure Sync'}</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -221,7 +221,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <td className="px-6 py-4 text-xs font-black text-slate-500">{emp.employeeId}</td>
                       <td className="px-6 py-4">
                         <div className="text-xs text-slate-900 dark:text-slate-200 font-bold">{emp.position || 'Consultant'}</div>
-                        <div className="text-[10px] text-slate-400 uppercase tracking-tight">{emp.role}</div>
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-600 uppercase font-medium">{emp.department}</td>
                       <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>{emp.status}</span></td>
