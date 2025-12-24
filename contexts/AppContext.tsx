@@ -200,14 +200,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
             const mappedDept = azureProfile.department || 'General';
 
-            // Automatic Position Creation
             currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
 
             if (!targetUser) {
                 const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
                 const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
                 const newEmp: Employee = {
-                    id: nextId, employeeId: mappedEmpId, firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
+                    id: nextId, employeeId: String(mappedEmpId), firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
                     lastName: azureProfile.surname || activeAccount.name?.split(' ').slice(1).join(' ') || '',
                     email: email, password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle, department: mappedDept,
                     departmentId: '', projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
@@ -224,7 +223,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                    updates.jobTitle = azureJobTitle;
                    updates.role = mappedSystemRole;
                 }
-                if (targetUser.employeeId !== mappedEmpId) updates.employeeId = mappedEmpId;
+                if (String(targetUser.employeeId) !== String(mappedEmpId)) updates.employeeId = String(mappedEmpId);
                 if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
                 if (targetUser.department !== mappedDept) updates.department = mappedDept;
                 
@@ -257,41 +256,76 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!account) return;
       const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.Read.All"], account: account });
       const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
-      const currentEmails = new Set(employees.map(e => e.email.toLowerCase()));
-      const newUsers = azureUsers.filter(au => au.mail && !currentEmails.has(au.mail.toLowerCase()));
       
-      if (newUsers.length === 0) {
-        showToast("Directory is already up to date.", "success");
-        return;
-      }
-
-      showToast(`Importing ${newUsers.length} new users...`, "info");
+      showToast(`Synchronizing directory...`, "info");
       const currentEmployees = await db.getEmployees();
       let currentPos = await db.getPositions();
       const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
       let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
 
-      for (const au of newUsers) {
+      let updatedCount = 0;
+      let createdCount = 0;
+
+      for (const au of azureUsers) {
+        const email = (au.mail || au.userPrincipalName).toLowerCase();
         const azureJobTitle = au.jobTitle || 'Team Member';
         const mappedSystemRole = getSystemRole(azureJobTitle);
-        
-        // Automatic Position Creation during bulk sync
+        const azureEmpId = String(au.employeeId || '');
+        const azureDept = au.department || 'General';
+
         currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
 
-        const newEmp: Employee = {
-          id: nextId, employeeId: au.employeeId || `AZ-${nextId}`, firstName: au.givenName || au.displayName.split(' ')[0],
-          lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User', email: au.mail || au.userPrincipalName,
-          password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle,
-          department: au.department || 'General', departmentId: '', projectIds: [], managerId: '',
-          joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
-          salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
-          jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
-        };
-        await db.addEmployee(newEmp);
-        nextId++;
+        const existingEmp = currentEmployees.find(e => e.email.toLowerCase() === email);
+
+        if (existingEmp) {
+          const updates: Partial<Employee> = {};
+          if (existingEmp.position !== azureJobTitle) {
+              updates.position = azureJobTitle;
+              updates.jobTitle = azureJobTitle;
+              updates.role = mappedSystemRole;
+          }
+          if (azureEmpId && String(existingEmp.employeeId) !== azureEmpId) {
+              updates.employeeId = azureEmpId;
+          }
+          if (existingEmp.department !== azureDept) {
+              updates.department = azureDept;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await db.updateEmployee({ ...existingEmp, ...updates });
+            updatedCount++;
+          }
+        } else {
+          const finalEmpId = azureEmpId || `AZ-${nextId}`;
+          const newEmp: Employee = {
+            id: nextId, 
+            employeeId: finalEmpId, 
+            firstName: au.givenName || au.displayName.split(' ')[0],
+            lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User', 
+            email: email,
+            password: 'ms-auth-user', 
+            role: mappedSystemRole, 
+            position: azureJobTitle,
+            department: azureDept, 
+            departmentId: '', 
+            projectIds: [], 
+            managerId: '',
+            joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), 
+            status: EmployeeStatus.ACTIVE,
+            salary: 0, 
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
+            jobTitle: azureJobTitle, 
+            phone: '', 
+            workLocation: 'Office HQ India'
+          };
+          await db.addEmployee(newEmp);
+          nextId++;
+          createdCount++;
+        }
       }
+      
       await refreshData();
-      showToast(`Imported ${newUsers.length} users successfully!`, "success");
+      showToast(`Sync complete! ${createdCount} new users, ${updatedCount} updated.`, "success");
     } catch (err: any) {
       console.error("Azure Sync Error:", err);
       showToast(err.message || "Failed to sync with Azure.", "error");
