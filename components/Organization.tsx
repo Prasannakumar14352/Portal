@@ -240,6 +240,15 @@ const Organization = () => {
     });
   }, [employees, deptForm.id]);
 
+  // Filter only managers, HR, and Admins for the "Department Head" dropdown
+  const eligibleManagers = useMemo(() => {
+    return employees.filter(emp => 
+        emp.role === UserRole.MANAGER || 
+        emp.role === UserRole.HR || 
+        emp.role === UserRole.ADMIN
+    );
+  }, [employees]);
+
   const handleDeptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetDeptId = deptForm.id;
@@ -312,7 +321,13 @@ const Organization = () => {
                   <div className="space-y-4">
                     <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
                     <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head (Manager)</label><select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}><option value="" disabled>Select Head...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}</select></div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head (Manager)</label>
+                      <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
+                        <option value="" disabled>Select Head...</option>
+                        {eligibleManagers.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Department Members</label>
