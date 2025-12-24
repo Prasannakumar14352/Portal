@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -10,19 +10,55 @@ interface TreeNode extends Employee {
   children: TreeNode[];
 }
 
-const buildOrgTree = (employees: Employee[]): TreeNode[] => {
+const buildOrgTree = (employees: Employee[], deptHeadId?: string | number): TreeNode[] => {
   const empMap: Record<string, TreeNode> = {};
   employees.forEach(emp => { empMap[emp.id] = { ...emp, children: [] }; });
+  
   const roots: TreeNode[] = [];
+  
+  // If we have a specific Department Head ID, we want to prioritize them as root
+  const headIdStr = deptHeadId ? String(deptHeadId) : null;
+
   employees.forEach(emp => {
     const node = empMap[emp.id];
-    if (emp.managerId && empMap[emp.managerId]) {
-      empMap[emp.managerId].children.push(node);
+    const empManagerIdStr = emp.managerId ? String(emp.managerId) : null;
+    
+    // Logic: 
+    // 1. If we have a dept head and this is the head, it's a root.
+    // 2. If no head or not the head, and manager exists in current map, add as child.
+    // 3. Otherwise, it's a root.
+    if (headIdStr && String(emp.id) === headIdStr) {
+        roots.push(node);
+    } else if (empManagerIdStr && empMap[empManagerIdStr]) {
+        // Prevent circular reference or head reporting to someone else in same view
+        if (headIdStr && empManagerIdStr === headIdStr) {
+             empMap[empManagerIdStr].children.push(node);
+        } else if (!headIdStr) {
+             empMap[empManagerIdStr].children.push(node);
+        } else {
+             // In dept view, if manager is NOT the head, but is in the list, still link them
+             empMap[empManagerIdStr].children.push(node);
+        }
     } else {
-      roots.push(node);
+        // If we are in dept view and this isn't the head and has no manager in this view
+        if (headIdStr && String(emp.id) !== headIdStr) {
+            roots.push(node);
+        } else if (!headIdStr) {
+            roots.push(node);
+        }
     }
   });
-  return roots;
+
+  // Filter out any nodes that were added to roots but actually have a parent already in empMap
+  // (This handles cases where the head reports to nobody, but others report to the head)
+  return roots.filter(root => {
+      const isActuallyAChild = employees.some(e => 
+          e.managerId && 
+          String(e.id) === String(root.id) && 
+          empMap[String(e.managerId)]
+      );
+      return !isActuallyAChild;
+  });
 };
 
 const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
@@ -31,20 +67,22 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   
   return (
     <li>
-      <div className="flex flex-col items-center relative pb-8">
-        <div className="org-node-card group bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-teal-500/50 transition-all w-44 relative z-10">
+      <div className="flex flex-col items-center relative pb-6">
+        <div className="org-node-card group bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-teal-500/50 transition-all w-36 relative z-10">
            <div className="flex flex-col items-center">
-             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-50 dark:border-slate-700 mb-2 shadow-sm group-hover:scale-110 transition-transform">
+             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-50 dark:border-slate-700 mb-1.5 shadow-sm group-hover:scale-110 transition-transform bg-slate-100">
                 <img src={node.avatar} alt={node.firstName} className="w-full h-full object-cover" />
              </div>
-             <div className="text-center w-full">
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-[13px] tracking-tight leading-tight truncate">{node.firstName} {node.lastName}</h4>
-                <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5 mb-1 truncate px-1">
+             <div className="text-center w-full min-w-0">
+                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-[11px] tracking-tight leading-tight truncate px-1" title={`${node.firstName} ${node.lastName}`}>
+                    {node.firstName} {node.lastName}
+                </h4>
+                <p className="text-[8px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-wider mt-0.5 mb-1 truncate px-1">
                     {node.position || 'Team Member'}
                 </p>
                 {node.department && (
-                  <div className="inline-flex items-center gap-1 text-[8px] bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300 px-2 py-0.5 rounded-full font-black uppercase">
-                    <Building2 size={8} /> {node.department}
+                  <div className="inline-flex items-center gap-1 text-[7px] bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-black uppercase max-w-full">
+                    <Building2 size={7} className="shrink-0" /> <span className="truncate">{node.department}</span>
                   </div>
                 )}
              </div>
@@ -53,19 +91,19 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
 
         {hasChildren && (
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
-            <div className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600 mb-0.5"></div>
+            <div className="w-px h-3 bg-slate-300 dark:bg-slate-600 mb-0.5"></div>
             <button 
               onClick={() => setExpanded(!expanded)} 
-              className={`flex items-center justify-center w-5 h-5 rounded-full border bg-white dark:bg-slate-700 shadow-sm transition-all hover:scale-110 ${expanded ? 'border-teal-500 text-teal-600' : 'border-slate-300 text-slate-400'}`}
+              className={`flex items-center justify-center w-4 h-4 rounded-full border bg-white dark:bg-slate-700 shadow-sm transition-all hover:scale-110 ${expanded ? 'border-teal-500 text-teal-600' : 'border-slate-300 text-slate-400'}`}
             >
-              {expanded ? <Minus size={10} strokeWidth={3} /> : <Plus size={10} strokeWidth={3} />}
+              {expanded ? <Minus size={8} strokeWidth={4} /> : <Plus size={8} strokeWidth={4} />}
             </button>
           </div>
         )}
       </div>
       
       {hasChildren && expanded && (
-        <ul className="animate-in fade-in slide-in-from-top-4 duration-500">
+        <ul className="animate-in fade-in slide-in-from-top-2 duration-300">
           {node.children.map(child => (
             <OrgChartNode key={child.id} node={child} />
           ))}
@@ -210,7 +248,7 @@ const Organization = () => {
 
   const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [chartDeptFilter, setChartDeptFilter] = useState<string>('all');
-  const [chartZoom, setChartZoom] = useState<number>(1);
+  const [chartZoom, setChartZoom] = useState<number>(0.85); // Slightly zoomed out by default to fit better
   
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showPosModal, setShowPosModal] = useState(false);
@@ -223,13 +261,22 @@ const Organization = () => {
   const [projectForm, setProjectForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasks: [], dueDate: '', employeeIds: [] });
   
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
+  const treeContainerRef = useRef<HTMLDivElement>(null);
 
   const orgTreeData = useMemo(() => {
+      // Find the manager of the selected department to act as root
+      let deptHeadId: string | number | undefined = undefined;
+      if (chartDeptFilter !== 'all') {
+          const activeDept = departments.find(d => String(d.id) === chartDeptFilter);
+          if (activeDept) deptHeadId = activeDept.managerId;
+      }
+
       const filteredEmps = chartDeptFilter === 'all' 
         ? employees 
         : employees.filter(e => String(e.departmentId) === String(chartDeptFilter));
-      return buildOrgTree(filteredEmps);
-  }, [employees, chartDeptFilter]);
+      
+      return buildOrgTree(filteredEmps, deptHeadId);
+  }, [employees, chartDeptFilter, departments]);
 
   const availableEmployeesForPicker = useMemo(() => {
     const validDeptIds = new Set(departments.map(d => String(d.id)));
@@ -336,19 +383,33 @@ const Organization = () => {
       }
   };
 
+  // Auto-fit Logic
+  const handleAutoFit = () => {
+      if (treeContainerRef.current) {
+          const containerWidth = treeContainerRef.current.clientWidth;
+          const treeEl = treeContainerRef.current.querySelector('.org-tree') as HTMLElement;
+          if (treeEl) {
+              const treeWidth = treeEl.scrollWidth;
+              // Add padding consideration
+              const optimalZoom = Math.min(1.2, Math.max(0.3, (containerWidth - 40) / treeWidth));
+              setChartZoom(optimalZoom);
+          }
+      }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in relative">
        <style>{`
-          .org-tree ul { padding-top: 20px; position: relative; display: flex; justify-content: center; }
-          .org-tree li { text-align: center; list-style-type: none; position: relative; padding: 20px 2px 0 2px; }
-          .org-tree li::before, .org-tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid #cbd5e1; width: 50%; height: 20px; }
-          .org-tree li::after { right: auto; left: 50%; border-left: 2px solid #cbd5e1; }
+          .org-tree ul { padding-top: 15px; position: relative; display: flex; justify-content: center; }
+          .org-tree li { text-align: center; list-style-type: none; position: relative; padding: 15px 4px 0 4px; }
+          .org-tree li::before, .org-tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 1.5px solid #cbd5e1; width: 50%; height: 15px; }
+          .org-tree li::after { right: auto; left: 50%; border-left: 1.5px solid #cbd5e1; }
           .org-tree li:only-child::after, .org-tree li:only-child::before { display: none; }
           .org-tree li:only-child { padding-top: 0; }
           .org-tree li:first-child::before, .org-tree li:last-child::after { border: 0 none; }
-          .org-tree li:last-child::after { border-left: 2px solid #cbd5e1; border-radius: 5px 0 0 0; }
-          .org-tree li:first-child::before { border-radius: 0 5px 0 0; }
-          .org-tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid #cbd5e1; width: 0; height: 20px; }
+          .org-tree li:last-child::after { border-left: 1.5px solid #cbd5e1; border-radius: 4px 0 0 0; }
+          .org-tree li:first-child::before { border-radius: 0 4px 0 0; }
+          .org-tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 1.5px solid #cbd5e1; width: 0; height: 15px; }
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
@@ -427,14 +488,14 @@ const Organization = () => {
            </div>
        )}
 
-       {/* Org Chart Tab with Zoom & Fit Features */}
+       {/* Org Chart Tab with Enhanced Fit & Scale */}
        {activeTab === 'chart' && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-                    <button onClick={() => setChartDeptFilter('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === 'all' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>All Company</button>
+                    <button onClick={() => { setChartDeptFilter('all'); setChartZoom(0.85); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === 'all' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>All Company</button>
                     {departments.map(d => (
-                        <button key={d.id} onClick={() => setChartDeptFilter(String(d.id))} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === String(d.id) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{d.name}</button>
+                        <button key={d.id} onClick={() => { setChartDeptFilter(String(d.id)); setTimeout(handleAutoFit, 100); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === String(d.id) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{d.name}</button>
                     ))}
                 </div>
                 
@@ -443,12 +504,16 @@ const Organization = () => {
                     <span className="text-[10px] font-black text-slate-400 w-12 text-center">{Math.round(chartZoom * 100)}%</span>
                     <button onClick={() => setChartZoom(prev => Math.min(1.5, prev + 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Zoom In"><ZoomIn size={16}/></button>
                     <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
+                    <button onClick={handleAutoFit} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Fit to Width"><Maximize2 size={15}/></button>
                     <button onClick={() => setChartZoom(1)} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Reset Zoom"><RefreshCw size={14}/></button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-700 overflow-hidden relative group">
-                <div className="p-4 md:p-8 overflow-auto min-h-[600px] flex justify-center bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] custom-scrollbar">
+            <div 
+              ref={treeContainerRef}
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-700 overflow-hidden relative group"
+            >
+                <div className="p-4 md:p-8 overflow-auto min-h-[600px] flex justify-center bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] dark:bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:32px_32px] custom-scrollbar">
                     {orgTreeData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-slate-400 pt-20">
                             <Network size={48} className="mb-4 opacity-20" />
@@ -456,16 +521,16 @@ const Organization = () => {
                         </div>
                     ) : (
                         <div 
-                          className="org-tree transition-transform duration-300 ease-out origin-top"
+                          className="org-tree transition-all duration-300 ease-out origin-top"
                           style={{ transform: `scale(${chartZoom})` }}
                         >
                             <ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul>
                         </div>
                     )}
                 </div>
-                {/* Visual Scale Indicator */}
-                <div className="absolute bottom-4 right-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-[9px] font-black uppercase text-slate-400 tracking-widest pointer-events-none">
-                    Zoom: {Math.round(chartZoom * 100)}%
+                {/* Scale Indicator Overlay */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-slate-800/90 backdrop-blur px-4 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase text-slate-400 tracking-widest pointer-events-none shadow-sm flex items-center gap-2">
+                    <Maximize2 size={10} /> Hierarchy Level: {Math.round(chartZoom * 100)}%
                 </div>
             </div>
           </div>
