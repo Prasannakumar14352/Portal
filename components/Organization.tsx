@@ -278,6 +278,18 @@ const Organization = () => {
     setShowDeptModal(false);
   };
 
+  const handlePosSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (posForm.id) {
+      await updatePosition(posForm.id, { title: posForm.title, description: posForm.description });
+      notify(`Position "${posForm.title}" updated.`);
+    } else {
+      await addPosition({ title: posForm.title, description: posForm.description });
+      notify(`Position "${posForm.title}" created.`);
+    }
+    setShowPosModal(false);
+  };
+
   const handleConfirmDeleteDept = (dept: Department) => {
       setDeptToDelete(dept);
       setShowDeleteConfirm(true);
@@ -296,6 +308,11 @@ const Organization = () => {
       const deptMembers = employees.filter(e => String(e.departmentId) === String(dept.id)).map(e => e.id);
       setDeptForm({ ...dept, employeeIds: deptMembers });
       setShowDeptModal(true);
+  };
+
+  const openPosEdit = (pos: Position) => {
+      setPosForm(pos);
+      setShowPosModal(true);
   };
 
   return (
@@ -346,6 +363,24 @@ const Organization = () => {
                 <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg active:scale-95 transition-all">Save Dept</button>
               </div>
           </form>
+       </DraggableModal>
+
+       {/* Position Modal */}
+       <DraggableModal isOpen={showPosModal} onClose={() => setShowPosModal(false)} title={posForm.id ? "Edit Job Position" : "Create New Position"} width="max-w-md">
+           <form onSubmit={handlePosSubmit} className="space-y-5">
+              <div>
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Position Title</label>
+                 <input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={posForm.title} onChange={e => setPosForm({...posForm, title: e.target.value})} placeholder="e.g. Lead UI Designer" />
+              </div>
+              <div>
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Short Description</label>
+                 <textarea required rows={3} className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={posForm.description} onChange={e => setPosForm({...posForm, description: e.target.value})} placeholder="Describe key responsibilities..."></textarea>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                <button type="button" onClick={() => setShowPosModal(false)} className="px-4 py-2 text-slate-400 font-bold text-xs uppercase tracking-widest">Cancel</button>
+                <button type="submit" className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest shadow-md hover:bg-emerald-700 transition-colors">Save Position</button>
+              </div>
+           </form>
        </DraggableModal>
 
        {/* Custom Confirmation Modal */}
@@ -432,7 +467,19 @@ const Organization = () => {
        {activeTab === 'positions' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Position</button>}</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition relative group"><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400">{p.description}</p></div>))}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {positions.map(p => (
+                    <div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
+                        {isPowerUser && (
+                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => openPosEdit(p)} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
+                            </div>
+                        )}
+                        <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{p.description}</p>
+                    </div>
+                ))}
+            </div>
           </div>
        )}
     </div>
