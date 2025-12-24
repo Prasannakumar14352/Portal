@@ -75,6 +75,77 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   );
 };
 
+// ArcGIS Map component for location visualization
+const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
+  const mapDiv = useRef<HTMLDivElement>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let view: any = null;
+    let cleanup = false;
+    const loadArcGIS = () => {
+      return new Promise<void>((resolve, reject) => {
+        if (window.require) { resolve(); return; }
+        const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://js.arcgis.com/4.29/esri/themes/light/main.css'; document.head.appendChild(link);
+        const script = document.createElement('script'); script.src = 'https://js.arcgis.com/4.29/'; script.async = true; script.onload = () => resolve(); script.onerror = (e) => reject(e); document.body.appendChild(script);
+      });
+    };
+    const initMap = async () => {
+      try {
+        await loadArcGIS();
+        if (cleanup || !mapDiv.current) return;
+        window.require(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer"], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
+          if (cleanup) return;
+          const map = new EsriMap({ basemap: "topo-vector" });
+          const employeeLayer = new GraphicsLayer({ title: "Employees" });
+          map.add(employeeLayer);
+          users.forEach(u => {
+            if (u.location?.latitude && u.location?.longitude) {
+              const point = { type: "point", longitude: u.location.longitude, latitude: u.location.latitude };
+              const markerSymbol = { type: "simple-marker", color: [13, 148, 136, 1], size: "12px", outline: { color: [255, 255, 255], width: 2 } };
+              employeeLayer.add(new Graphic({ 
+                  geometry: point, 
+                  symbol: markerSymbol,
+                  attributes: { name: `${u.firstName} ${u.lastName}`, pos: u.position },
+                  popupTemplate: { title: "{name}", content: "{pos}" }
+              }));
+            }
+          });
+          view = new MapView({ container: mapDiv.current, map: map, center: [78.9629, 20.5937], zoom: 4 });
+          view.when(() => { if (!cleanup) setIsMapLoaded(true); });
+        });
+      } catch (e) { setMapError("ArcGIS failed to load."); }
+    };
+    initMap();
+    return () => { cleanup = true; if (view) view.destroy(); };
+  }, [users]);
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden h-[600px] relative">
+      {mapError ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center text-slate-400">
+           <AlertTriangle size={48} className="text-amber-500 mb-4" />
+           <p className="font-bold">Map Service Unavailable</p>
+           <p className="text-xs mt-1">Please check your internet connection or try again later.</p>
+        </div>
+      ) : (
+        <>
+          <div ref={mapDiv} className="w-full h-full"></div>
+          {!isMapLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-900 z-10">
+               <div className="flex flex-col items-center gap-3">
+                  <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Map Data...</p>
+               </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 const EmployeePicker: React.FC<{ 
   selectedIds: (string | number)[], 
   onToggle: (id: string | number) => void,
@@ -120,7 +191,7 @@ const EmployeePicker: React.FC<{
             );
           })}
           {filtered.length === 0 && (
-            <div className="p-8 text-center text-slate-400 text-[10px] uppercase font-bold italic">No matching employees.</div>
+            <div className="p-8 text-center text-slate-400 text-[10px] uppercase font-bold italic">No matching unassigned employees.</div>
           )}
        </div>
     </div>
@@ -136,7 +207,7 @@ const Organization = () => {
     addProject, updateProject, deleteProject
   } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart'>('departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [chartDeptFilter, setChartDeptFilter] = useState<string>('all');
   
   const [showDeptModal, setShowDeptModal] = useState(false);
@@ -155,6 +226,19 @@ const Organization = () => {
         : employees.filter(e => String(e.departmentId) === String(chartDeptFilter));
       return buildOrgTree(filteredEmps);
   }, [employees, chartDeptFilter]);
+
+  // Filter employees to only show those NOT in any department, 
+  // or those already in the department we are currently editing.
+  const availableEmployeesForPicker = useMemo(() => {
+    return employees.filter(emp => {
+      // If we're editing an existing dept, always show people currently assigned to it
+      const isInCurrentDept = deptForm.id && String(emp.departmentId) === String(deptForm.id);
+      // Otherwise only show people who have no department (General/Empty)
+      const isUnassigned = !emp.departmentId || emp.departmentId === '';
+      
+      return isInCurrentDept || isUnassigned;
+    });
+  }, [employees, deptForm.id]);
 
   const handleDeptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,6 +305,7 @@ const Organization = () => {
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
+       {/* Department Modal */}
        <DraggableModal isOpen={showDeptModal} onClose={() => setShowDeptModal(false)} title={deptForm.id ? "Edit Department" : "Add Department"} width="max-w-2xl">
           <form onSubmit={handleDeptSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -237,7 +322,7 @@ const Organization = () => {
                         const cur = prev.employeeIds || []; 
                         return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; 
                       })} 
-                      allEmployees={employees} 
+                      allEmployees={availableEmployeesForPicker} 
                     />
                   </div>
               </div>
@@ -248,6 +333,7 @@ const Organization = () => {
           </form>
        </DraggableModal>
 
+       {/* Custom Confirmation Modal */}
        <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-md">
            <div className="text-center py-4">
               <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
@@ -264,15 +350,17 @@ const Organization = () => {
            </div>
        </DraggableModal>
 
+       {/* Component Header & Tabs */}
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage structure, hierarchy and roles.</p></div>
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
-             {['departments', 'positions', 'projects', 'chart', 'employees'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab}</button>
+             {['departments', 'positions', 'projects', 'chart', 'locations', 'employees'].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab === 'locations' ? 'Map View' : tab}</button>
              ))}
           </div>
        </div>
 
+       {/* Departments Tab */}
        {activeTab === 'departments' && (
            <div className="space-y-4">
                <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div>
@@ -295,6 +383,7 @@ const Organization = () => {
            </div>
        )}
 
+       {/* Org Chart Tab */}
        {activeTab === 'chart' && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -313,7 +402,24 @@ const Organization = () => {
           </div>
        )}
 
+       {/* Map View Tab */}
+       {activeTab === 'locations' && (
+          <div className="space-y-4">
+             <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><MapPin className="text-emerald-600" /> Employee Map</h3>
+             </div>
+             <GraphicsLayerMap users={employees} />
+          </div>
+       )}
+
        {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
+       
+       {activeTab === 'positions' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Position</button>}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition relative group"><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400">{p.description}</p></div>))}</div>
+          </div>
+       )}
     </div>
   );
 };
