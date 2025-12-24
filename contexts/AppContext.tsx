@@ -134,7 +134,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setHolidays(holidayData);
       setPayslips(payslipData);
       
-      // Load invitations from local storage (mock store)
       const savedInvites = localStorage.getItem('pending_invitations');
       if (savedInvites) setInvitations(JSON.parse(savedInvites));
     } catch (error) {
@@ -142,11 +141,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const getSystemRole = (roleStr: string): UserRole => {
-      const r = (roleStr || '').toLowerCase();
-      if (r.includes('admin')) return UserRole.ADMIN;
-      if (r.includes('hr')) return UserRole.HR;
-      if (r.includes('manager')) return UserRole.MANAGER;
+  const getSystemRole = (jobTitle: string): UserRole => {
+      const title = (jobTitle || '').toLowerCase().trim();
+      if (title === 'hr manager') return UserRole.HR;
+      if (title === 'manager') return UserRole.MANAGER;
+      if (title === 'hr') return UserRole.HR;
+      if (title === 'admin') return UserRole.ADMIN;
       return UserRole.EMPLOYEE;
   };
 
@@ -179,7 +179,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const currentEmployees = await db.getEmployees();
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
-            const mappedJobTitle = azureProfile.jobTitle || 'Team Member';
+            const azureJobTitle = azureProfile.jobTitle || 'Team Member';
+            const mappedSystemRole = getSystemRole(azureJobTitle);
             const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
             const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
             const mappedDept = azureProfile.department || 'General';
@@ -190,20 +191,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const newEmp: Employee = {
                     id: nextId, employeeId: mappedEmpId, firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
                     lastName: azureProfile.surname || activeAccount.name?.split(' ').slice(1).join(' ') || '',
-                    email: email, password: 'ms-auth-user', role: mappedJobTitle, position: mappedJobTitle, department: mappedDept,
+                    email: email, password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle, department: mappedDept,
                     departmentId: '', projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
                     salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(activeAccount.name || 'User')}&background=0D9488&color=fff`,
-                    jobTitle: mappedJobTitle, phone: '', workLocation: 'Office HQ India'
+                    jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
                 };
                 await db.addEmployee(newEmp);
                 targetUser = newEmp;
                 setEmployees(await db.getEmployees());
             } else {
                 const updates: Partial<Employee> = {};
-                if (targetUser.jobTitle !== mappedJobTitle) updates.jobTitle = mappedJobTitle;
+                if (targetUser.position !== azureJobTitle) {
+                   updates.position = azureJobTitle;
+                   updates.jobTitle = azureJobTitle;
+                   updates.role = mappedSystemRole;
+                }
                 if (targetUser.employeeId !== mappedEmpId) updates.employeeId = mappedEmpId;
                 if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
                 if (targetUser.department !== mappedDept) updates.department = mappedDept;
+                
                 if (Object.keys(updates).length > 0) {
                   await db.updateEmployee({ ...targetUser, ...updates });
                   targetUser = { ...targetUser, ...updates };
@@ -213,7 +219,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (targetUser) {
                 setCurrentUser({ 
                     id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
-                    role: getSystemRole(targetUser.role), position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
+                    role: targetUser.role as UserRole, position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
                     departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
                 });
             }
@@ -233,7 +239,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       email: data.email!,
       firstName: data.firstName!,
       lastName: data.lastName!,
-      role: data.role!,
+      role: data.role!, // This comes from the selection in Invite UI
       position: data.position!,
       department: data.department!,
       salary: data.salary || 0,
@@ -262,7 +268,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     showToast(`Processing acceptance for ${invite.firstName}...`, 'info');
 
-    // 1. Check Azure Provisioning
     if (invite.provisionInAzure && msalInstance) {
       try {
         const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
@@ -272,6 +277,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
         await microsoftGraphService.createUser(tokenResponse.accessToken, {
           ...invite,
+          jobTitle: invite.position, // Mapping position back to jobTitle for Azure
           password: "EmpowerUser2025!"
         });
         showToast("Azure Portal account created.", "success");
@@ -281,7 +287,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    // 2. Add to Local Database
     const currentEmployees = await db.getEmployees();
     const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
     const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
@@ -307,7 +312,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     await db.addEmployee(newEmp);
     
-    // 3. Cleanup Invitation
     const updatedInvitations = invitations.filter(inv => inv.id !== id);
     setInvitations(updatedInvitations);
     localStorage.setItem('pending_invitations', JSON.stringify(updatedInvitations));
@@ -329,7 +333,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (user) {
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
-            role: getSystemRole(user.role), position: user.position, avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
+            role: user.role as UserRole, position: user.position, avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
             departmentId: user.departmentId, projectIds: user.projectIds, location: user.location, workLocation: user.workLocation, hireDate: user.joinDate
         });
         showToast(`Welcome back, ${user.firstName}!`, 'success');
@@ -385,14 +389,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
       let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
       for (const au of newUsers) {
+        const azureJobTitle = au.jobTitle || 'Team Member';
+        const mappedSystemRole = getSystemRole(azureJobTitle);
         const newEmp: Employee = {
           id: nextId, employeeId: au.employeeId || `AZ-${nextId}`, firstName: au.givenName || au.displayName.split(' ')[0],
           lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User', email: au.mail || au.userPrincipalName,
-          password: 'ms-auth-user', role: au.jobTitle || 'Employee', position: au.jobTitle || 'Consultant',
+          password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle,
           department: au.department || 'General', departmentId: '', projectIds: [], managerId: '',
           joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
           salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
-          jobTitle: au.jobTitle || 'Team Member', phone: '', workLocation: 'Office HQ India'
+          jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
         };
         await db.addEmployee(newEmp);
         nextId++;
@@ -428,7 +434,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showToast("Provisioning in Azure Portal...", "info");
         const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
         const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account: account });
-        await microsoftGraphService.createUser(tokenResponse.accessToken, { ...emp, password: emp.password || "HRPortal2025!" });
+        await microsoftGraphService.createUser(tokenResponse.accessToken, { ...emp, jobTitle: emp.position, password: emp.password || "HRPortal2025!" });
         showToast("Successfully provisioned in Azure Entra ID", "success");
       } catch (err: any) {
         showToast("Azure Provisioning Failed: " + (err.message || "Unknown error"), "error");

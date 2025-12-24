@@ -12,10 +12,10 @@ interface EmployeeListProps {
   onDeleteEmployee: (id: string | number) => void;
 }
 
-const SYSTEM_PERMISSIONS = [
-    UserRole.EMPLOYEE,
-    UserRole.MANAGER,
+const SYSTEM_ROLES = [
     UserRole.HR,
+    UserRole.MANAGER,
+    UserRole.EMPLOYEE,
     UserRole.ADMIN
 ];
 
@@ -347,16 +347,16 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Position</label>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Position (Designation)</label>
               <select required value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all dark:text-white">
                  <option value="" disabled>Select Position...</option>
                  {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">System Permissions</label>
-              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white">
-                 {SYSTEM_PERMISSIONS.map(role => <option key={role} value={role}>{role}</option>)}
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">System Permission (Role)</label>
+              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white">
+                 {SYSTEM_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>
           </div>
