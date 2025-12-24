@@ -76,7 +76,6 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   );
 };
 
-// Map component kept but minimized for brevity
 const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
   const mapDiv = useRef<HTMLDivElement>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -125,20 +124,47 @@ const EmployeePicker: React.FC<{
   allEmployees: Employee[]
 }> = ({ selectedIds, onToggle, allEmployees }) => {
   const [query, setQuery] = useState('');
-  const filtered = useMemo(() => allEmployees.filter(e => `${e.firstName} ${e.lastName}`.toLowerCase().includes(query.toLowerCase())), [allEmployees, query]);
+  
+  const filtered = useMemo(() => {
+    return allEmployees.filter(e => 
+        `${e.firstName} ${e.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
+        (e.position || '').toLowerCase().includes(query.toLowerCase())
+    );
+  }, [allEmployees, query]);
+
   return (
     <div className="space-y-3">
-       <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder="Search employees..." className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500" value={query} onChange={e => setQuery(e.target.value)} /></div>
+       <div className="relative">
+           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+           <input 
+             type="text" 
+             placeholder="Search name or position..." 
+             className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+             value={query} 
+             onChange={e => setQuery(e.target.value)} 
+           />
+       </div>
        <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl divide-y divide-slate-50 dark:divide-slate-700/50">
           {filtered.map(emp => {
             const isSelected = selectedIds.includes(emp.id);
             return (
               <div key={emp.id} onClick={() => onToggle(emp.id)} className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                <div className="flex items-center gap-3"><img src={emp.avatar} className="w-8 h-8 rounded-full border" alt="" /><div><p className="text-xs font-bold">{emp.firstName} {emp.lastName}</p></div></div>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700'}`}>{isSelected && <CheckCircle2 size={12} className="text-white" />}</div>
+                <div className="flex items-center gap-3">
+                  <img src={emp.avatar} className="w-8 h-8 rounded-full border border-slate-200" alt="" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{emp.firstName} {emp.lastName}</p>
+                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{emp.position || emp.role}</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700'}`}>
+                    {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                </div>
               </div>
             );
           })}
+          {filtered.length === 0 && (
+            <div className="p-8 text-center text-slate-400 text-[10px] uppercase font-bold italic">No matching employees.</div>
+          )}
        </div>
     </div>
   );
@@ -176,6 +202,7 @@ const Organization = () => {
   const handleDeptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetDeptId = deptForm.id;
+    
     if (deptForm.id) {
       await updateDepartment(deptForm.id, { name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
     } else {
@@ -183,16 +210,19 @@ const Organization = () => {
       await addDepartment({ id: newId, name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId } as any);
       targetDeptId = newId;
     }
+
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
     employees.forEach(emp => {
       const isSelected = deptForm.employeeIds.includes(emp.id);
       const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
+      
       if (isSelected && !currentlyInDept) {
         updates.push({ id: emp.id, data: { departmentId: targetDeptId, department: deptForm.name } });
       } else if (!isSelected && currentlyInDept) {
         updates.push({ id: emp.id, data: { departmentId: '', department: 'General' } });
       }
     });
+
     if (updates.length > 0) await bulkUpdateEmployees(updates);
     notify(`Department ${deptForm.name} saved.`);
     setShowDeptModal(false);
@@ -201,9 +231,9 @@ const Organization = () => {
   const handleConfirmDeleteDept = async (id: string | number) => {
       const dept = departments.find(d => String(d.id) === String(id));
       if (!dept) return;
-      if (window.confirm(`Are you sure you want to delete the "${dept.name}" department? Employees will be reset to General.`)) {
+      if (window.confirm(`Are you sure you want to delete the "${dept.name}" department? All associated employees will be reset to the General department.`)) {
           await deleteDepartment(id);
-          notify(`Department "${dept.name}" deleted and employees unassigned.`);
+          notify(`Department "${dept.name}" deleted successfully.`);
       }
   };
 
@@ -213,8 +243,26 @@ const Organization = () => {
       setShowDeptModal(true);
   };
 
-  const handlePosSubmit = (e: React.FormEvent) => { e.preventDefault(); posForm.id ? updatePosition(posForm.id, { title: posForm.title, description: posForm.description }) : addPosition({ title: posForm.title, description: posForm.description }); setShowPosModal(true); };
-  const handleProjSubmit = async (e: React.FormEvent) => { e.preventDefault(); /* same as existing project submit */ setShowProjModal(false); };
+  const handlePosSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (posForm.id) {
+      updatePosition(posForm.id, { title: posForm.title, description: posForm.description });
+    } else {
+      addPosition({ title: posForm.title, description: posForm.description });
+    }
+    setShowPosModal(false);
+  };
+
+  const handleProjSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const tasks = projForm.tasksString.split(',').map((t: string) => t.trim()).filter((t: string) => t !== '');
+    if (projForm.id) {
+      await updateProject(projForm.id, { name: projForm.name, description: projForm.description, status: projForm.status, tasks });
+    } else {
+      await addProject({ name: projForm.name, description: projForm.description, status: projForm.status, tasks });
+    }
+    setShowProjModal(false);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -232,49 +280,59 @@ const Organization = () => {
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
-       {/* Modals for Dept, Pos, Proj kept but standard */}
+       {/* Department Modal */}
        <DraggableModal isOpen={showDeptModal} onClose={() => setShowDeptModal(false)} title={deptForm.id ? "Edit Department" : "Add Department"} width="max-w-2xl">
           <form onSubmit={handleDeptSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-4">
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Manager</label><select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}><option value="" disabled>Select Head...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}</select></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head (Manager)</label><select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}><option value="" disabled>Select Head...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}</select></div>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Department Members</label>
-                    <EmployeePicker selectedIds={deptForm.employeeIds} onToggle={(id) => setDeptForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={employees} />
+                    <EmployeePicker 
+                      selectedIds={deptForm.employeeIds || []} 
+                      onToggle={(id) => setDeptForm((prev: any) => { 
+                        const cur = prev.employeeIds || []; 
+                        return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; 
+                      })} 
+                      allEmployees={employees} 
+                    />
                   </div>
               </div>
-              <div className="flex justify-end gap-3 pt-6 border-t"><button type="button" onClick={() => setShowDeptModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs">Cancel</button><button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg">Save Dept</button></div>
+              <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+                <button type="button" onClick={() => setShowDeptModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs">Cancel</button>
+                <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg active:scale-95 transition-all">Save Dept</button>
+              </div>
           </form>
        </DraggableModal>
 
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-          <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500">Manage structure and hierarchy.</p></div>
+          <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage structure, hierarchy and roles.</p></div>
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
              {['departments', 'positions', 'projects', 'chart', 'locations', 'employees'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab}</button>
+                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab === 'locations' ? 'Map View' : tab}</button>
              ))}
           </div>
        </div>
 
        {activeTab === 'departments' && (
            <div className="space-y-4">
-               <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div>
+               <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {departments.map(dept => (
-                      <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition relative group">
+                      <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
                           {isPowerUser && (
                               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Edit2 size={14}/></button>
-                                  <button onClick={() => handleConfirmDeleteDept(dept.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button>
+                                  <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
+                                  <button onClick={() => handleConfirmDeleteDept(dept.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
                               </div>
                           )}
-                          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4"><Building2 size={20} /></div>
+                          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 dark:bg-emerald-900/20"><Building2 size={20} /></div>
                           <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4>
-                          <p className="text-sm text-slate-500 h-10 line-clamp-2">{dept.description}</p>
-                          <div className="mt-4 pt-4 border-t text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> {employees.filter(e => String(e.departmentId) === String(dept.id)).length} Active Members</div>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2">{dept.description}</p>
+                          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> {employees.filter(e => String(e.departmentId) === String(dept.id)).length} Active Members</div>
                       </div>
                   ))}
                </div>
@@ -284,16 +342,16 @@ const Organization = () => {
        {activeTab === 'chart' && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl flex items-center gap-1">
-                    <button onClick={() => setChartDeptFilter('all')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${chartDeptFilter === 'all' ? 'bg-white dark:bg-slate-700 text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>All Company</button>
+                <div className="bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl flex items-center gap-1 overflow-x-auto max-w-full no-scrollbar">
+                    <button onClick={() => setChartDeptFilter('all')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${chartDeptFilter === 'all' ? 'bg-white dark:bg-slate-700 text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>All Company</button>
                     {departments.map(d => (
-                        <button key={d.id} onClick={() => setChartDeptFilter(String(d.id))} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${chartDeptFilter === String(d.id) ? 'bg-white dark:bg-slate-700 text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{d.name}</button>
+                        <button key={d.id} onClick={() => setChartDeptFilter(String(d.id))} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${chartDeptFilter === String(d.id) ? 'bg-white dark:bg-slate-700 text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{d.name}</button>
                     ))}
                 </div>
             </div>
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden relative">
                 <div className="p-12 overflow-auto min-h-[700px] flex justify-center bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px]">
-                {orgTreeData.length === 0 ? <div className="flex flex-col items-center justify-center text-slate-400"><Network size={48} className="mb-4" /><p>No matching structure found.</p></div> : <div className="org-tree"><ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul></div>}
+                {orgTreeData.length === 0 ? <div className="flex flex-col items-center justify-center text-slate-400"><Network size={48} className="mb-4 opacity-20" /><p className="font-bold text-xs uppercase tracking-widest">No matching hierarchy found</p></div> : <div className="org-tree"><ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul></div>}
                 </div>
             </div>
           </div>
@@ -301,6 +359,12 @@ const Organization = () => {
 
        {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
        {activeTab === 'locations' && <div className="space-y-4"><GraphicsLayerMap users={users} /></div>}
+       {activeTab === 'positions' && (
+         <div className="space-y-4">
+           <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Position</button>}</div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition relative group"><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400">{p.description}</p></div>))}</div>
+         </div>
+       )}
     </div>
   );
 };
