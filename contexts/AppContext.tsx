@@ -55,7 +55,7 @@ interface AppContextType {
   updateUser: (id: string | number, data: Partial<Employee>) => Promise<void>; 
   bulkUpdateEmployees: (updates: { id: string | number, data: Partial<Employee> }[]) => Promise<void>;
   deleteEmployee: (id: string | number) => Promise<void>;
-  addDepartment: (dept: Omit<Department, 'id'>) => Promise<void>;
+  addDepartment: (dept: Department) => Promise<void>;
   updateDepartment: (id: string | number, data: Partial<Department>) => Promise<void>;
   deleteDepartment: (id: string | number) => Promise<void>;
   addPosition: (pos: Omit<Position, 'id'>) => Promise<void>;
@@ -525,7 +525,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const addDepartment = async (dept: Omit<Department, 'id'>) => { await db.addDepartment({ ...dept, id: Math.random().toString(36).substr(2, 9) }); setDepartments(await db.getDepartments()); showToast('Department created', 'success'); };
+  const addDepartment = async (dept: Department) => { 
+      await db.addDepartment(dept); 
+      setDepartments(await db.getDepartments()); 
+      showToast('Department created', 'success'); 
+  };
+
   const updateDepartment = async (id: string | number, data: Partial<Department>) => {
     const existing = departments.find(d => String(d.id) === String(id));
     if (existing) { await db.updateDepartment({ ...existing, ...data } as any); setDepartments(await db.getDepartments()); showToast('Department updated', 'success'); }

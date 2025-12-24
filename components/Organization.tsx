@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2 } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -156,7 +156,8 @@ const EmployeePicker: React.FC<{
   const filtered = useMemo(() => {
     return allEmployees.filter(e => 
         `${e.firstName} ${e.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-        (e.position || '').toLowerCase().includes(query.toLowerCase())
+        (e.position || '').toLowerCase().includes(query.toLowerCase()) ||
+        String(e.employeeId).toLowerCase().includes(query.toLowerCase())
     );
   }, [allEmployees, query]);
 
@@ -166,7 +167,7 @@ const EmployeePicker: React.FC<{
            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
            <input 
              type="text" 
-             placeholder="Search name or position..." 
+             placeholder="Search name, position, or ID..." 
              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
              value={query} 
              onChange={e => setQuery(e.target.value)} 
@@ -180,7 +181,7 @@ const EmployeePicker: React.FC<{
                 <div className="flex items-center gap-3">
                   <img src={emp.avatar} className="w-8 h-8 rounded-full border border-slate-200" alt="" />
                   <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{emp.firstName} {emp.lastName}</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{emp.firstName} {emp.lastName} <span className="text-[9px] text-slate-400">#{emp.employeeId}</span></p>
                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{emp.position || emp.role}</p>
                   </div>
                 </div>
@@ -212,11 +213,13 @@ const Organization = () => {
   
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showPosModal, setShowPosModal] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
   
   const [deptForm, setDeptForm] = useState<any>({ id: '', name: '', description: '', managerId: '', employeeIds: [] });
   const [posForm, setPosForm] = useState<any>({ id: '', title: '', description: '' });
+  const [projectForm, setProjectForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasks: [], dueDate: '', employeeIds: [] });
   
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
@@ -227,18 +230,17 @@ const Organization = () => {
       return buildOrgTree(filteredEmps);
   }, [employees, chartDeptFilter]);
 
-  // Filter employees to only show those NOT in any department, 
-  // or those already in the department we are currently editing.
+  // Available employees for the picker - relaxed to ensure previously assigned users appear when reset
   const availableEmployeesForPicker = useMemo(() => {
+    const validDeptIds = new Set(departments.map(d => String(d.id)));
+
     return employees.filter(emp => {
-      // If we're editing an existing dept, always show people currently assigned to it
-      const isInCurrentDept = deptForm.id && String(emp.departmentId) === String(deptForm.id);
-      // Otherwise only show people who have no department (General/Empty)
-      const isUnassigned = !emp.departmentId || emp.departmentId === '';
+      const isInCurrentEditingDept = deptForm.id && String(emp.departmentId) === String(deptForm.id);
+      const isUnassigned = !emp.departmentId || emp.departmentId === '' || emp.department === 'General' || !validDeptIds.has(String(emp.departmentId));
       
-      return isInCurrentDept || isUnassigned;
+      return isInCurrentEditingDept || isUnassigned;
     });
-  }, [employees, deptForm.id]);
+  }, [employees, departments, deptForm.id]);
 
   // Filter only managers, HR, and Admins for the "Department Head" dropdown
   const eligibleManagers = useMemo(() => {
@@ -257,13 +259,19 @@ const Organization = () => {
       await updateDepartment(deptForm.id, { name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
     } else {
       const newId = Math.random().toString(36).substr(2, 9);
-      await addDepartment({ id: newId, name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId } as any);
+      await addDepartment({ id: newId, name: deptForm.name, description: deptForm.description, managerId: deptForm.managerId });
       targetDeptId = newId;
     }
 
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
     employees.forEach(emp => {
-      const isSelected = (deptForm.employeeIds || []).includes(emp.id);
+      // Logic: Include manager in the employee IDs if they aren't already there to ensure they're assigned to the dept
+      const selectedIds = [...(deptForm.employeeIds || [])];
+      if (deptForm.managerId && !selectedIds.includes(deptForm.managerId)) {
+        selectedIds.push(deptForm.managerId);
+      }
+
+      const isSelected = selectedIds.includes(emp.id);
       const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
       
       if (isSelected && !currentlyInDept) {
@@ -290,6 +298,18 @@ const Organization = () => {
     setShowPosModal(false);
   };
 
+  const handleProjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (projectForm.id) {
+        await updateProject(projectForm.id, { ...projectForm });
+        notify(`Project "${projectForm.name}" updated.`);
+    } else {
+        await addProject({ ...projectForm });
+        notify(`Project "${projectForm.name}" created.`);
+    }
+    setShowProjectModal(false);
+  };
+
   const handleConfirmDeleteDept = (dept: Department) => {
       setDeptToDelete(dept);
       setShowDeleteConfirm(true);
@@ -313,6 +333,13 @@ const Organization = () => {
   const openPosEdit = (pos: Position) => {
       setPosForm(pos);
       setShowPosModal(true);
+  };
+
+  const handleConfirmDeletePos = async (pos: Position) => {
+      if (window.confirm(`Delete position "${pos.title}"?`)) {
+          await deletePosition(pos.id);
+          notify("Position deleted.");
+      }
   };
 
   return (
@@ -342,7 +369,7 @@ const Organization = () => {
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head (Manager)</label>
                       <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
                         <option value="" disabled>Select Head...</option>
-                        {eligibleManagers.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+                        {eligibleManagers.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.jobTitle || e.role})</option>)}
                       </select>
                     </div>
                   </div>
@@ -361,6 +388,41 @@ const Organization = () => {
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
                 <button type="button" onClick={() => setShowDeptModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs">Cancel</button>
                 <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg active:scale-95 transition-all">Save Dept</button>
+              </div>
+          </form>
+       </DraggableModal>
+
+       {/* Project Modal */}
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={projectForm.id ? "Edit Project" : "Create New Project"} width="max-w-2xl">
+          <form onSubmit={handleProjectSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-4">
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" rows={3} value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} /></div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
+                        <select className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}>
+                            <option value="Active">Active</option>
+                            <option value="On Hold">On Hold</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Allocated Members</label>
+                    <EmployeePicker 
+                      selectedIds={projectForm.employeeIds || []} 
+                      onToggle={(id) => setProjectForm((prev: any) => { 
+                        const cur = prev.employeeIds || []; 
+                        return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; 
+                      })} 
+                      allEmployees={employees} 
+                    />
+                  </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+                <button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs">Cancel</button>
+                <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg active:scale-95 transition-all">Save Project</button>
               </div>
           </form>
        </DraggableModal>
@@ -415,21 +477,65 @@ const Organization = () => {
            <div className="space-y-4">
                <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Dept</button>}</div>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {departments.map(dept => (
-                      <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
-                          {isPowerUser && (
-                              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
-                                  <button onClick={() => handleConfirmDeleteDept(dept)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
-                              </div>
-                          )}
-                          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 dark:bg-emerald-900/20"><Building2 size={20} /></div>
-                          <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2">{dept.description}</p>
-                          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> {employees.filter(e => String(e.departmentId) === String(dept.id)).length} Active Members</div>
-                      </div>
-                  ))}
+                  {departments.map(dept => {
+                      // Modified: Count all employees assigned to this department, ensuring Manager is included
+                      const activeMembersCount = employees.filter(e => String(e.departmentId) === String(dept.id)).length;
+                      
+                      return (
+                        <div key={dept.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
+                            {isPowerUser && (
+                                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
+                                    <button onClick={() => handleConfirmDeleteDept(dept)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
+                                </div>
+                            )}
+                            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 dark:bg-emerald-900/20"><Building2 size={20} /></div>
+                            <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{dept.name}</h4>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2">{dept.description}</p>
+                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Users size={12}/> {activeMembersCount} Active Members
+                            </div>
+                        </div>
+                      );
+                  })}
                </div>
+           </div>
+       )}
+
+       {/* Projects Tab */}
+       {activeTab === 'projects' && (
+           <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Layout className="text-emerald-600" /> Projects</h3>
+                    {isPowerUser && (
+                        <button onClick={() => { setProjectForm({ id: '', name: '', description: '', status: 'Active', tasks: [], dueDate: '', employeeIds: [] }); setShowProjectModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2">
+                            <Plus size={16} /> Add Project
+                        </button>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projects.map(project => {
+                        // Logic: Count employees where this project ID exists in their projectIds list
+                        const projectMemberCount = employees.filter(e => e.projectIds?.map(String).includes(String(project.id))).length;
+
+                        return (
+                            <div key={project.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 dark:bg-blue-900/20"><Briefcase size={20} /></div>
+                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${project.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>{project.status}</span>
+                                </div>
+                                <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{project.name}</h4>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2">{project.description}</p>
+                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <Users size={12}/> {projectMemberCount} Team Members
+                                    </div>
+                                    {project.dueDate && <div className="text-[10px] font-bold text-slate-400 uppercase">Due {new Date(project.dueDate).toLocaleDateString()}</div>}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
            </div>
        )}
 
@@ -471,8 +577,9 @@ const Organization = () => {
                 {positions.map(p => (
                     <div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
                         {isPowerUser && (
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => openPosEdit(p)} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
+                                <button onClick={() => handleConfirmDeletePos(p)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
                             </div>
                         )}
                         <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4>
