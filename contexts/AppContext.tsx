@@ -162,39 +162,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         if (activeAccount) {
             const email = activeAccount.username;
-            const name = activeAccount.name || email.split('@')[0];
-            const currentEmployees = await db.getEmployees();
             
+            // Acquire Token for Graph API to get extended details
+            const tokenResponse = await pca.acquireTokenSilent({
+              scopes: ["User.Read"],
+              account: activeAccount
+            });
+
+            // Fetch extended profile properties (Job Title, Employee ID, etc)
+            const azureProfile = await microsoftGraphService.fetchMe(tokenResponse.accessToken);
+            
+            const currentEmployees = await db.getEmployees();
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
+            // Logic for mapping Azure properties to our schema
+            const mappedJobTitle = azureProfile.jobTitle || 'Team Member';
+            const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
+            const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
+            const mappedDept = azureProfile.department || 'General';
+
             if (!targetUser) {
                 const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
                 const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
                 
                 const newEmp: Employee = {
                     id: nextId,
-                    employeeId: `${nextId}`, 
-                    firstName: name.split(' ')[0],
-                    lastName: name.split(' ').slice(1).join(' ') || 'User',
+                    employeeId: mappedEmpId, 
+                    firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
+                    lastName: azureProfile.surname || activeAccount.name?.split(' ').slice(1).join(' ') || '',
                     email: email,
                     password: 'ms-auth-user', 
-                    role: 'Employee',
-                    position: 'Consultant',
-                    department: 'General',
+                    role: mappedJobTitle, // Azure Job Title becomes system role string
+                    position: mappedJobTitle,
+                    department: mappedDept,
                     departmentId: '', 
                     projectIds: [],   
                     managerId: '',    
-                    joinDate: formatDateISO(new Date()),
+                    joinDate: mappedHireDate,
                     status: EmployeeStatus.ACTIVE,
                     salary: 0,
-                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D9488&color=fff`,
-                    jobTitle: 'New Joiner (SSO)',
+                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(activeAccount.name || 'User')}&background=0D9488&color=fff`,
+                    jobTitle: mappedJobTitle,
                     phone: '',
                     workLocation: 'Office HQ India'
                 };
                 await db.addEmployee(newEmp);
                 targetUser = newEmp;
                 setEmployees(await db.getEmployees());
+            } else {
+                // UPDATE user if Azure details have changed
+                const updates: Partial<Employee> = {};
+                if (targetUser.jobTitle !== mappedJobTitle) updates.jobTitle = mappedJobTitle;
+                if (targetUser.employeeId !== mappedEmpId) updates.employeeId = mappedEmpId;
+                if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
+                if (targetUser.department !== mappedDept) updates.department = mappedDept;
+                
+                if (Object.keys(updates).length > 0) {
+                  await db.updateEmployee({ ...targetUser, ...updates });
+                  targetUser = { ...targetUser, ...updates };
+                  setEmployees(await db.getEmployees());
+                }
             }
 
             if (targetUser) {
@@ -297,18 +324,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       for (const au of newUsers) {
         const newEmp: Employee = {
           id: nextId,
-          employeeId: `AZ-${nextId}`,
+          employeeId: au.employeeId || `AZ-${nextId}`,
           firstName: au.givenName || au.displayName.split(' ')[0],
           lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User',
           email: au.mail || au.userPrincipalName,
           password: 'ms-auth-user',
-          role: 'Employee',
+          role: au.jobTitle || 'Employee',
           position: au.jobTitle || 'Consultant',
           department: au.department || 'General',
           departmentId: '',
           projectIds: [],
           managerId: '',
-          joinDate: formatDateISO(new Date()),
+          joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()),
           status: EmployeeStatus.ACTIVE,
           salary: 0,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
