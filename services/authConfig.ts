@@ -19,7 +19,7 @@ export const msalConfig: Configuration = {
 };
 
 export const loginRequest: PopupRequest = {
-    // Added User.Read.All for directory access
-    scopes: ["User.Read", "User.Read.All"],
+    // Added User.ReadWrite.All for provisioning capabilities
+    scopes: ["User.Read", "User.Read.All", "User.ReadWrite.All"],
     prompt: "select_account"
 };

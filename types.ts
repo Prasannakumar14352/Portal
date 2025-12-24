@@ -11,7 +11,22 @@ export enum DepartmentType {
 export enum EmployeeStatus {
   ACTIVE = 'Active',
   INACTIVE = 'Inactive',
-  ON_LEAVE = 'On Leave'
+  ON_LEAVE = 'On Leave',
+  INVITED = 'Invited'
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  position: string;
+  department: string;
+  salary: number;
+  invitedDate: string;
+  token: string;
+  provisionInAzure: boolean;
 }
 
 export interface ToastMessage {

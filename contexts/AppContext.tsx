@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
 import { microsoftGraphService, AzureUser } from '../services/microsoftGraphService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role, Position } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role, Position, Invitation } from '../types';
 
 const formatDateISO = (date: Date) => {
   const y = date.getFullYear();
@@ -23,6 +23,7 @@ const formatTime12 = (date: Date) => {
 interface AppContextType {
   employees: Employee[];
   users: Employee[]; 
+  invitations: Invitation[];
   departments: Department[];
   roles: Role[];
   positions: Position[];
@@ -46,7 +47,10 @@ interface AppContextType {
   forgotPassword: (email: string) => Promise<boolean>;
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
-  addEmployee: (emp: Employee) => Promise<void>;
+  inviteEmployee: (data: Partial<Invitation>) => Promise<void>;
+  acceptInvitation: (id: string) => Promise<void>;
+  revokeInvitation: (id: string) => Promise<void>;
+  addEmployee: (emp: Employee, syncToAzure?: boolean) => Promise<void>;
   updateEmployee: (emp: Employee) => Promise<void>;
   updateUser: (id: string | number, data: Partial<Employee>) => Promise<void>; 
   bulkUpdateEmployees: (updates: { id: string | number, data: Partial<Employee> }[]) => Promise<void>;
@@ -93,6 +97,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -128,8 +133,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setNotifications(notifData);
       setHolidays(holidayData);
       setPayslips(payslipData);
+      
+      // Load invitations from local storage (mock store)
+      const savedInvites = localStorage.getItem('pending_invitations');
+      if (savedInvites) setInvitations(JSON.parse(savedInvites));
     } catch (error) {
-      console.error("Failed to fetch data:", error);
+      console.error("Failed to refresh data:", error);
     }
   };
 
@@ -162,20 +171,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         if (activeAccount) {
             const email = activeAccount.username;
-            
-            // Acquire Token for Graph API to get extended details
             const tokenResponse = await pca.acquireTokenSilent({
               scopes: ["User.Read"],
               account: activeAccount
             });
-
-            // Fetch extended profile properties (Job Title, Employee ID, etc)
             const azureProfile = await microsoftGraphService.fetchMe(tokenResponse.accessToken);
-            
             const currentEmployees = await db.getEmployees();
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
-            // Logic for mapping Azure properties to our schema
             const mappedJobTitle = azureProfile.jobTitle || 'Team Member';
             const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
             const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
@@ -184,54 +187,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (!targetUser) {
                 const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
                 const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-                
                 const newEmp: Employee = {
-                    id: nextId,
-                    employeeId: mappedEmpId, 
-                    firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
+                    id: nextId, employeeId: mappedEmpId, firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
                     lastName: azureProfile.surname || activeAccount.name?.split(' ').slice(1).join(' ') || '',
-                    email: email,
-                    password: 'ms-auth-user', 
-                    role: mappedJobTitle, // Azure Job Title becomes system role string
-                    position: mappedJobTitle,
-                    department: mappedDept,
-                    departmentId: '', 
-                    projectIds: [],   
-                    managerId: '',    
-                    joinDate: mappedHireDate,
-                    status: EmployeeStatus.ACTIVE,
-                    salary: 0,
-                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(activeAccount.name || 'User')}&background=0D9488&color=fff`,
-                    jobTitle: mappedJobTitle,
-                    phone: '',
-                    workLocation: 'Office HQ India'
+                    email: email, password: 'ms-auth-user', role: mappedJobTitle, position: mappedJobTitle, department: mappedDept,
+                    departmentId: '', projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
+                    salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(activeAccount.name || 'User')}&background=0D9488&color=fff`,
+                    jobTitle: mappedJobTitle, phone: '', workLocation: 'Office HQ India'
                 };
                 await db.addEmployee(newEmp);
                 targetUser = newEmp;
                 setEmployees(await db.getEmployees());
             } else {
-                // UPDATE user if Azure details have changed
                 const updates: Partial<Employee> = {};
                 if (targetUser.jobTitle !== mappedJobTitle) updates.jobTitle = mappedJobTitle;
                 if (targetUser.employeeId !== mappedEmpId) updates.employeeId = mappedEmpId;
                 if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
                 if (targetUser.department !== mappedDept) updates.department = mappedDept;
-                
                 if (Object.keys(updates).length > 0) {
                   await db.updateEmployee({ ...targetUser, ...updates });
                   targetUser = { ...targetUser, ...updates };
                   setEmployees(await db.getEmployees());
                 }
             }
-
             if (targetUser) {
                 setCurrentUser({ 
                     id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
-                    role: getSystemRole(targetUser.role),
-                    position: targetUser.position,
-                    avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
-                    departmentId: targetUser.departmentId, projectIds: targetUser.projectIds,
-                    location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
+                    role: getSystemRole(targetUser.role), position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
+                    departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
                 });
             }
         }
@@ -242,17 +225,112 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
+  const inviteEmployee = async (data: Partial<Invitation>) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const newInvitation: Invitation = {
+      id,
+      email: data.email!,
+      firstName: data.firstName!,
+      lastName: data.lastName!,
+      role: data.role!,
+      position: data.position!,
+      department: data.department!,
+      salary: data.salary || 0,
+      invitedDate: formatDateISO(new Date()),
+      token,
+      provisionInAzure: data.provisionInAzure || false
+    };
+
+    const updated = [...invitations, newInvitation];
+    setInvitations(updated);
+    localStorage.setItem('pending_invitations', JSON.stringify(updated));
+
+    showToast(`Sending invitation to ${data.email}...`, 'info');
+    await emailService.sendInvitation({
+        email: data.email!,
+        firstName: data.firstName!,
+        role: data.role!,
+        token: token
+    });
+    showToast(`Invitation sent successfully!`, 'success');
+  };
+
+  const acceptInvitation = async (id: string) => {
+    const invite = invitations.find(inv => inv.id === id);
+    if (!invite) return;
+
+    showToast(`Processing acceptance for ${invite.firstName}...`, 'info');
+
+    // 1. Check Azure Provisioning
+    if (invite.provisionInAzure && msalInstance) {
+      try {
+        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+        const tokenResponse = await msalInstance.acquireTokenSilent({
+          scopes: ["User.ReadWrite.All"],
+          account: account
+        });
+        await microsoftGraphService.createUser(tokenResponse.accessToken, {
+          ...invite,
+          password: "EmpowerUser2025!"
+        });
+        showToast("Azure Portal account created.", "success");
+      } catch (err: any) {
+        console.error("Azure Accept Provision Error:", err);
+        showToast("Azure provisioning failed, but local setup continues.", "warning");
+      }
+    }
+
+    // 2. Add to Local Database
+    const currentEmployees = await db.getEmployees();
+    const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+    const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+
+    const newEmp: Employee = {
+      id: nextId,
+      employeeId: `${nextId}`,
+      firstName: invite.firstName,
+      lastName: invite.lastName,
+      email: invite.email,
+      password: 'initial-password',
+      role: invite.role,
+      position: invite.position,
+      department: invite.department,
+      joinDate: formatDateISO(new Date()),
+      status: EmployeeStatus.ACTIVE,
+      salary: invite.salary,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.firstName + ' ' + invite.lastName)}&background=0D9488&color=fff`,
+      jobTitle: invite.position,
+      phone: '',
+      workLocation: 'Office HQ India'
+    };
+
+    await db.addEmployee(newEmp);
+    
+    // 3. Cleanup Invitation
+    const updatedInvitations = invitations.filter(inv => inv.id !== id);
+    setInvitations(updatedInvitations);
+    localStorage.setItem('pending_invitations', JSON.stringify(updatedInvitations));
+    
+    await refreshData();
+    showToast(`${invite.firstName} is now a registered employee!`, 'success');
+  };
+
+  const revokeInvitation = async (id: string) => {
+    const updated = invitations.filter(inv => inv.id !== id);
+    setInvitations(updated);
+    localStorage.setItem('pending_invitations', JSON.stringify(updated));
+    showToast("Invitation revoked.", "info");
+  };
+
   const login = async (email: string, password: string): Promise<boolean> => {
     const currentEmployees = await db.getEmployees();
     let user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
     if (user) {
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
-            role: getSystemRole(user.role),
-            position: user.position,
-            avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
-            departmentId: user.departmentId, projectIds: user.projectIds,
-            location: user.location, workLocation: user.workLocation, hireDate: user.joinDate
+            role: getSystemRole(user.role), position: user.position, avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
+            departmentId: user.departmentId, projectIds: user.projectIds, location: user.location, workLocation: user.workLocation, hireDate: user.joinDate
         });
         showToast(`Welcome back, ${user.firstName}!`, 'success');
         return true;
@@ -290,74 +368,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const syncAzureUsers = async () => {
     if (!msalInstance || !currentUser) return;
-    
     try {
       showToast("Acquiring directory token...", "info");
       const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-      if (!account) {
-        showToast("No active Microsoft session found.", "error");
-        return;
-      }
-
-      const tokenResponse = await msalInstance.acquireTokenSilent({
-        scopes: ["User.Read.All"],
-        account: account
-      });
-
-      showToast("Fetching users from Azure Entra ID...", "info");
+      if (!account) return;
+      const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.Read.All"], account: account });
       const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
-      
       const currentEmails = new Set(employees.map(e => e.email.toLowerCase()));
       const newUsers = azureUsers.filter(au => au.mail && !currentEmails.has(au.mail.toLowerCase()));
-
       if (newUsers.length === 0) {
         showToast("Directory is already up to date.", "success");
         return;
       }
-
       showToast(`Importing ${newUsers.length} new users...`, "info");
-      
       const currentEmployees = await db.getEmployees();
       const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
       let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-
       for (const au of newUsers) {
         const newEmp: Employee = {
-          id: nextId,
-          employeeId: au.employeeId || `AZ-${nextId}`,
-          firstName: au.givenName || au.displayName.split(' ')[0],
-          lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User',
-          email: au.mail || au.userPrincipalName,
-          password: 'ms-auth-user',
-          role: au.jobTitle || 'Employee',
-          position: au.jobTitle || 'Consultant',
-          department: au.department || 'General',
-          departmentId: '',
-          projectIds: [],
-          managerId: '',
-          joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()),
-          status: EmployeeStatus.ACTIVE,
-          salary: 0,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
-          jobTitle: au.jobTitle || 'Team Member',
-          phone: '',
-          workLocation: 'Office HQ India'
+          id: nextId, employeeId: au.employeeId || `AZ-${nextId}`, firstName: au.givenName || au.displayName.split(' ')[0],
+          lastName: au.surname || au.displayName.split(' ').slice(1).join(' ') || 'User', email: au.mail || au.userPrincipalName,
+          password: 'ms-auth-user', role: au.jobTitle || 'Employee', position: au.jobTitle || 'Consultant',
+          department: au.department || 'General', departmentId: '', projectIds: [], managerId: '',
+          joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
+          salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
+          jobTitle: au.jobTitle || 'Team Member', phone: '', workLocation: 'Office HQ India'
         };
         await db.addEmployee(newEmp);
         nextId++;
       }
-
       await refreshData();
       showToast(`Imported ${newUsers.length} users successfully!`, "success");
-
     } catch (err: any) {
       console.error("Azure Sync Error:", err);
-      if (err.name === "InteractionRequiredAuthError") {
-        showToast("Permission required. Redirecting to consent...", "warning");
-        msalInstance.acquireTokenRedirect({ scopes: ["User.Read.All"] });
-      } else {
-        showToast(err.message || "Failed to sync with Azure.", "error");
-      }
+      showToast(err.message || "Failed to sync with Azure.", "error");
     }
   };
 
@@ -367,11 +411,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (newTheme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -381,7 +422,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  const addEmployee = async (emp: Employee) => { await db.addEmployee(emp); setEmployees(await db.getEmployees()); showToast('Employee added', 'success'); };
+  const addEmployee = async (emp: Employee, syncToAzure: boolean = false) => { 
+    if (syncToAzure && msalInstance) {
+      try {
+        showToast("Provisioning in Azure Portal...", "info");
+        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+        const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account: account });
+        await microsoftGraphService.createUser(tokenResponse.accessToken, { ...emp, password: emp.password || "HRPortal2025!" });
+        showToast("Successfully provisioned in Azure Entra ID", "success");
+      } catch (err: any) {
+        showToast("Azure Provisioning Failed: " + (err.message || "Unknown error"), "error");
+      }
+    }
+    await db.addEmployee(emp); 
+    setEmployees(await db.getEmployees()); 
+    showToast('Employee added locally', 'success'); 
+  };
+
   const updateEmployee = async (emp: Employee) => { await db.updateEmployee(emp); setEmployees(await db.getEmployees()); setAttendance(await db.getAttendance()); showToast('Employee updated', 'success'); };
   const updateUser = async (id: string | number, data: Partial<Employee>) => {
     const existing = employees.find(e => String(e.id) === String(id));
@@ -396,11 +453,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
   const deleteEmployee = async (id: string | number) => { 
     try {
-      await db.deleteEmployee(id.toString()); 
-      setEmployees(await db.getEmployees()); 
-      showToast('Employee and all linked records deleted', 'success'); 
+      await db.deleteEmployee(id.toString()); setEmployees(await db.getEmployees()); showToast('Employee and all linked records deleted', 'success'); 
     } catch (err: any) {
-      console.error("Deletion failed:", err);
       showToast(`Delete failed: ${err.message || 'Unknown database error'}`, 'error');
     }
   };
@@ -476,21 +530,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30);
     const assignedLocation = currentUser.workLocation || 'Office HQ India';
     const localDate = formatDateISO(now);
-    
     const record: AttendanceRecord = {
-      id: Math.random().toString(36).substr(2, 9),
-      employeeId: currentUser.id,
-      employeeName: currentUser.name,
-      date: localDate,
-      checkIn: formatTime12(now),
-      checkInTime: now.toISOString(),
-      checkOut: '',
-      status: isLate ? 'Late' : 'Present',
-      workLocation: assignedLocation
+      id: Math.random().toString(36).substr(2, 9), employeeId: currentUser.id, employeeName: currentUser.name, date: localDate,
+      checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: isLate ? 'Late' : 'Present', workLocation: assignedLocation
     };
-    await db.addAttendance(record);
-    setAttendance(await db.getAttendance()); 
-    showToast(`Checked in successfully at ${record.checkIn}`, 'success');
+    await db.addAttendance(record); setAttendance(await db.getAttendance()); showToast(`Checked in successfully at ${record.checkIn}`, 'success');
   };
 
   const checkOut = async (reason?: string) => {
@@ -501,38 +545,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const start = new Date(todayRec.checkInTime || now.toISOString());
     const durationHrs = (now.getTime() - start.getTime()) / (1000 * 60 * 60);
     const finalStatus = durationHrs >= 9 ? 'Present' : todayRec.status;
-
-    const updatedRecord: AttendanceRecord = {
-      ...todayRec,
-      checkOut: formatTime12(now),
-      checkOutTime: now.toISOString(),
-      status: finalStatus,
-      notes: reason || todayRec.notes
-    };
-    await db.updateAttendance(updatedRecord);
-    setAttendance(await db.getAttendance());
-    showToast(`Checked out successfully at ${updatedRecord.checkOut}`, 'success');
+    const updatedRecord: AttendanceRecord = { ...todayRec, checkOut: formatTime12(now), checkOutTime: now.toISOString(), status: finalStatus, notes: reason || todayRec.notes };
+    await db.updateAttendance(updatedRecord); setAttendance(await db.getAttendance()); showToast(`Checked out successfully at ${updatedRecord.checkOut}`, 'success');
   };
 
-  const updateAttendanceRecord = async (record: AttendanceRecord) => {
-      await db.updateAttendance(record);
-      setAttendance(await db.getAttendance());
-      showToast("Attendance record updated", "success");
-  };
+  const updateAttendanceRecord = async (record: AttendanceRecord) => { await db.updateAttendance(record); setAttendance(await db.getAttendance()); showToast("Attendance record updated", "success"); };
 
   const notify = async (message: string) => {
     if (!currentUser) return;
-    const newNotif: Notification = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId: currentUser.id,
-      title: 'System Notification',
-      message,
-      time: 'Just now',
-      read: false,
-      type: 'info'
-    };
-    await db.addNotification(newNotif);
-    setNotifications(await db.getNotifications());
+    const newNotif: Notification = { id: Math.random().toString(36).substr(2, 9), userId: currentUser.id, title: 'System Notification', message, time: 'Just now', read: false, type: 'info' };
+    await db.addNotification(newNotif); setNotifications(await db.getNotifications());
   };
 
   const markNotificationRead = async (id: string | number) => { await db.markNotificationRead(id.toString()); setNotifications(await db.getNotifications()); };
@@ -555,9 +577,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const value = {
-    employees, users: employees, departments, roles, positions, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
+    employees, users: employees, invitations, departments, roles, positions, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
     login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
+    inviteEmployee, acceptInvitation, revokeInvitation,
     addEmployee, updateEmployee, updateUser, bulkUpdateEmployees, deleteEmployee, addDepartment, updateDepartment, deleteDepartment,
     addPosition, updatePosition, deletePosition,
     addRole, updateRole, deleteRole, addProject, updateProject, deleteProject, addLeave, addLeaves, updateLeave, updateLeaveStatus,
