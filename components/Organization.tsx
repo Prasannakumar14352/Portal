@@ -16,7 +16,6 @@ const buildOrgTree = (employees: Employee[]): TreeNode[] => {
   const roots: TreeNode[] = [];
   employees.forEach(emp => {
     const node = empMap[emp.id];
-    // Check if manager is also in this filtered list
     if (emp.managerId && empMap[emp.managerId]) {
       empMap[emp.managerId].children.push(node);
     } else {
@@ -74,48 +73,6 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
       )}
     </li>
   );
-};
-
-const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
-  const mapDiv = useRef<HTMLDivElement>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let view: any = null;
-    let cleanup = false;
-    const loadArcGIS = () => {
-      return new Promise<void>((resolve, reject) => {
-        if (window.require) { resolve(); return; }
-        const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://js.arcgis.com/4.29/esri/themes/light/main.css'; document.head.appendChild(link);
-        const script = document.createElement('script'); script.src = 'https://js.arcgis.com/4.29/'; script.async = true; script.onload = () => resolve(); script.onerror = (e) => reject(e); document.body.appendChild(script);
-      });
-    };
-    const initMap = async () => {
-      try {
-        await loadArcGIS();
-        if (cleanup || !mapDiv.current) return;
-        window.require(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer"], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
-          if (cleanup) return;
-          const map = new EsriMap({ basemap: "topo-vector" });
-          const employeeLayer = new GraphicsLayer({ title: "Employees" });
-          map.add(employeeLayer);
-          users.forEach(u => {
-            if (u.location?.latitude) {
-              const point = { type: "point", longitude: u.location.longitude, latitude: u.location.latitude };
-              const markerSymbol = { type: "simple-marker", color: [220, 38, 38, 1], size: "10px", outline: { color: [255, 255, 255], width: 2 } };
-              employeeLayer.add(new Graphic({ geometry: point, symbol: markerSymbol }));
-            }
-          });
-          view = new MapView({ container: mapDiv.current, map: map, center: [78.9629, 20.5937], zoom: 4 });
-          view.when(() => { if (!cleanup) setIsMapLoaded(true); });
-        });
-      } catch (e) { setMapError("ArcGIS failed to load."); }
-    };
-    initMap();
-    return () => { cleanup = true; if (view) view.destroy(); };
-  }, [users]);
-  return <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden h-[600px] relative">{mapError ? <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center"><AlertTriangle size={48} className="text-red-500 mb-4" /><p>{mapError}</p></div> : <><div ref={mapDiv} className="w-full h-full"></div>{!isMapLoaded && <div className="absolute inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-900 z-10"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div></div>}</>}</div >;
 };
 
 const EmployeePicker: React.FC<{ 
@@ -179,16 +136,16 @@ const Organization = () => {
     addProject, updateProject, deleteProject
   } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
+  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart'>('departments');
   const [chartDeptFilter, setChartDeptFilter] = useState<string>('all');
   
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showPosModal, setShowPosModal] = useState(false);
-  const [showProjModal, setShowProjModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
   
   const [deptForm, setDeptForm] = useState<any>({ id: '', name: '', description: '', managerId: '', employeeIds: [] });
   const [posForm, setPosForm] = useState<any>({ id: '', title: '', description: '' });
-  const [projForm, setProjForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasksString: '', employeeIds: [] });
   
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
@@ -213,7 +170,7 @@ const Organization = () => {
 
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
     employees.forEach(emp => {
-      const isSelected = deptForm.employeeIds.includes(emp.id);
+      const isSelected = (deptForm.employeeIds || []).includes(emp.id);
       const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
       
       if (isSelected && !currentlyInDept) {
@@ -228,40 +185,24 @@ const Organization = () => {
     setShowDeptModal(false);
   };
 
-  const handleConfirmDeleteDept = async (id: string | number) => {
-      const dept = departments.find(d => String(d.id) === String(id));
-      if (!dept) return;
-      if (window.confirm(`Are you sure you want to delete the "${dept.name}" department? All associated employees will be reset to the General department.`)) {
-          await deleteDepartment(id);
-          notify(`Department "${dept.name}" deleted successfully.`);
-      }
+  const handleConfirmDeleteDept = (dept: Department) => {
+      setDeptToDelete(dept);
+      setShowDeleteConfirm(true);
+  };
+
+  const executeDeleteDept = async () => {
+    if (deptToDelete) {
+        await deleteDepartment(deptToDelete.id);
+        notify(`Department "${deptToDelete.name}" deleted successfully.`);
+        setDeptToDelete(null);
+        setShowDeleteConfirm(false);
+    }
   };
 
   const openDeptEdit = (dept: Department) => {
       const deptMembers = employees.filter(e => String(e.departmentId) === String(dept.id)).map(e => e.id);
       setDeptForm({ ...dept, employeeIds: deptMembers });
       setShowDeptModal(true);
-  };
-
-  const handlePosSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (posForm.id) {
-      updatePosition(posForm.id, { title: posForm.title, description: posForm.description });
-    } else {
-      addPosition({ title: posForm.title, description: posForm.description });
-    }
-    setShowPosModal(false);
-  };
-
-  const handleProjSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const tasks = projForm.tasksString.split(',').map((t: string) => t.trim()).filter((t: string) => t !== '');
-    if (projForm.id) {
-      await updateProject(projForm.id, { name: projForm.name, description: projForm.description, status: projForm.status, tasks });
-    } else {
-      await addProject({ name: projForm.name, description: projForm.description, status: projForm.status, tasks });
-    }
-    setShowProjModal(false);
   };
 
   return (
@@ -280,7 +221,6 @@ const Organization = () => {
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
-       {/* Department Modal */}
        <DraggableModal isOpen={showDeptModal} onClose={() => setShowDeptModal(false)} title={deptForm.id ? "Edit Department" : "Add Department"} width="max-w-2xl">
           <form onSubmit={handleDeptSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -308,11 +248,27 @@ const Organization = () => {
           </form>
        </DraggableModal>
 
+       <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-md">
+           <div className="text-center py-4">
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
+                  <AlertTriangle className="text-red-600 dark:text-red-400" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Delete Department?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed px-4">
+                  Are you sure you want to delete the <strong className="text-slate-700 dark:text-slate-200">"{deptToDelete?.name}"</strong> department? All associated employees will be reset to the General department.
+              </p>
+           </div>
+           <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">Cancel</button>
+              <button onClick={executeDeleteDept} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-red-700 transition-colors">Confirm Delete</button>
+           </div>
+       </DraggableModal>
+
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage structure, hierarchy and roles.</p></div>
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
-             {['departments', 'positions', 'projects', 'chart', 'locations', 'employees'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab === 'locations' ? 'Map View' : tab}</button>
+             {['departments', 'positions', 'projects', 'chart', 'employees'].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'chart' ? 'Org Chart' : tab}</button>
              ))}
           </div>
        </div>
@@ -326,7 +282,7 @@ const Organization = () => {
                           {isPowerUser && (
                               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button onClick={() => openDeptEdit(dept)} className="p-1.5 text-slate-400 hover:text-teal-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Edit2 size={14}/></button>
-                                  <button onClick={() => handleConfirmDeleteDept(dept.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
+                                  <button onClick={() => handleConfirmDeleteDept(dept)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-colors"><Trash2 size={14}/></button>
                               </div>
                           )}
                           <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 dark:bg-emerald-900/20"><Building2 size={20} /></div>
@@ -358,13 +314,6 @@ const Organization = () => {
        )}
 
        {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
-       {activeTab === 'locations' && <div className="space-y-4"><GraphicsLayerMap users={users} /></div>}
-       {activeTab === 'positions' && (
-         <div className="space-y-4">
-           <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Position</button>}</div>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition relative group"><h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400">{p.description}</p></div>))}</div>
-         </div>
-       )}
     </div>
   );
 };
