@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw, Share2, Send, CheckCircle, Clock, XCircle, Calendar } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Mail, Filter, ChevronLeft, ChevronRight, Copy, Check, Key, Eye, EyeOff, MapPin, Building2, User as UserIcon, Phone, Briefcase, AlertTriangle, Hash, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, Info, FileSpreadsheet, UserSquare, RefreshCw, Share2, Send, CheckCircle, Clock, XCircle, Calendar, UserCheck } from 'lucide-react';
 import { Employee, DepartmentType, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -39,9 +39,9 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
-  const [formData, setFormData] = useState<Partial<Invitation>>({
+  const [formData, setFormData] = useState<any>({
     firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE, department: '',
-    salary: 0, position: '', provisionInAzure: false
+    salary: 0, position: '', provisionInAzure: false, managerId: ''
   });
 
   const filteredEmployees = useMemo(() => {
@@ -101,7 +101,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       department: departments.length > 0 ? departments[0].name : '',
       salary: 0, 
       position: positions.length > 0 ? positions[0].title : '',
-      provisionInAzure: false
+      provisionInAzure: false,
+      managerId: ''
     });
     setShowModal(true);
   };
@@ -227,7 +228,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-1">
                           <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-2"><Eye size={16} /></button>
-                          {isPowerUser && <button onClick={() => { setEditingEmployee(emp); setFormData(emp); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2"><Edit2 size={16} /></button>}
+                          {isPowerUser && <button onClick={() => { setEditingEmployee(emp); setFormData({ ...emp, managerId: emp.managerId || '' }); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2"><Edit2 size={16} /></button>}
                         </div>
                       </td>
                     </tr>
@@ -311,6 +312,13 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 <DetailRow icon={Calendar} label="Join Date" value={viewingEmployee.joinDate} />
                 <DetailRow icon={MapPin} label="Work Location" value={viewingEmployee.workLocation || 'Office HQ India'} />
                 <DetailRow icon={Briefcase} label="System Role" value={viewingEmployee.role} />
+                {viewingEmployee.managerId && (
+                  <DetailRow 
+                    icon={UserCheck} 
+                    label="Reports To" 
+                    value={employees.find(e => String(e.id) === String(viewingEmployee.managerId))?.firstName + ' ' + employees.find(e => String(e.id) === String(viewingEmployee.managerId))?.lastName} 
+                  />
+                )}
             </div>
 
             <div className="pt-6 border-t dark:border-slate-700 flex justify-end">
@@ -320,7 +328,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         )}
       </DraggableModal>
 
-      {/* INVITE MODAL */}
+      {/* INVITE / EDIT MODAL */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit Employee' : 'Send New Invitation'} width="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           {!editingEmployee && (
@@ -338,11 +346,11 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white" /></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
           </div>
 
-          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white" /></div></div>
+          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div></div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
@@ -361,8 +369,29 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department</label><select required value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white">{departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}</select></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department</label><select required value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500">{departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}</select></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+          </div>
+
+          <div>
+             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Reporting Manager</label>
+             <div className="relative">
+                <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <select 
+                  value={formData.managerId} 
+                  onChange={(e) => setFormData({...formData, managerId: e.target.value})} 
+                  className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500 appearance-none"
+                >
+                    <option value="">No Manager Assigned (Direct Report to HQ)</option>
+                    {employees
+                      .filter(emp => String(emp.id) !== String(editingEmployee?.id)) // Prevent self-reporting
+                      .map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.firstName} {emp.lastName} ({emp.position || emp.role})</option>
+                      ))
+                    }
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+             </div>
           </div>
 
           {!editingEmployee && (

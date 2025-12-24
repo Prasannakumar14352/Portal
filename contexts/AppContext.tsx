@@ -527,10 +527,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addDepartment = async (dept: Omit<Department, 'id'>) => { await db.addDepartment({ ...dept, id: Math.random().toString(36).substr(2, 9) }); setDepartments(await db.getDepartments()); showToast('Department created', 'success'); };
   const updateDepartment = async (id: string | number, data: Partial<Department>) => {
-    const existing = departments.find(d => d.id === id);
-    if (existing) { await db.updateDepartment({ ...existing, ...data }); setDepartments(await db.getDepartments()); showToast('Department updated', 'success'); }
+    const existing = departments.find(d => String(d.id) === String(id));
+    if (existing) { await db.updateDepartment({ ...existing, ...data } as any); setDepartments(await db.getDepartments()); showToast('Department updated', 'success'); }
   };
-  const deleteDepartment = async (id: string | number) => { await db.deleteDepartment(id.toString()); setDepartments(await db.getDepartments()); showToast('Department deleted', 'info'); };
+  const deleteDepartment = async (id: string | number) => { 
+    // Unassign employees before deletion
+    const affectedEmployees = employees.filter(e => String(e.departmentId) === String(id));
+    if (affectedEmployees.length > 0) {
+      const updates = affectedEmployees.map(e => ({
+        id: e.id,
+        data: { departmentId: '', department: 'General' }
+      }));
+      await bulkUpdateEmployees(updates);
+    }
+    await db.deleteDepartment(id.toString()); 
+    setDepartments(await db.getDepartments()); 
+    showToast('Department deleted and members unassigned', 'info'); 
+  };
 
   const addPosition = async (pos: Omit<Position, 'id'>) => { await db.addPosition({ ...pos, id: Math.random().toString(36).substr(2, 9) }); setPositions(await db.getPositions()); showToast('Position created', 'success'); };
   const updatePosition = async (id: string | number, data: Partial<Position>) => {
