@@ -191,6 +191,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const azureProfile = await microsoftGraphService.fetchMe(tokenResponse.accessToken);
             const currentEmployees = await db.getEmployees();
             let currentPos = await db.getPositions();
+            const currentDepts = await db.getDepartments();
             
             let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
@@ -198,7 +199,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const mappedSystemRole = getSystemRole(azureJobTitle);
             const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
             const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
-            const mappedDept = azureProfile.department || 'General';
+            
+            // Resolve Department ID from Azure String
+            const azureDeptName = azureProfile.department || 'General';
+            const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
+            const mappedDeptId = matchedDept ? matchedDept.id : '';
+            const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
 
             currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
 
@@ -208,8 +214,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const newEmp: Employee = {
                     id: nextId, employeeId: String(mappedEmpId), firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
                     lastName: azureProfile.surname || activeAccount.name?.split(' ').slice(1).join(' ') || '',
-                    email: email, password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle, department: mappedDept,
-                    departmentId: '', projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
+                    email: email, password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle, department: mappedDeptName,
+                    departmentId: mappedDeptId, projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
                     salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(activeAccount.name || 'User')}&background=0D9488&color=fff`,
                     jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
                 };
@@ -225,7 +231,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
                 if (String(targetUser.employeeId) !== String(mappedEmpId)) updates.employeeId = String(mappedEmpId);
                 if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
-                if (targetUser.department !== mappedDept) updates.department = mappedDept;
+                
+                // Only sync from Azure if local department info is missing or inconsistent
+                if (targetUser.department !== mappedDeptName) {
+                    updates.department = mappedDeptName;
+                    updates.departmentId = mappedDeptId;
+                }
                 
                 if (Object.keys(updates).length > 0) {
                   await db.updateEmployee({ ...targetUser, ...updates });
@@ -260,6 +271,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast(`Synchronizing directory...`, "info");
       const currentEmployees = await db.getEmployees();
       let currentPos = await db.getPositions();
+      const currentDepts = await db.getDepartments();
       const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
       let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
 
@@ -271,7 +283,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const azureJobTitle = au.jobTitle || 'Team Member';
         const mappedSystemRole = getSystemRole(azureJobTitle);
         const azureEmpId = String(au.employeeId || '');
-        const azureDept = au.department || 'General';
+        
+        // Resolve Department logic
+        const azureDeptName = au.department || 'General';
+        const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
+        const mappedDeptId = matchedDept ? matchedDept.id : '';
+        const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
 
         currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
 
@@ -287,8 +304,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (azureEmpId && String(existingEmp.employeeId) !== azureEmpId) {
               updates.employeeId = azureEmpId;
           }
-          if (existingEmp.department !== azureDept) {
-              updates.department = azureDept;
+          // Important: Only overwrite department if they are significantly different to avoid case-looping
+          if (existingEmp.department !== mappedDeptName) {
+              updates.department = mappedDeptName;
+              updates.departmentId = mappedDeptId;
           }
 
           if (Object.keys(updates).length > 0) {
@@ -306,8 +325,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             password: 'ms-auth-user', 
             role: mappedSystemRole, 
             position: azureJobTitle,
-            department: azureDept, 
-            departmentId: '', 
+            department: mappedDeptName, 
+            departmentId: mappedDeptId, 
             projectIds: [], 
             managerId: '',
             joinDate: au.employeeHireDate ? au.employeeHireDate.split('T')[0] : formatDateISO(new Date()), 
@@ -389,8 +408,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     const currentEmployees = await db.getEmployees();
+    const currentDepts = await db.getDepartments();
     const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
     const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+    
+    const matchedDept = currentDepts.find(d => d.name === invite.department);
 
     const newEmp: Employee = {
       id: nextId,
@@ -402,6 +424,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       role: invite.role,
       position: invite.position,
       department: invite.department,
+      departmentId: matchedDept ? matchedDept.id : '',
       joinDate: formatDateISO(new Date()),
       status: EmployeeStatus.ACTIVE,
       salary: invite.salary,
@@ -536,7 +559,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 1. Perform Local DB Updates
     for (const update of updates) {
       const existing = employees.find(e => String(e.id) === String(update.id));
-      if (existing) await db.updateEmployee({ ...existing, ...update.data });
+      if (existing) {
+          const finalData = { ...update.data };
+          
+          // If departmentId changed, ensure department name string is updated for consistency
+          if (finalData.departmentId !== undefined) {
+              const matchedDept = departments.find(d => String(d.id) === String(finalData.departmentId));
+              finalData.department = matchedDept ? matchedDept.name : 'General';
+          }
+          
+          await db.updateEmployee({ ...existing, ...finalData });
+      }
     }
 
     // 2. Sync to Azure Portal (Requires permission and active session)
@@ -555,7 +588,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             // Only sync employees who are marked as MS-AUTH (meaning they came from Azure)
             if (emp && emp.password === 'ms-auth-user') {
               try {
-                await microsoftGraphService.updateUser(tokenResponse.accessToken, emp.email, update.data);
+                const azurePayload = { ...update.data };
+                
+                // CRITICAL: Ensure the department string is resolved for Azure if only ID was provided in update
+                if (azurePayload.departmentId !== undefined && !azurePayload.department) {
+                    const matchedDept = departments.find(d => String(d.id) === String(azurePayload.departmentId));
+                    azurePayload.department = matchedDept ? matchedDept.name : 'General';
+                }
+
+                await microsoftGraphService.updateUser(tokenResponse.accessToken, emp.email, azurePayload);
                 azureSyncCount++;
               } catch (e) {
                 console.error(`Azure sync failed for ${emp.email}:`, e);
