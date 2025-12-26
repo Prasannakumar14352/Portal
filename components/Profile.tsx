@@ -47,6 +47,8 @@ const Profile = () => {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const mapDiv = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const viewRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
 
   // Initialize data
   const initializeFormData = (user: User) => {
@@ -79,10 +81,6 @@ const Profile = () => {
   // Permission logic
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   
-  // Rules:
-  // 1. Must be in Edit Mode to edit anything.
-  // 2. HR fields (Dept, Position, Hire Date) only editable by HR in Edit Mode.
-  // 3. Contact info editable by user in Edit Mode.
   const canEditAdminFields = isEditMode && isHR;
   const canEditPersonalFields = isEditMode;
 
@@ -95,7 +93,6 @@ const Profile = () => {
 
   // ArcGIS Map Logic
   useEffect(() => {
-    let view: any = null;
     let cleanup = false;
 
     const loadArcGIS = () => {
@@ -120,29 +117,75 @@ const Profile = () => {
         await loadArcGIS();
         if (cleanup || !mapDiv.current) return;
 
-        window.require(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer"], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
+        window.require([
+          "esri/Map", 
+          "esri/views/MapView", 
+          "esri/Graphic", 
+          "esri/layers/GraphicsLayer",
+          "esri/rest/locator"
+        ], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any, locator: any) => {
           if (cleanup) return;
+          
           const map = new EsriMap({ basemap: "topo-vector" });
-          view = new MapView({
+          const view = new MapView({
             container: mapDiv.current,
             map: map,
             center: [location.lng, location.lat],
             zoom: 12
           });
+          viewRef.current = view;
+
           const layer = new GraphicsLayer();
           map.add(layer);
+
           const marker = new Graphic({
             geometry: { type: "point", longitude: location.lng, latitude: location.lat },
             symbol: { type: "simple-marker", color: [13, 148, 136], size: "12px", outline: { color: [255, 255, 255], width: 2 } }
           });
+          markerRef.current = marker;
           layer.add(marker);
+
+          // Interactive Logic for Location Selection
+          view.on("click", async (event: any) => {
+            // Only allow interaction in Edit Mode
+            if (!viewRef.current.container.parentElement.classList.contains('map-editing')) return;
+
+            const lat = event.mapPoint.latitude;
+            const lng = event.mapPoint.longitude;
+
+            // Move Marker
+            markerRef.current.geometry = event.mapPoint;
+            setLocation({ lat, lng });
+
+            // Reverse Geocode to get address
+            try {
+              const response = await locator.locationToAddress("https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer", {
+                location: event.mapPoint
+              });
+              if (response && response.address) {
+                setFormData(prev => ({ ...prev, address: response.address }));
+              }
+            } catch (err) {
+              console.warn("Reverse geocode failed", err);
+            }
+          });
+
           view.when(() => setIsMapLoaded(true));
         });
       } catch (e) { console.error("Map failed", e); }
     };
 
-    initMap();
-    return () => { cleanup = true; if (view) view.destroy(); };
+    if (!viewRef.current) initMap();
+    
+    return () => { cleanup = true; };
+  }, [location]);
+
+  // Sync marker position when location state changes externally or via map click
+  useEffect(() => {
+    if (markerRef.current && location) {
+      markerRef.current.geometry = { type: "point", longitude: location.lng, latitude: location.lat };
+      if (viewRef.current) viewRef.current.center = [location.lng, location.lat];
+    }
   }, [location]);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,10 +325,16 @@ const Profile = () => {
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                 <h4 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2"><Globe size={16} className="text-teal-600" /> Location</h4>
+                {isEditMode && <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded animate-pulse uppercase tracking-wider">Click map to set</span>}
             </div>
-            <div className="h-48 relative bg-slate-50 dark:bg-slate-900">
+            <div className={`h-48 relative bg-slate-50 dark:bg-slate-900 ${isEditMode ? 'map-editing cursor-crosshair ring-2 ring-inset ring-teal-500/20' : ''}`}>
                 <div ref={mapDiv} className="w-full h-full"></div>
                 {!isMapLoaded && <div className="absolute inset-0 flex items-center justify-center"><span className="text-[10px] font-bold text-slate-400 animate-pulse">Loading Map...</span></div>}
+                {isEditMode && isMapLoaded && (
+                  <div className="absolute top-2 left-2 z-10 bg-teal-600 text-white px-2 py-1 rounded shadow-lg text-[9px] font-bold uppercase pointer-events-none">
+                    Select New Location
+                  </div>
+                )}
             </div>
             <div className="p-5">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Registered Address</p>
@@ -374,7 +423,7 @@ const Profile = () => {
                     <InputField label="Primary Address" icon={MapPin} value={formData.address} onChange={(v: string) => setFormData({...formData, address: v})} disabled={!canEditPersonalFields} placeholder="123 Corporate Blvd, Tech City" />
                     <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-start gap-4">
                         <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-                        <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">Location updates are monitored for attendance verification purposes. Please ensure your primary work address is correct.</p>
+                        <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">Location updates are monitored for attendance verification purposes. {isEditMode ? 'You can click on the map to automatically set your address.' : 'Please ensure your primary work address is correct.'}</p>
                     </div>
                 </div>
             </div>
