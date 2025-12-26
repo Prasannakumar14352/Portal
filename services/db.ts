@@ -144,6 +144,10 @@ const mockDb = {
         if(idx !== -1) store.attendance[idx] = record;
         return Promise.resolve(record);
     },
+    deleteAttendance: async (id: string) => {
+        store.attendance = store.attendance.filter(a => String(a.id) !== String(id));
+        return Promise.resolve();
+    },
     getTimeEntries: async (): Promise<TimeEntry[]> => Promise.resolve([...store.timeEntries]),
     addTimeEntry: async (entry: TimeEntry) => { store.timeEntries.push(entry); return Promise.resolve(entry); },
     updateTimeEntry: async (entry: TimeEntry) => {
@@ -168,7 +172,10 @@ const mockDb = {
     },
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
     addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
-    deleteHoliday: async (id: string) => { store.holidays = store.holidays.filter(h => String(h.id) !== String(id)); return Promise.resolve(); },
+    deleteHoliday: async (id: string) => {
+        store.holidays = store.holidays.filter(h => String(h.id) !== String(id));
+        return Promise.resolve();
+    },
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
     addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
 };
@@ -211,6 +218,7 @@ const apiDb = {
   getAttendance: () => api.get('/attendance'),
   addAttendance: (record: AttendanceRecord) => api.post('/attendance', record),
   updateAttendance: (record: AttendanceRecord) => api.put(`/attendance/${record.id}`, record),
+  deleteAttendance: (id: string) => api.delete(`/attendance/${id}`),
 
   getTimeEntries: () => api.get('/time_entries'),
   addTimeEntry: (entry: TimeEntry) => api.post('/time_entries', entry),

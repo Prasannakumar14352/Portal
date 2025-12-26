@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Lock, Zap } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Trash2, Lock, Zap } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -25,11 +25,8 @@ interface AttendanceProps {
 }
 
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
-  const { checkIn, checkOut, timeEntries, addTimeEntry, projects, currentUser, updateAttendanceRecord, showToast, employees } = useAppContext();
+  const { checkIn, checkOut, timeEntries, addTimeEntry, projects, currentUser, updateAttendanceRecord, deleteAttendanceRecord, showToast } = useAppContext();
   
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [searchName, setSearchName] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -54,10 +51,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [editForm, setEditForm] = useState({ checkIn: '', checkOut: '' });
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
+
   const todayRecord = useMemo(() => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(currentTime);
-    // Fixed: Use String() for ID comparison to handle number/string mismatch
     const sessions = records.filter(r => String(r.employeeId) === String(currentUser.id) && r.date === todayStr);
     if (sessions.length === 0) return undefined;
     const active = sessions.find(r => !r.checkOut);
@@ -76,15 +75,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-      if (!startDate && !endDate) {
-          const now = new Date();
-          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-          setStartDate(formatDateISO(firstDay));
-          setEndDate(formatDateISO(now));
-      }
   }, []);
 
   const checkInTimeObj = todayRecord?.checkInTime ? new Date(todayRecord.checkInTime) : null;
@@ -163,13 +153,24 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       setEditingRecord(null);
   };
 
+  const openDeleteConfirm = (record: AttendanceRecord) => {
+    setRecordToDelete(record);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (recordToDelete) {
+      await deleteAttendanceRecord(recordToDelete.id);
+      setShowDeleteConfirm(false);
+      setRecordToDelete(null);
+    }
+  };
+
   const paginatedRecords = useMemo(() => {
     let filtered = records;
-    if (searchName) filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(searchName.toLowerCase()));
-    // Fixed: Use String() for ID comparison
     if (!isHR && currentUser) filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [records, searchName, isHR, currentUser, currentPage, itemsPerPage]);
+  }, [records, isHR, currentUser, currentPage, itemsPerPage]);
 
   return (
     <div className="space-y-6">
@@ -213,12 +214,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       </div>
 
       {/* Checkout Time Log Modal */}
-      <DraggableModal 
-        isOpen={showTimeLogModal} 
-        onClose={() => setShowTimeLogModal(false)} 
-        title="Quick Time Log" 
-        width="max-w-lg"
-      >
+      <DraggableModal isOpen={showTimeLogModal} onClose={() => setShowTimeLogModal(false)} title="Quick Time Log" width="max-w-lg">
           <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-start gap-2 mb-6">
               <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
               <p className="text-xs text-amber-800">You must log your work hours before checking out.</p>
@@ -309,15 +305,28 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {paginatedRecords.map((record, index) => (
-                <tr key={record.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                  <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{record.employeeName}</td>
-                  <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{record.date}</td>
-                  <td className="px-6 py-4 uppercase text-xs text-slate-700 dark:text-slate-300">{record.checkIn} - {record.checkOut || '--:--'}</td>
-                  <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">{calculateDuration(record)}</td>
-                  <td className="px-6 py-4 text-center">{isHR ? <button onClick={() => openEditModal(record)} className="p-1.5 text-slate-400 hover:text-emerald-600"><Edit2 size={16} /></button> : '-'}</td>
-                </tr>
-              ))}
+              {paginatedRecords.map((record, index) => {
+                const canManage = isHR || String(record.employeeId) === String(currentUser?.id);
+                return (
+                  <tr key={record.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{record.employeeName}</td>
+                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{record.date}</td>
+                    <td className="px-6 py-4 uppercase text-xs text-slate-700 dark:text-slate-300">{record.checkIn} - {record.checkOut || '--:--'}</td>
+                    <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">{calculateDuration(record)}</td>
+                    <td className="px-6 py-4 text-center">
+                      {canManage ? (
+                        <div className="flex justify-center gap-2">
+                           <button onClick={() => openEditModal(record)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit Session"><Edit2 size={16} /></button>
+                           <button onClick={() => openDeleteConfirm(record)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors" title="Delete Session"><Trash2 size={16} /></button>
+                        </div>
+                      ) : '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+              {paginatedRecords.length === 0 && (
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic font-medium">No attendance logs found for this period.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -326,10 +335,27 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       {/* Manual Edit Modal */}
       <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Record" width="max-w-md">
           <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div><label className="block text-sm font-medium">Check In</label><input type="time" className="w-full p-2 border rounded" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} /></div>
-              <div><label className="block text-sm font-medium">Check Out</label><input type="time" className="w-full p-2 border rounded" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} /></div>
-              <button type="submit" className="w-full py-2 bg-emerald-600 text-white rounded font-bold">Update</button>
+              <div><label className="block text-sm font-medium">Check In</label><input type="time" className="w-full p-2 border rounded dark:bg-slate-700 dark:text-white" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} /></div>
+              <div><label className="block text-sm font-medium">Check Out</label><input type="time" className="w-full p-2 border rounded dark:bg-slate-700 dark:text-white" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} /></div>
+              <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition">Update Record</button>
           </form>
+      </DraggableModal>
+
+      {/* Delete Confirmation Modal */}
+      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-sm">
+          <div className="text-center py-4">
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
+                  <Trash2 className="text-red-600 dark:text-red-400" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Are you sure?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm px-4">
+                  This action will permanently remove this attendance entry. This cannot be undone.
+              </p>
+          </div>
+          <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+              <button onClick={handleDeleteSubmit} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-red-700">Delete</button>
+          </div>
       </DraggableModal>
     </div>
   );

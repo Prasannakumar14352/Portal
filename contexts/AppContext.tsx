@@ -82,6 +82,7 @@ interface AppContextType {
   checkIn: () => Promise<void>;
   checkOut: (reason?: string) => Promise<void>;
   updateAttendanceRecord: (record: AttendanceRecord) => Promise<void>; 
+  deleteAttendanceRecord: (id: string | number) => Promise<void>;
   getTodayAttendance: () => AttendanceRecord | undefined;
   notify: (message: string) => Promise<void>; 
   markNotificationRead: (id: string | number) => Promise<void>;
@@ -632,7 +633,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(new Date());
-    const sessions = attendance.filter(a => a.employeeId === currentUser.id && a.date === todayStr);
+    const sessions = attendance.filter(a => String(a.employeeId) === String(currentUser.id) && a.date === todayStr);
     if (sessions.length === 0) return undefined;
     const active = sessions.find(s => !s.checkOut);
     return active || sessions[sessions.length - 1];
@@ -659,6 +660,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await db.updateAttendance(updated); setAttendance(await db.getAttendance()); showToast(`Checked out.`, 'success');
   };
   const updateAttendanceRecord = async (record: AttendanceRecord) => { await db.updateAttendance(record); setAttendance(await db.getAttendance()); showToast("Updated.", "success"); };
+  const deleteAttendanceRecord = async (id: string | number) => { await db.deleteAttendance(id.toString()); setAttendance(await db.getAttendance()); showToast("Record deleted.", "success"); };
   const notify = async (message: string) => {
     if (!currentUser) return;
     const newNotif: Notification = { id: Math.random().toString(36).substr(2, 9), userId: currentUser.id, title: 'System', message, time: 'Just now', read: false, type: 'info' };
@@ -692,7 +694,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addPosition, updatePosition, deletePosition,
     addRole, updateRole, deleteRole, addProject, updateProject, deleteProject, addLeave, addLeaves, updateLeave, updateLeaveStatus,
     addLeaveType, updateLeaveType, deleteLeaveType, addTimeEntry, updateTimeEntry, deleteTimeEntry,
-    checkIn, checkOut, updateAttendanceRecord, getTodayAttendance, notify, markNotificationRead, markAllRead,
+    checkIn, checkOut, updateAttendanceRecord, deleteAttendanceRecord, getTodayAttendance, notify, markNotificationRead, markAllRead,
     addHoliday, addHolidays, deleteHoliday, generatePayslips, manualAddPayslip, syncAzureUsers
   };
 
