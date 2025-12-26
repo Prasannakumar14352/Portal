@@ -143,9 +143,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const getSystemRole = (jobTitle: string): UserRole => {
       const title = (jobTitle || '').toLowerCase().trim();
-      if (title === 'hr manager') return UserRole.HR;
-      if (title === 'manager') return UserRole.MANAGER;
-      if (title === 'hr') return UserRole.HR;
+      if (title === 'hr manager' || title === 'hr' || title === 'head of hr') return UserRole.HR;
+      if (title === 'manager' || title.includes('manager')) return UserRole.MANAGER;
       if (title === 'admin') return UserRole.ADMIN;
       return UserRole.EMPLOYEE;
   };
@@ -161,6 +160,96 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return updated;
     }
     return existingPositions;
+  };
+
+  /**
+   * Internal function to process an Azure login result (Redirect or Popup)
+   */
+  const processAzureLogin = async (account: any, accessToken: string) => {
+      try {
+          const azureProfile = await microsoftGraphService.fetchMe(accessToken);
+          const email = account.username || azureProfile.mail || azureProfile.userPrincipalName;
+          
+          const currentEmployees = await db.getEmployees();
+          const currentDepts = await db.getDepartments();
+          let currentPos = await db.getPositions();
+          
+          let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
+          
+          const azureJobTitle = azureProfile.jobTitle || 'Team Member';
+          const mappedSystemRole = getSystemRole(azureJobTitle);
+          const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
+          const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
+          
+          // Resolve Department
+          const azureDeptName = azureProfile.department || 'General';
+          const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
+          const mappedDeptId = matchedDept ? matchedDept.id : '';
+          const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
+
+          currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
+
+          if (!targetUser) {
+              const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+              const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
+              const newEmp: Employee = {
+                  id: nextId, 
+                  employeeId: String(mappedEmpId), 
+                  firstName: azureProfile.givenName || account.name?.split(' ')[0] || 'User',
+                  lastName: azureProfile.surname || account.name?.split(' ').slice(1).join(' ') || '',
+                  email: email, 
+                  password: 'ms-auth-user', 
+                  role: mappedSystemRole, 
+                  position: azureJobTitle, 
+                  department: mappedDeptName,
+                  departmentId: mappedDeptId, 
+                  projectIds: [], 
+                  managerId: '', 
+                  joinDate: mappedHireDate, 
+                  status: EmployeeStatus.ACTIVE,
+                  salary: 0, 
+                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name || 'User')}&background=0D9488&color=fff`,
+                  jobTitle: azureJobTitle, 
+                  phone: '', 
+                  workLocation: 'Office HQ India'
+              };
+              await db.addEmployee(newEmp);
+              targetUser = newEmp;
+              setEmployees(await db.getEmployees());
+          } else {
+              const updates: Partial<Employee> = {};
+              if (targetUser.position !== azureJobTitle) {
+                 updates.position = azureJobTitle;
+                 updates.jobTitle = azureJobTitle;
+                 updates.role = mappedSystemRole;
+              }
+              if (String(targetUser.employeeId) !== String(mappedEmpId)) updates.employeeId = String(mappedEmpId);
+              if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
+              if (targetUser.department !== mappedDeptName) {
+                  updates.department = mappedDeptName;
+                  updates.departmentId = mappedDeptId;
+              }
+              
+              if (Object.keys(updates).length > 0) {
+                await db.updateEmployee({ ...targetUser, ...updates });
+                targetUser = { ...targetUser, ...updates };
+                setEmployees(await db.getEmployees());
+              }
+          }
+
+          if (targetUser) {
+              setCurrentUser({ 
+                  id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
+                  role: targetUser.role as UserRole, position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
+                  departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
+              });
+              return true;
+          }
+          return false;
+      } catch (err) {
+          console.error("Azure user processing failed:", err);
+          return false;
+      }
   };
 
   useEffect(() => {
@@ -183,74 +272,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const activeAccount = result?.account || (accounts.length > 0 ? accounts[0] : null);
 
         if (activeAccount) {
-            const email = activeAccount.username;
             const tokenResponse = await pca.acquireTokenSilent({
               scopes: ["User.Read", "User.ReadWrite.All"],
               account: activeAccount
             });
-            const azureProfile = await microsoftGraphService.fetchMe(tokenResponse.accessToken);
-            const currentEmployees = await db.getEmployees();
-            let currentPos = await db.getPositions();
-            const currentDepts = await db.getDepartments();
-            
-            let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
-            
-            const azureJobTitle = azureProfile.jobTitle || 'Team Member';
-            const mappedSystemRole = getSystemRole(azureJobTitle);
-            const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
-            const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
-            
-            // Resolve Department ID from Azure String
-            const azureDeptName = azureProfile.department || 'General';
-            const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
-            const mappedDeptId = matchedDept ? matchedDept.id : '';
-            const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
-
-            currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
-
-            if (!targetUser) {
-                const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
-                const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-                const newEmp: Employee = {
-                    id: nextId, employeeId: String(mappedEmpId), firstName: azureProfile.givenName || activeAccount.name?.split(' ')[0] || 'User',
-                    lastName: azureProfile.surname || activeAccount.name?.split(' ').slice(1).join(' ') || '',
-                    email: email, password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle, department: mappedDeptName,
-                    departmentId: mappedDeptId, projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
-                    salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(activeAccount.name || 'User')}&background=0D9488&color=fff`,
-                    jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
-                };
-                await db.addEmployee(newEmp);
-                targetUser = newEmp;
-                setEmployees(await db.getEmployees());
-            } else {
-                const updates: Partial<Employee> = {};
-                if (targetUser.position !== azureJobTitle) {
-                   updates.position = azureJobTitle;
-                   updates.jobTitle = azureJobTitle;
-                   updates.role = mappedSystemRole;
-                }
-                if (String(targetUser.employeeId) !== String(mappedEmpId)) updates.employeeId = String(mappedEmpId);
-                if (targetUser.joinDate !== mappedHireDate) updates.joinDate = mappedHireDate;
-                
-                // Only sync from Azure if local department info is missing or inconsistent
-                if (targetUser.department !== mappedDeptName) {
-                    updates.department = mappedDeptName;
-                    updates.departmentId = mappedDeptId;
-                }
-                
-                if (Object.keys(updates).length > 0) {
-                  await db.updateEmployee({ ...targetUser, ...updates });
-                  targetUser = { ...targetUser, ...updates };
-                  setEmployees(await db.getEmployees());
-                }
-            }
-            if (targetUser) {
-                setCurrentUser({ 
-                    id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
-                    role: targetUser.role as UserRole, position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
-                    departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
-                });
-            }
+            await processAzureLogin(activeAccount, tokenResponse.accessToken);
         }
         setMsalInstance(pca);
       } catch (err) { console.warn("MSAL initialization failed:", err); }
@@ -258,6 +284,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     init();
   }, []);
+
+  const loginWithMicrosoft = async (): Promise<boolean> => {
+    if (!msalInstance) {
+        showToast("Microsoft Authentication not ready. Refresh and try again.", "error");
+        return false;
+    }
+    try {
+        const { loginRequest } = await import("../services/authConfig");
+        // Using Popup for immediate feedback and better reliability in sandboxed environments
+        const result = await msalInstance.loginPopup(loginRequest);
+        if (result && result.account) {
+            return await processAzureLogin(result.account, result.accessToken);
+        }
+        return false;
+    } catch (error: any) { 
+        console.error("MS Popup Login Error:", error); 
+        // Handle common errors like user cancelling the popup
+        if (error.name === "BrowserAuthError" && error.errorCode === "user_cancelled") {
+            showToast("Sign-in cancelled by user.", "info");
+        } else {
+            showToast("Microsoft Sign-In failed: " + (error.message || "Unknown Error"), "error");
+        }
+        return false;
+    }
+  };
 
   const syncAzureUsers = async () => {
     if (!msalInstance || !currentUser) return;
@@ -304,7 +355,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (azureEmpId && String(existingEmp.employeeId) !== azureEmpId) {
               updates.employeeId = azureEmpId;
           }
-          // Important: Only overwrite department if they are significantly different to avoid case-looping
           if (existingEmp.department !== mappedDeptName) {
               updates.department = mappedDeptName;
               updates.departmentId = mappedDeptId;
@@ -467,19 +517,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
   
-  const loginWithMicrosoft = async (): Promise<boolean> => {
-    if (!msalInstance) return false;
-    try {
-        const { loginRequest } = await import("../services/authConfig");
-        await msalInstance.loginRedirect(loginRequest);
-        return true;
-    } catch (error: any) { 
-        console.error("MS Redirect Login Error:", error); 
-        showToast("Microsoft Sign-In failed to initiate.", "error");
-        return false;
-    }
-  };
-
   const logout = async () => { 
     if (msalInstance) {
         try {
@@ -561,13 +598,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const existing = employees.find(e => String(e.id) === String(update.id));
       if (existing) {
           const finalData = { ...update.data };
-          
-          // If departmentId changed, ensure department name string is updated for consistency
           if (finalData.departmentId !== undefined) {
               const matchedDept = departments.find(d => String(d.id) === String(finalData.departmentId));
               finalData.department = matchedDept ? matchedDept.name : 'General';
           }
-          
           await db.updateEmployee({ ...existing, ...finalData });
       }
     }
@@ -585,17 +619,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           let azureSyncCount = 0;
           for (const update of updates) {
             const emp = employees.find(e => String(e.id) === String(update.id));
-            // Only sync employees who are marked as MS-AUTH (meaning they came from Azure)
             if (emp && emp.password === 'ms-auth-user') {
               try {
                 const azurePayload = { ...update.data };
-                
-                // CRITICAL: Ensure the department string is resolved for Azure if only ID was provided in update
                 if (azurePayload.departmentId !== undefined && !azurePayload.department) {
                     const matchedDept = departments.find(d => String(d.id) === String(azurePayload.departmentId));
                     azurePayload.department = matchedDept ? matchedDept.name : 'General';
                 }
-
                 await microsoftGraphService.updateUser(tokenResponse.accessToken, emp.email, azurePayload);
                 azureSyncCount++;
               } catch (e) {
@@ -608,7 +638,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         }
       } catch (err) {
-        console.warn("Permission missing or session expired for Azure Sync. Local changes saved only.");
+        console.warn("Azure Sync permission missing. Local changes saved only.");
       }
     }
 
@@ -634,18 +664,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (existing) { await db.updateDepartment({ ...existing, ...data } as any); setDepartments(await db.getDepartments()); showToast('Department updated', 'success'); }
   };
   const deleteDepartment = async (id: string | number) => { 
-    // Unassign employees before deletion
     const affectedEmployees = employees.filter(e => String(e.departmentId) === String(id));
     if (affectedEmployees.length > 0) {
-      const updates = affectedEmployees.map(e => ({
-        id: e.id,
-        data: { departmentId: '', department: 'General' }
-      }));
+      const updates = affectedEmployees.map(e => ({ id: e.id, data: { departmentId: '', department: 'General' } }));
       await bulkUpdateEmployees(updates);
     }
     await db.deleteDepartment(id.toString()); 
     setDepartments(await db.getDepartments()); 
-    showToast('Department deleted and members unassigned', 'info'); 
+    showToast('Department deleted', 'info'); 
   };
 
   const addPosition = async (pos: Omit<Position, 'id'>) => { await db.addPosition({ ...pos, id: Math.random().toString(36).substr(2, 9) }); setPositions(await db.getPositions()); showToast('Position created', 'success'); };
