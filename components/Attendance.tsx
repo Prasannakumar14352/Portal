@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Trash2, Lock, Zap } from 'lucide-react';
+// Fixed missing Info import from lucide-react
+import { Calendar, Clock, MapPin, Search, Filter, PlayCircle, StopCircle, CheckCircle2, AlertTriangle, X, ShieldCheck, ChevronLeft, ChevronRight, Hourglass, Edit2, Trash2, Lock, Zap, Info } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -49,7 +50,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
-  const [editForm, setEditForm] = useState({ date: '', checkIn: '', checkOut: '' });
+  
+  // Updated state to handle night shifts (cross-day checkout)
+  const [editForm, setEditForm] = useState({ 
+    checkInDate: '', 
+    checkInTime: '', 
+    checkOutDate: '', 
+    checkOutTime: '' 
+  });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
@@ -134,27 +142,40 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   const openEditModal = (record: AttendanceRecord) => {
       setEditingRecord(record);
-      const cin = record.checkInTime ? new Date(record.checkInTime).toTimeString().substring(0, 5) : '';
-      const cout = record.checkOutTime ? new Date(record.checkOutTime).toTimeString().substring(0, 5) : '';
-      setEditForm({ date: record.date, checkIn: cin, checkOut: cout });
+      
+      const cinDateObj = record.checkInTime ? new Date(record.checkInTime) : new Date(record.date);
+      const coutDateObj = record.checkOutTime ? new Date(record.checkOutTime) : null;
+
+      setEditForm({ 
+        checkInDate: formatDateISO(cinDateObj),
+        checkInTime: cinDateObj.toTimeString().substring(0, 5),
+        checkOutDate: coutDateObj ? formatDateISO(coutDateObj) : formatDateISO(cinDateObj),
+        checkOutTime: coutDateObj ? coutDateObj.toTimeString().substring(0, 5) : ''
+      });
       setShowEditModal(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRecord) return;
-      const datePart = editForm.date;
-      const newCheckInISO = editForm.checkIn ? new Date(`${datePart}T${editForm.checkIn}:00`).toISOString() : undefined;
-      const newCheckOutISO = editForm.checkOut ? new Date(`${datePart}T${editForm.checkOut}:00`).toISOString() : undefined;
+
+      const newCheckInISO = new Date(`${editForm.checkInDate}T${editForm.checkInTime}:00`).toISOString();
+      const newCheckOutISO = editForm.checkOutTime 
+        ? new Date(`${editForm.checkOutDate}T${editForm.checkOutTime}:00`).toISOString() 
+        : undefined;
+
       const fmtTime = (iso: string | undefined) => iso ? formatTime12(new Date(iso)) : '--:--';
+      
       const updatedRecord: AttendanceRecord = { 
         ...editingRecord, 
-        date: datePart,
+        // Use check-in date as the primary record date
+        date: editForm.checkInDate,
         checkIn: fmtTime(newCheckInISO), 
         checkInTime: newCheckInISO, 
         checkOut: fmtTime(newCheckOutISO), 
         checkOutTime: newCheckOutISO 
       };
+
       await updateAttendanceRecord(updatedRecord);
       setShowEditModal(false);
       setEditingRecord(null);
@@ -315,7 +336,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               {paginatedRecords.map((record, index) => {
                 const canManage = isHR || String(record.employeeId) === String(currentUser?.id);
                 return (
-                  <tr key={record.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                  <tr key={record.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{record.employeeName}</td>
                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{record.date}</td>
                     <td className="px-6 py-4 uppercase text-xs text-slate-700 dark:text-slate-300">{record.checkIn} - {record.checkOut || '--:--'}</td>
@@ -339,25 +360,48 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Manual Edit Modal */}
-      <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Record" width="max-w-md">
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                  <label className="block text-sm font-medium mb-1">Date</label>
-                  <input required type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                      <label className="block text-sm font-medium mb-1">Check In</label>
-                      <input type="time" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} />
+      {/* Manual Edit Modal - Updated for Night Shifts */}
+      <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Attendance Session" width="max-w-md">
+          <form onSubmit={handleEditSubmit} className="space-y-6">
+              <div className="space-y-4">
+                  {/* Check In Group */}
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <label className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Shift Start (Check-In)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Date</label>
+                            <input required type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkInDate} onChange={e => setEditForm({...editForm, checkInDate: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Time</label>
+                            <input required type="time" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkInTime} onChange={e => setEditForm({...editForm, checkInTime: e.target.value})} />
+                        </div>
+                    </div>
                   </div>
-                  <div>
-                      <label className="block text-sm font-medium mb-1">Check Out</label>
-                      <input type="time" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} />
+
+                  {/* Check Out Group */}
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3">Shift End (Check-Out)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Date</label>
+                            <input required type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkOutDate} onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Time</label>
+                            <input type="time" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkOutTime} onChange={e => setEditForm({...editForm, checkOutTime: e.target.value})} />
+                        </div>
+                    </div>
                   </div>
               </div>
+
+              <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-800 flex items-start gap-2">
+                  <Info className="text-amber-600 shrink-0 mt-0.5" size={14} />
+                  <p className="text-[10px] text-amber-800 dark:text-amber-200 leading-relaxed font-medium">Night shift records will calculate hours correctly based on these dates. Ensure the checkout date is accurate.</p>
+              </div>
+
               <div className="pt-2">
-                  <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]">Update Record</button>
+                  <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20 active:scale-[0.98] text-sm uppercase tracking-widest">Update Session</button>
               </div>
           </form>
       </DraggableModal>

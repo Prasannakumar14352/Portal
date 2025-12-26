@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 // Initialize the Google GenAI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -28,7 +28,8 @@ ORGANIZATION DATA:
 - Recent Leaves: ${context.leaves.slice(0, 10).map(l => `${l.userName} for ${l.type} from ${l.startDate} to ${l.endDate} (${l.status})`).join('; ')}
 `;
 
-  const response = await ai.models.generateContent({
+  // Explicitly typing the response for compliance with guidelines
+  const response: GenerateContentResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: message,
     config: {
@@ -38,7 +39,7 @@ Rules:
 1. Use the provided context to answer questions about specific employees, policies, or schedules.
 2. If asked about leave balances, look at the leave types and approved leaves in the context.
 3. Be professional, helpful, and concise.
-4. Privacy: Only share sensitive details like salary if the current user is an 'HR Manager'. For standard employees, keep information to roles, departments, and public schedules.
+4. Privacy: Only share sensitive details like salary if the current user is 'HR Manager'. For standard employees, keep information to roles, departments, and public schedules.
 5. If the data is not in the context, say "I don't have information on that in our current records."
 6. The current date is ${new Date().toLocaleDateString()}.
 
@@ -47,6 +48,7 @@ ${contextSummary}`,
     }
   });
   
+  // Directly accessing .text property as per guidelines
   return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
 };
 
