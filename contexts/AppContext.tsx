@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { PublicClientApplication } from "@azure/msal-browser";
+import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
@@ -115,6 +115,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [msalInstance, setMsalInstance] = useState<PublicClientApplication | null>(null);
+  const [isInteracting, setIsInteracting] = useState(false);
 
   const refreshData = async () => {
     try {
@@ -260,17 +261,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       const pca = await initMsal();
       if (pca) {
-          const result = await pca.handleRedirectPromise();
-          const accounts = pca.getAllAccounts();
-          const activeAccount = result?.account || (accounts.length > 0 ? accounts[0] : null);
-          if (activeAccount) {
-              try {
+          try {
+              const result = await pca.handleRedirectPromise();
+              const accounts = pca.getAllAccounts();
+              const activeAccount = result?.account || (accounts.length > 0 ? accounts[0] : null);
+              if (activeAccount) {
                   const tokenResponse = await pca.acquireTokenSilent({
                       scopes: ["User.Read", "User.ReadWrite.All"],
                       account: activeAccount
                   });
                   await processAzureLogin(activeAccount, tokenResponse.accessToken);
-              } catch (e) { console.warn("Silent token acquisition failed", e); }
+              }
+          } catch (e) { 
+              console.warn("Initial MSAL check failed", e); 
           }
       }
       setIsLoading(false);
@@ -279,9 +282,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const loginWithMicrosoft = async (): Promise<boolean> => {
+    if (isInteracting) {
+        showToast("Authentication is already in progress...", "info");
+        return false;
+    }
+
     let instance = msalInstance;
     if (!instance) {
-        showToast("Re-initializing Microsoft Auth...", "info");
         instance = await initMsal();
     }
     
@@ -290,18 +297,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return false;
     }
     
+    setIsInteracting(true);
     try {
+        // Ensure any previous interaction is cleaned up
+        await instance.handleRedirectPromise();
+
         const result = await instance.loginPopup(loginRequest);
         if (result && result.account) {
-            return await processAzureLogin(result.account, result.accessToken);
+            const ok = await processAzureLogin(result.account, result.accessToken);
+            setIsInteracting(false);
+            return ok;
         }
+        setIsInteracting(false);
         return false;
     } catch (error: any) { 
-        console.error("MS Login Error:", error); 
-        if (error.name === "BrowserAuthError" && error.errorCode === "user_cancelled") {
-            showToast("Sign-in cancelled.", "info");
+        setIsInteracting(false);
+        console.error("MS Login Error Detail:", error); 
+        
+        // Specific handling for 'interaction_in_progress' to prevent 'user_cancelled' cascading
+        if (error instanceof BrowserAuthError && error.errorCode === "interaction_in_progress") {
+            showToast("A sign-in window is already open. Please complete or close it.", "warning");
+        } else if (error instanceof BrowserAuthError && error.errorCode === "user_cancelled") {
+            showToast("Sign-in was cancelled.", "info");
+        } else if (error.message && error.message.includes("popup_window_error")) {
+            showToast("Popup blocked by browser. Please enable popups and try again.", "error");
         } else {
-            showToast("Microsoft Sign-In failed. Please try again.", "error");
+            showToast("Microsoft Sign-In failed: " + (error.message || "Please check your network."), "error");
         }
         return false;
     }

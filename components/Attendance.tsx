@@ -57,7 +57,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const todayRecord = useMemo(() => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(currentTime);
-    const sessions = records.filter(r => r.employeeId === currentUser.id && r.date === todayStr);
+    // Fixed: Use String() for ID comparison to handle number/string mismatch
+    const sessions = records.filter(r => String(r.employeeId) === String(currentUser.id) && r.date === todayStr);
     if (sessions.length === 0) return undefined;
     const active = sessions.find(r => !r.checkOut);
     if (active) return active;
@@ -69,7 +70,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const userProjects = useMemo(() => projects.filter(p => p.status === 'Active'), [projects]);
   const selectedProjectTasks = useMemo(() => {
     if (!logForm.projectId || logForm.projectId === 'NO_PROJECT') return ['General Administration', 'Internal Meeting', 'Documentation', 'Support'];
-    return projects.find(p => p.id === logForm.projectId)?.tasks || [];
+    return projects.find(p => String(p.id) === String(logForm.projectId))?.tasks || [];
   }, [logForm.projectId, projects]);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const handleCheckOutClick = () => {
     if (!currentUser) return;
     const todayStr = formatDateISO(new Date());
-    const hasLog = timeEntries.some(t => t.userId === currentUser.id && t.date === todayStr);
+    const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === todayStr);
     const actionType = isEarlyLogout ? 'early' : 'normal';
     if (!hasLog) {
         setPendingCheckoutAction(actionType);
@@ -165,7 +166,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const paginatedRecords = useMemo(() => {
     let filtered = records;
     if (searchName) filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(searchName.toLowerCase()));
-    if (!isHR && currentUser) filtered = filtered.filter(r => r.employeeId === currentUser.id);
+    // Fixed: Use String() for ID comparison
+    if (!isHR && currentUser) filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [records, searchName, isHR, currentUser, currentPage, itemsPerPage]);
 
@@ -210,7 +212,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
          </div>
       </div>
 
-      {/* Checkout Time Log Modal - Standardized with scrollbars and subtask logic */}
+      {/* Checkout Time Log Modal */}
       <DraggableModal 
         isOpen={showTimeLogModal} 
         onClose={() => setShowTimeLogModal(false)} 
@@ -226,7 +228,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Project</label>
                   <select required className="w-full px-3 py-2.5 border rounded-xl text-sm outline-none dark:bg-slate-700 bg-white dark:text-white transition shadow-sm" value={logForm.projectId} onChange={e => setLogForm({...logForm, projectId: e.target.value, task: ''})}>
                     <option value="" disabled>Choose project...</option>
-                    {userProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {userProjects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                     <option value="NO_PROJECT">General / Administration</option>
                   </select>
               </div>

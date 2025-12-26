@@ -1,5 +1,5 @@
 
-import { Configuration, PopupRequest } from "@azure/msal-browser";
+import { Configuration, PopupRequest, LogLevel } from "@azure/msal-browser";
 
 // --- AZURE APP CONFIGURATION ---
 const CLIENT_ID = process.env.VITE_AZURE_CLIENT_ID || "af84ee21-88c6-4cb7-9586-957230a8f583";
@@ -15,6 +15,28 @@ export const msalConfig: Configuration = {
     cache: {
         cacheLocation: "localStorage", 
         storeAuthStateInCookie: true,
+    },
+    system: {
+        allowRedirectInIframe: true,
+        loggerOptions: {
+            loggerCallback: (level, message, containsPii) => {
+                if (containsPii) return;
+                switch (level) {
+                    case LogLevel.Error:
+                        console.error("[MSAL]", message);
+                        return;
+                    case LogLevel.Info:
+                        console.info("[MSAL]", message);
+                        return;
+                    case LogLevel.Verbose:
+                        console.debug("[MSAL]", message);
+                        return;
+                    case LogLevel.Warning:
+                        console.warn("[MSAL]", message);
+                        return;
+                }
+            }
+        }
     }
 };
 
