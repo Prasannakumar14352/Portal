@@ -49,7 +49,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
-  const [editForm, setEditForm] = useState({ checkIn: '', checkOut: '' });
+  const [editForm, setEditForm] = useState({ date: '', checkIn: '', checkOut: '' });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
@@ -136,18 +136,25 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       setEditingRecord(record);
       const cin = record.checkInTime ? new Date(record.checkInTime).toTimeString().substring(0, 5) : '';
       const cout = record.checkOutTime ? new Date(record.checkOutTime).toTimeString().substring(0, 5) : '';
-      setEditForm({ checkIn: cin, checkOut: cout });
+      setEditForm({ date: record.date, checkIn: cin, checkOut: cout });
       setShowEditModal(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRecord) return;
-      const datePart = editingRecord.date;
+      const datePart = editForm.date;
       const newCheckInISO = editForm.checkIn ? new Date(`${datePart}T${editForm.checkIn}:00`).toISOString() : undefined;
       const newCheckOutISO = editForm.checkOut ? new Date(`${datePart}T${editForm.checkOut}:00`).toISOString() : undefined;
       const fmtTime = (iso: string | undefined) => iso ? formatTime12(new Date(iso)) : '--:--';
-      const updatedRecord: AttendanceRecord = { ...editingRecord, checkIn: fmtTime(newCheckInISO), checkInTime: newCheckInISO, checkOut: fmtTime(newCheckOutISO), checkOutTime: newCheckOutISO };
+      const updatedRecord: AttendanceRecord = { 
+        ...editingRecord, 
+        date: datePart,
+        checkIn: fmtTime(newCheckInISO), 
+        checkInTime: newCheckInISO, 
+        checkOut: fmtTime(newCheckOutISO), 
+        checkOutTime: newCheckOutISO 
+      };
       await updateAttendanceRecord(updatedRecord);
       setShowEditModal(false);
       setEditingRecord(null);
@@ -335,9 +342,23 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       {/* Manual Edit Modal */}
       <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Record" width="max-w-md">
           <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div><label className="block text-sm font-medium">Check In</label><input type="time" className="w-full p-2 border rounded dark:bg-slate-700 dark:text-white" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} /></div>
-              <div><label className="block text-sm font-medium">Check Out</label><input type="time" className="w-full p-2 border rounded dark:bg-slate-700 dark:text-white" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} /></div>
-              <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition">Update Record</button>
+              <div>
+                  <label className="block text-sm font-medium mb-1">Date</label>
+                  <input required type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <label className="block text-sm font-medium mb-1">Check In</label>
+                      <input type="time" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={editForm.checkIn} onChange={e => setEditForm({...editForm, checkIn: e.target.value})} />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium mb-1">Check Out</label>
+                      <input type="time" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" value={editForm.checkOut} onChange={e => setEditForm({...editForm, checkOut: e.target.value})} />
+                  </div>
+              </div>
+              <div className="pt-2">
+                  <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]">Update Record</button>
+              </div>
           </form>
       </DraggableModal>
 

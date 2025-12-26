@@ -218,7 +218,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                             <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-white text-sm">
                                 {emp.firstName} {emp.lastName}
                                 {emp.password === 'ms-auth-user' && (
-                                    <Cloud size={14} className="text-blue-500" title="Synced with Azure Portal" />
+                                    /* Fix: Wrapped Cloud icon in span to handle tooltip as lucide icons don't support title prop directly */
+                                    <span title="Synced with Azure Portal">
+                                        <Cloud size={14} className="text-blue-500" />
+                                    </span>
                                 )}
                             </div>
                             <div className="text-[11px] text-slate-400 font-medium">{emp.email}</div>
