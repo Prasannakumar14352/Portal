@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2, Calendar, MoreVertical } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2, Calendar, MoreVertical, ListChecks } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -237,7 +237,18 @@ const Organization = () => {
   
   const [deptForm, setDeptForm] = useState<any>({ id: '', name: '', description: '', managerId: '', employeeIds: [] });
   const [posForm, setPosForm] = useState<any>({ id: '', title: '', description: '' });
-  const [projectForm, setProjectForm] = useState<any>({ id: '', name: '', description: '', status: 'Active', tasks: '', dueDate: '', employeeIds: [] });
+  
+  // Project form state
+  const [projectForm, setProjectForm] = useState<any>({ 
+    id: '', 
+    name: '', 
+    description: '', 
+    status: 'Active', 
+    tasks: [] as string[], 
+    dueDate: '', 
+    employeeIds: [] as (string | number)[] 
+  });
+  const [newTaskInput, setNewTaskInput] = useState('');
   
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const treeContainerRef = useRef<HTMLDivElement>(null);
@@ -310,16 +321,42 @@ const Organization = () => {
     setShowPosModal(false);
   };
 
+  const addTask = () => {
+    if (newTaskInput.trim()) {
+      setProjectForm({ ...projectForm, tasks: [...projectForm.tasks, newTaskInput.trim()] });
+      setNewTaskInput('');
+    }
+  };
+
+  const removeTask = (index: number) => {
+    setProjectForm({
+      ...projectForm,
+      tasks: projectForm.tasks.filter((_: any, i: number) => i !== index)
+    });
+  };
+
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetProjId = projectForm.id;
-    const taskList = typeof projectForm.tasks === 'string' ? projectForm.tasks.split(',').map((t: string) => t.trim()).filter(Boolean) : projectForm.tasks;
     
     if (projectForm.id) {
-        await updateProject(projectForm.id, { ...projectForm, tasks: taskList });
+        await updateProject(projectForm.id, { 
+          name: projectForm.name,
+          description: projectForm.description,
+          status: projectForm.status,
+          tasks: projectForm.tasks,
+          dueDate: projectForm.dueDate
+        });
     } else {
         targetProjId = Math.random().toString(36).substr(2, 9);
-        await addProject({ ...projectForm, id: targetProjId, tasks: taskList });
+        await addProject({ 
+          id: targetProjId,
+          name: projectForm.name,
+          description: projectForm.description,
+          status: projectForm.status,
+          tasks: projectForm.tasks,
+          dueDate: projectForm.dueDate
+        });
     }
 
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
@@ -351,7 +388,6 @@ const Organization = () => {
             await deleteDepartment(deleteTarget.id);
             notify(`Department deleted.`);
         } else {
-            // Unassign employees from the project first
             const affectedEmployees = employees.filter(e => e.projectIds?.map(String).includes(String(deleteTarget.id)));
             if (affectedEmployees.length > 0) {
                 const updates = affectedEmployees.map(e => ({
@@ -376,7 +412,15 @@ const Organization = () => {
 
   const openProjectEdit = (project: Project) => {
       const projMembers = employees.filter(e => e.projectIds?.map(String).includes(String(project.id))).map(e => e.id);
-      setProjectForm({ ...project, employeeIds: projMembers, tasks: project.tasks.join(', ') });
+      setProjectForm({ 
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        status: project.status,
+        tasks: [...project.tasks],
+        dueDate: project.dueDate,
+        employeeIds: projMembers
+      });
       setShowProjectModal(true);
   };
 
@@ -408,27 +452,58 @@ const Organization = () => {
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
-       {/* Project Modal */}
-       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={projectForm.id ? "Edit Project" : "Create Project"} width="max-w-3xl">
+       {/* Project Modal with Improved Task Management */}
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={projectForm.id ? "Edit Project" : "Create Project"} width="max-w-4xl">
            <form onSubmit={handleProjectSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                      <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Project Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} /></div>
-                      <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required rows={3} className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} /></div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label><select className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
-                          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Due Date</label><input type="date" className="w-full px-3 py-2 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} /></div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  <div className="lg:col-span-7 space-y-5">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Project Identity</label>
+                        <input required type="text" placeholder="Project name..." className="w-full px-4 py-3 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-bold dark:text-white" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} />
                       </div>
-                      <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tasks (Comma Separated)</label><input type="text" placeholder="e.g. Design, Development, QA" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={projectForm.tasks} onChange={e => setProjectForm({...projectForm, tasks: e.target.value})} /></div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Strategic Overview</label>
+                        <textarea required rows={3} placeholder="Define goals and scope..." className="w-full px-4 py-3 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 text-sm dark:text-white" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Progress Status</label><select className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-medium dark:text-white" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Target Milestone</label><input type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white font-medium" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} /></div>
+                      </div>
+                      
+                      {/* Interactive Task Manager */}
+                      <div className="space-y-3">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><ListTodo size={14} className="text-emerald-600"/> Associated Deliverables</label>
+                          <div className="flex gap-2">
+                              <input 
+                                type="text" 
+                                placeholder="Add a specific task..." 
+                                className="flex-1 px-4 py-2 border rounded-xl dark:bg-slate-900 bg-white border-slate-200 outline-none focus:ring-1 focus:ring-emerald-500 text-sm" 
+                                value={newTaskInput} 
+                                onChange={e => setNewTaskInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTask())}
+                              />
+                              <button type="button" onClick={addTask} className="px-4 py-2 bg-slate-800 text-white rounded-xl font-bold text-xs hover:bg-slate-900 transition-colors">Add</button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1 min-h-[40px]">
+                              {projectForm.tasks.map((task: string, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm animate-in zoom-in-90">
+                                      <span>{task}</span>
+                                      <button type="button" onClick={() => removeTask(idx)} className="text-emerald-400 hover:text-emerald-600 transition-colors"><X size={14}/></button>
+                                  </div>
+                              ))}
+                              {projectForm.tasks.length === 0 && <p className="text-xs text-slate-400 italic py-2 ml-1">No tasks defined yet.</p>}
+                          </div>
+                      </div>
                   </div>
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Project Team</label>
+                  
+                  <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 ml-1">Resource Allocation (Team)</label>
                       <EmployeePicker selectedIds={projectForm.employeeIds || []} onToggle={(id) => setProjectForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={employees} />
                   </div>
               </div>
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
-                <button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs">Cancel</button>
-                <button type="submit" className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase shadow-lg hover:bg-emerald-700 transition-all">Save Project</button>
+                <button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-2.5 text-slate-400 font-bold uppercase text-xs tracking-widest">Discard</button>
+                <button type="submit" className="bg-emerald-600 text-white px-10 py-3 rounded-xl text-sm font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95">Save Project Bundle</button>
               </div>
            </form>
        </DraggableModal>
@@ -438,11 +513,11 @@ const Organization = () => {
           <form onSubmit={handleDeptSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-4">
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Name</label><input required type="text" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={deptForm.name} onChange={e => setDeptForm({...deptForm, name: e.target.value})} /></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label><textarea required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" rows={3} value={deptForm.description} onChange={e => setDeptForm({...deptForm, description: e.target.value})} /></div>
                     <div>
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Department Head</label>
-                      <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
+                      <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white" value={deptForm.managerId} onChange={e => setDeptForm({...deptForm, managerId: e.target.value})}>
                         <option value="" disabled>Select Head...</option>
                         {eligibleManagers.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.jobTitle || e.role})</option>)}
                       </select>
@@ -493,7 +568,7 @@ const Organization = () => {
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Layout className="text-emerald-600" /> Managed Projects</h3>
                     {isPowerUser && (
-                        <button onClick={() => { setProjectForm({ id: '', name: '', description: '', status: 'Active', tasks: '', dueDate: '', employeeIds: [] }); setShowProjectModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-bold">
+                        <button onClick={() => { setProjectForm({ id: '', name: '', description: '', status: 'Active', tasks: [], dueDate: '', employeeIds: [] }); setShowProjectModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-bold">
                             <Plus size={16} /> Add Project
                         </button>
                     )}
@@ -505,23 +580,44 @@ const Organization = () => {
                             <div key={project.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
                                 {isPowerUser && (
                                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => openProjectEdit(project)} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Edit2 size={14}/></button>
-                                        <button onClick={() => handleConfirmDelete(project.id, 'project')} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button>
+                                        <button onClick={() => openProjectEdit(project)} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-all"><Edit2 size={14}/></button>
+                                        <button onClick={() => handleConfirmDelete(project.id, 'project')} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-all"><Trash2 size={14}/></button>
                                     </div>
                                 )}
                                 <div className="flex justify-between items-start mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+                                    <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center text-teal-600 shadow-sm border border-teal-100 dark:border-teal-800">
                                         <Briefcase size={22} />
                                     </div>
                                     <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${project.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : project.status === 'On Hold' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                                         {project.status}
                                     </span>
                                 </div>
-                                <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{project.name}</h4>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2 leading-relaxed">{project.description}</p>
-                                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1 tracking-tight">{project.name}</h4>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2 leading-relaxed mb-4">{project.description}</p>
+                                
+                                {/* Associated Tasks Summary */}
+                                <div className="space-y-2 mb-5">
+                                    <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1 border-slate-50 dark:border-slate-700">
+                                        <span>Milestones</span>
+                                        <span>{project.tasks.length} Total</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        {project.tasks.slice(0, 3).map((t, i) => (
+                                            <div key={i} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                                <CheckCircle size={12} className="text-emerald-500 shrink-0" />
+                                                <span className="truncate">{t}</span>
+                                            </div>
+                                        ))}
+                                        {project.tasks.length > 3 && (
+                                            <p className="text-[10px] text-slate-400 font-bold italic pl-5">+ {project.tasks.length - 3} more deliverables</p>
+                                        )}
+                                        {project.tasks.length === 0 && <p className="text-[10px] text-slate-400 italic">No tasks assigned.</p>}
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                        <Users size={12}/> {projectMemberCount} Members
+                                        <Users size={12}/> {projectMemberCount} Assigned
                                     </div>
                                     {project.dueDate && (
                                         <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 dark:bg-slate-700/50 px-2 py-1 rounded-md">

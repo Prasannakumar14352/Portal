@@ -430,7 +430,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     <button 
                         type="button" 
                         onClick={() => setFormData({...formData, durationType: 'Half Day'})}
-                        className={`py-2.5 rounded-xl text-xs font-black uppercase transition-all border ${formData.durationType === 'Half Day' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
+                        className={`py-2.5 rounded-xl text-xs font-black uppercase transition-all border ${formData.durationType === 'Half Day' ? 'bg-amber-50 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
                     >
                         Half Day
                     </button>
@@ -471,7 +471,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         <form onSubmit={handleTypeSubmit} className="space-y-4">
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Type Name</label><input required type="text" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} placeholder="e.g. Wellness Break" /></div>
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Annual Allowance (Days)</label><input required type="number" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea required rows={2} className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Eligibility details..." /></div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label>
+              <textarea required rows={2} className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Eligibility details..."></textarea>
+            </div>
             <div className="flex items-center gap-2 py-2">
               <input type="checkbox" id="active-check" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-teal-600 rounded border-slate-300" />
               <label htmlFor="active-check" className="text-xs font-bold text-slate-600 dark:text-slate-300">Visible to Employees</label>
