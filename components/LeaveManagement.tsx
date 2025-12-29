@@ -3,12 +3,11 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User } from '../types';
 import { 
   Upload, Paperclip, CheckSquare, Search, Edit2, Calendar as CalendarIcon, 
-  List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers, Filter, UserCheck
+  List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers, Filter, UserCheck, BookOpen
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
-// Defined missing LeaveManagementProps interface
 interface LeaveManagementProps {
   currentUser: User | null;
   users: User[];
@@ -23,7 +22,6 @@ interface LeaveManagementProps {
   deleteLeaveType: (id: string | number) => void;
 }
 
-// Custom MultiSelect Component
 const MultiSelectUser = ({ 
   options, 
   selectedIds, 
@@ -56,117 +54,41 @@ const MultiSelectUser = ({
     }
   };
 
-  const removeTag = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    onChange(selectedIds.filter(sid => sid !== id));
-  };
-
   return (
     <div className="relative" ref={containerRef}>
       <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">{label}</label>
       <div 
-        className="w-full min-h-[46px] border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 cursor-pointer focus-within:ring-2 focus-within:ring-emerald-500/20 bg-white dark:bg-slate-700 shadow-sm transition-all"
+        className="w-full min-h-[46px] border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 cursor-pointer bg-white dark:bg-slate-700 shadow-sm transition-all"
         onClick={() => setIsOpen(!isOpen)}
       >
-        {selectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1 font-medium">Select colleagues to notify...</span>}
+        {selectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1">Select colleagues...</span>}
         {selectedIds.map(id => {
           const user = options.find(u => String(u.id) === id);
           return (
-            <span key={id} className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-tight px-2.5 py-1 rounded-lg flex items-center gap-2 border border-emerald-100 dark:border-emerald-900 shadow-sm">
+            <span key={id} className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1.5 border border-emerald-100">
               {user?.name}
-              <X size={12} className="hover:text-emerald-900 dark:hover:text-emerald-200 cursor-pointer" onClick={(e) => removeTag(e, id)} />
+              <X size={10} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleSelect(id); }} />
             </span>
           );
         })}
-        <div className="ml-auto">
-          <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
+        <ChevronDown size={14} className="ml-auto text-slate-400" />
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-2 space-y-1">
+        <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 p-2">
             {options.map(user => (
-              <div 
-                key={user.id} 
-                onClick={() => handleSelect(String(user.id))}
-                className={`flex items-center px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${selectedIds.includes(String(user.id)) ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
-              >
-                <div className={`w-5 h-5 border-2 rounded-full mr-3 flex items-center justify-center transition-all ${selectedIds.includes(String(user.id)) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200 dark:border-slate-600'}`}>
-                  {selectedIds.includes(String(user.id)) && <CheckCircle size={14} className="text-white" />}
+              <div key={user.id} onClick={() => handleSelect(String(user.id))} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.includes(String(user.id)) ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''}`}>
+                <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.includes(String(user.id)) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200'}`}>
+                  {selectedIds.includes(String(user.id)) && <CheckCircle size={10} className="text-white" />}
                 </div>
-                <img src={user.avatar} className="w-7 h-7 rounded-full mr-3 object-cover border border-slate-100" alt="" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{user.name}</p>
-                  <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight truncate">{user.jobTitle}</p>
-                </div>
+                <span className="text-sm font-bold text-slate-700 dark:text-white">{user.name}</span>
               </div>
             ))}
-            {options.length === 0 && <p className="p-4 text-center text-xs text-slate-400 font-bold uppercase italic">No colleagues found.</p>}
-          </div>
         </div>
       )}
     </div>
   );
 };
-
-const LeaveTypeCard: React.FC<{ 
-  config: LeaveTypeConfig, 
-  isHR: boolean, 
-  onUpdate: (id: string, data: any) => void, 
-  onDelete: (id: string) => void,
-  onEdit: (id: string, data: any) => void
-}> = ({ config, isHR, onUpdate, onDelete, onEdit }) => (
-  <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow relative">
-    <div className="flex justify-between items-start mb-2">
-      <div className="flex items-center space-x-2">
-        <div className={`p-2 rounded-lg ${config.color ? config.color.replace('text-', 'bg-').replace('600', '100') + ' dark:bg-opacity-20' : 'bg-slate-100 dark:bg-slate-700'}`}>
-            <Calendar className={`w-5 h-5 ${config.color || 'text-slate-600 dark:text-slate-400'}`} />
-        </div>
-        <h3 className="font-bold text-slate-800 dark:text-white text-lg">{config.name}</h3>
-      </div>
-      <span className={`text-xs px-2 py-1 rounded-full ${config.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
-        {config.isActive ? 'Active' : 'Inactive'}
-      </span>
-    </div>
-    
-    <div className="mb-4 mt-2">
-      <h4 className={`text-2xl font-bold ${config.color || 'text-slate-800 dark:text-white'}`}>{config.days} Days</h4>
-      <p className="text-xs text-slate-500 dark:text-slate-400">Default allocation per year</p>
-    </div>
-    
-    <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 h-12 line-clamp-2">{config.description}</p>
-    
-    {isHR && (
-      <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-4">
-          <div className="flex items-center space-x-2">
-            <div className={`w-10 h-5 rounded-full p-1 cursor-pointer transition-colors ${config.isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} 
-                onClick={() => onUpdate(String(config.id), { isActive: !config.isActive })}>
-                <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${config.isActive ? 'translate-x-5' : ''}`} />
-            </div>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{config.isActive ? 'Active' : 'Hidden'}</span>
-          </div>
-          
-          <div className="flex space-x-2">
-          <button 
-              onClick={() => onEdit(String(config.id), config)}
-              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-900/30 rounded"
-          >
-              <Edit2 size={16} />
-          </button>
-          <button 
-              onClick={() => {
-              if (window.confirm('Delete this leave type?')) onDelete(String(config.id));
-              }}
-              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:text-slate-400 dark:hover:text-red-400 dark:hover:bg-red-900/30 rounded"
-          >
-              <Trash2 size={16} />
-          </button>
-          </div>
-      </div>
-    )}
-  </div>
-);
 
 const LeaveManagement: React.FC<LeaveManagementProps> = ({ 
   currentUser, users, leaves, leaveTypes, 
@@ -174,168 +96,50 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
   const { showToast } = useAppContext();
-  
-  // UI State
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
-  const [isEditing, setIsEditing] = useState<string | null>(null);
-  
-  const [editingType, setEditingType] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar' | 'team'>('requests');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('All');
-  
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
-  
-  // Calendar View State
-  const [calMonth, setCalMonth] = useState(new Date());
+  const [isEditing, setIsEditing] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<string | null>(null);
 
-  // Request Form State
-  const [formData, setFormData] = useState<{
-    type: string;
-    startDate: string;
-    endDate: string;
-    reason: string;
-    attachment?: boolean;
-    consent?: boolean;
-    notifyUserIds: string[];
-    approverId: string;
-    isUrgent: boolean;
-  }>({ 
-    type: '', 
-    startDate: '', 
-    endDate: '', 
-    reason: '', 
-    attachment: false, 
-    consent: false,
-    notifyUserIds: [],
-    approverId: String(currentUser?.managerId || ''),
-    isUrgent: false
+  const [formData, setFormData] = useState({
+    type: '', startDate: '', endDate: '', reason: '', notifyUserIds: [], approverId: '', isUrgent: false
   });
 
-  // Type Config Form State
-  const [typeData, setTypeData] = useState<{
-    name: string;
-    days: number;
-    description: string;
-    isActive: boolean;
-    color: string;
-  }>({ name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600' });
+  const [typeData, setTypeData] = useState({
+    name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600'
+  });
 
-  // Predefined Colors for Leave Types
-  const colorOptions = [
-    'text-slate-600', 'text-red-600', 'text-orange-600', 'text-amber-600', 
-    'text-green-600', 'text-emerald-600', 'text-teal-600', 'text-cyan-600',
-    'text-blue-600', 'text-indigo-600', 'text-violet-600', 'text-purple-600', 
-    'text-fuchsia-600', 'text-pink-600', 'text-rose-600'
-  ];
+  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
-  const isManager = currentUser?.role === UserRole.MANAGER || currentUser?.role === UserRole.HR;
-  const isHR = currentUser?.role === UserRole.HR;
-
-  // Filter list of potential managers (HR, Managers, Admins)
   const availableManagers = useMemo(() => {
-      return users.filter(u => 
-          (u.role === UserRole.MANAGER || u.role === UserRole.HR || u.role === UserRole.ADMIN) && 
-          String(u.id) !== String(currentUser?.id)
-      );
+    return users.filter(u => 
+        (u.role === UserRole.MANAGER || u.role === UserRole.HR || u.role === UserRole.ADMIN) && 
+        String(u.id) !== String(currentUser?.id)
+    );
   }, [users, currentUser]);
 
-  // --- Helper Functions ---
   const getDaysDiff = (start: string, end: string) => {
     if (!start || !end) return 0;
     const s = new Date(start);
     const e = new Date(end);
     const diffTime = e.getTime() - s.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays > 0 ? diffDays : 0;
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
   };
 
-  // --- Filtering & Derived State ---
-  const visibleLeaves = useMemo(() => {
-    let filtered = [];
-    if (currentUser?.role === UserRole.HR) {
-      filtered = leaves;
-    } else if (currentUser?.role === UserRole.MANAGER) {
-      const directReports = users.filter(u => String(u.managerId) === String(currentUser.id)).map(u => u.id);
-      
-      const relevantLeaves = leaves.filter(l => 
-        String(l.userId) === String(currentUser.id) || 
-        String(l.approverId) === String(currentUser.id) || 
-        (directReports.includes(l.userId) && (!l.approverId || String(l.approverId) === String(currentUser.id))) 
-      );
-      
-      filtered = relevantLeaves;
-    } else {
-      filtered = leaves.filter(l => String(l.userId) === String(currentUser?.id));
-    }
-    return filtered;
-  }, [leaves, currentUser, users]);
-
-  const searchedLeaves = useMemo(() => {
-    const lowerQ = searchQuery.toLowerCase();
-    
-    return visibleLeaves.filter(l => {
-      const matchesSearch = l.userName.toLowerCase().includes(lowerQ) ||
-                            l.type.toLowerCase().includes(lowerQ) ||
-                            l.status.toLowerCase().includes(lowerQ);
-      const matchesStatus = statusFilter === 'All' || 
-                            (statusFilter === 'Pending' ? l.status.includes('Pending') : l.status === statusFilter);
-      return matchesSearch && matchesStatus;
-    });
-  }, [visibleLeaves, searchQuery, statusFilter]);
-
-  // Pagination Logic
-  const totalPages = Math.ceil(searchedLeaves.length / itemsPerPage);
-  const paginatedLeaves = searchedLeaves.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const getBalance = (typeName: string, limit: number, userId?: string | number) => {
-    const targetId = userId || currentUser?.id;
+  const getBalance = (typeName: string, limit: number) => {
     const used = leaves
-      .filter(l => String(l.userId) === String(targetId) && l.type === typeName && l.status === LeaveStatusEnum.APPROVED)
+      .filter(l => String(l.userId) === String(currentUser?.id) && l.type === typeName && l.status === LeaveStatusEnum.APPROVED)
       .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate), 0);
     return Math.max(0, limit - used);
-  };
-
-  const getSelectedTypeBalance = () => {
-    const t = leaveTypes.find(lt => lt.name === formData.type);
-    if (!t) return null;
-    return `${getBalance(t.name, t.days)}/${t.days} Days Available`;
   };
 
   const handleOpenCreate = () => {
     setIsEditing(null);
     setFormData({ 
-      type: leaveTypes.find(t => t.isActive)?.name || '', 
-      startDate: '', endDate: '', reason: '', 
-      attachment: false, consent: false, notifyUserIds: [], 
-      approverId: String(currentUser?.managerId || ''),
-      isUrgent: false
-    });
-    setShowModal(true);
-  };
-
-  const handleOpenEdit = (leave: LeaveRequest) => {
-    if (leave.status !== LeaveStatusEnum.PENDING_MANAGER) {
-        showToast("You can only edit pending requests.", "error");
-        return;
-    }
-    setIsEditing(String(leave.id));
-    setFormData({
-      type: leave.type,
-      startDate: leave.startDate,
-      endDate: leave.endDate,
-      reason: leave.reason,
-      attachment: !!leave.attachmentUrl,
-      consent: !!leave.managerConsent,
-      notifyUserIds: (leave.notifyUserIds || []).map(String),
-      approverId: String(leave.approverId || currentUser?.managerId || ''),
-      isUrgent: leave.isUrgent || false
+      type: leaveTypes.filter(t => t.isActive)[0]?.name || '', 
+      startDate: '', endDate: '', reason: '', notifyUserIds: [], 
+      approverId: String(currentUser?.managerId || ''), isUrgent: false
     });
     setShowModal(true);
   };
@@ -343,36 +147,25 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const handleTypeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingType) updateLeaveType(editingType, typeData);
-    else addLeaveType(typeData);
+    else addLeaveType({ ...typeData, id: Math.random().toString(36).substr(2, 9) });
     setShowTypeModal(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLeaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      type: formData.type,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      reason: formData.reason,
-      attachmentUrl: formData.attachment ? 'mock_cert.pdf' : undefined,
-      managerConsent: formData.consent,
-      notifyUserIds: formData.notifyUserIds,
-      approverId: formData.approverId,
-      isUrgent: formData.isUrgent
-    };
-    if (isEditing) editLeave(isEditing, payload);
-    else addLeave(payload);
+    if (isEditing) editLeave(isEditing, formData);
+    else addLeave(formData);
     setShowModal(false);
   };
 
-  const StatusBadge = ({ status }: { status: LeaveStatusEnum | string }) => {
+  const StatusBadge = ({ status }: { status: string }) => {
     const styles: Record<string, string> = {
-      [LeaveStatusEnum.APPROVED]: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
-      [LeaveStatusEnum.REJECTED]: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-      [LeaveStatusEnum.PENDING_MANAGER]: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
-      [LeaveStatusEnum.PENDING_HR]: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+      [LeaveStatusEnum.APPROVED]: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      [LeaveStatusEnum.REJECTED]: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      'Pending': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     };
-    return <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${styles[status] || 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>{status}</span>;
+    const styleClass = styles[status] || styles['Pending'];
+    return <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${styleClass}`}>{status}</span>;
   };
 
   return (
@@ -380,16 +173,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Leave Management</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Manage time off and track balances.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Track team absences and configure policies.</p>
         </div>
         
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto">
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
-            {['requests', 'balances', 'types', 'calendar', 'team'].filter(m => m !== 'team' || isManager).map(m => (
-                <button key={m} onClick={() => setViewMode(m as any)} className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm transition whitespace-nowrap capitalize ${viewMode === m ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-medium' : 'text-slate-500 hover:text-slate-700'}`}>{m}</button>
+            {['requests', 'balances', 'types', 'calendar'].map(m => (
+                <button key={m} onClick={() => setViewMode(m as any)} className={`px-4 py-1.5 rounded-md text-sm transition capitalize ${viewMode === m ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>{m}</button>
             ))}
           </div>
-          <button onClick={handleOpenCreate} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition flex items-center space-x-2 text-sm shadow-sm font-bold uppercase tracking-tight"><Plus size={18} /><span>New Request</span></button>
+          <button onClick={handleOpenCreate} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition flex items-center space-x-2 text-sm font-bold uppercase tracking-tight shadow-lg shadow-emerald-500/20"><Plus size={18} /><span>New Request</span></button>
         </div>
       </div>
 
@@ -398,136 +191,136 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
-                  <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Details</th><th className="px-6 py-4">Duration</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Actions</th></tr>
+                  <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Duration</th><th className="px-6 py-4">Status</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {paginatedLeaves.map(leave => (
+                  {leaves.map(leave => (
                     <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                       <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-sm">{leave.userName}</td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-bold dark:text-white uppercase tracking-tight">{leave.type}</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest font-mono">{leave.startDate} to {leave.endDate}</div>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-black text-emerald-600">{getDaysDiff(leave.startDate, leave.endDate)} Days</td>
+                      <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400 text-xs uppercase">{leave.type}</td>
+                      <td className="px-6 py-4 font-mono text-[10px] text-slate-500">{leave.startDate} to {leave.endDate}</td>
+                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">{getDaysDiff(leave.startDate, leave.endDate)} Days</td>
                       <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
-                      <td className="px-6 py-4 text-right">
-                         {(String(currentUser?.id) === String(leave.userId) && leave.status.includes('Pending')) ? (
-                             <button onClick={() => handleOpenEdit(leave)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors bg-white dark:bg-slate-700 rounded-lg border border-slate-100 dark:border-slate-600 shadow-sm"><Edit2 size={16}/></button>
-                         ) : <span className="text-slate-200">—</span>}
-                      </td>
                     </tr>
                   ))}
-                  {paginatedLeaves.length === 0 && (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No leave requests found.</td></tr>
-                  )}
+                  {leaves.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No records found.</td></tr>}
                 </tbody>
               </table>
-            </div>
-            {/* Pagination Controls */}
-            <div className="flex justify-between items-center p-4 border-t dark:border-slate-700">
-              <div className="text-xs text-slate-500 font-medium">
-                Showing {paginatedLeaves.length} of {searchedLeaves.length} requests • Page {currentPage} of {totalPages || 1}
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="p-1.5 rounded-lg border dark:border-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button 
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="p-1.5 rounded-lg border dark:border-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
             </div>
         </div>
       )}
 
-      {/* Request Modal */}
-      <DraggableModal 
-        isOpen={showModal} 
-        onClose={() => setShowModal(false)} 
-        title={isEditing ? 'Modify Request' : 'New Leave Request'} 
-        width="max-w-xl"
-      >
-        <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Leave Category</label>
-                  <div className="relative">
-                      <select className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none shadow-sm font-bold" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} required>
-                        <option value="" disabled>Select a type...</option>
-                        {leaveTypes.filter(t => t.isActive).map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+      {viewMode === 'types' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><BookOpen className="text-emerald-600" /> Organizational Leave Policies</h3>
+            {isHR && (
+              <button onClick={() => { setEditingType(null); setTypeData({ name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600' }); setShowTypeModal(true); }} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-4 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-white hover:bg-slate-50 flex items-center gap-2 shadow-sm transition-all"><Plus size={16} /> Add Leave Type</button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {leaveTypes.map(type => (
+              <div key={type.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm relative group hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 ${type.color || 'text-emerald-600'}`}>
+                      <Calendar size={24} />
+                    </div>
+                    {isHR && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"><Edit2 size={16}/></button>
+                        <button onClick={() => { if(window.confirm('Delete this policy?')) deleteLeaveType(type.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                      </div>
+                    )}
                   </div>
-                  {formData.type && <p className="text-[10px] text-emerald-600 mt-2 font-black uppercase tracking-tight ml-1">{getSelectedTypeBalance()}</p>}
-                </div>
+                  <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{type.name}</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2 h-10">{type.description}</p>
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <span className="block text-2xl font-black text-slate-800 dark:text-white">{type.days}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Days / Year</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${type.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>{type.isActive ? 'Active' : 'Inactive'}</span>
+                  </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-                <div>
-                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Approving Manager</label>
-                   <div className="relative">
-                      <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                      <select 
-                        required
-                        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl pl-10 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none shadow-sm font-bold"
-                        value={formData.approverId}
-                        onChange={e => setFormData({...formData, approverId: e.target.value})}
-                      >
-                         <option value="" disabled>Select Approver...</option>
-                         {availableManagers.map(mgr => (
-                           <option key={mgr.id} value={String(mgr.id)}>{mgr.name} ({mgr.jobTitle})</option>
-                         ))}
-                      </select>
-                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                   </div>
+      {/* Leave Request Modal */}
+      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? 'Edit Request' : 'New Leave Request'} width="max-w-xl">
+        <form onSubmit={handleLeaveSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Leave Category</label>
+                <div className="relative">
+                  <select 
+                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-700 dark:text-white font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none" 
+                    value={formData.type} 
+                    onChange={e => setFormData({...formData, type: e.target.value})} 
+                    required
+                  >
+                    <option value="" disabled>Select a type...</option>
+                    {leaveTypes.filter(t => t.isActive).map(t => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                 </div>
+                {formData.type && (
+                  <p className="text-[10px] text-emerald-600 mt-2 font-black uppercase ml-1">
+                    {getBalance(formData.type, leaveTypes.find(lt => lt.name === formData.type)?.days || 0)} Days Remaining
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Approving Manager</label>
+                <div className="relative">
+                  <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <select required className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 dark:text-white font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none" value={formData.approverId} onChange={e => setFormData({...formData, approverId: e.target.value})}>
+                    <option value="" disabled>Select Approver...</option>
+                    {availableManagers.map(mgr => <option key={mgr.id} value={String(mgr.id)}>{mgr.name}</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">From Date</label>
-                <input required type="date" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm bg-white dark:bg-slate-700 dark:text-white shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">To Date</label>
-                <input required type="date" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm bg-white dark:bg-slate-700 dark:text-white shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/20 font-bold" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
-              </div>
+              <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">From Date</label><input required type="date" className="w-full border rounded-xl px-4 py-2.5 text-sm dark:bg-slate-700 dark:text-white font-bold outline-none" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} /></div>
+              <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">To Date</label><input required type="date" className="w-full border rounded-xl px-4 py-2.5 text-sm dark:bg-slate-700 dark:text-white font-bold outline-none" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} /></div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Reason for Absence</label>
-              <textarea required rows={3} className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm bg-white dark:bg-slate-700 dark:text-white shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium placeholder-slate-400" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Provide context for your leave request..."></textarea>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">Reason for Absence</label><textarea required rows={3} className="w-full border rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Why are you taking leave?"></textarea></div>
+
+            <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 flex items-center gap-3">
+               <input type="checkbox" id="urgent-check" checked={formData.isUrgent} onChange={e => setFormData({...formData, isUrgent: e.target.checked})} className="w-5 h-5 text-red-600 rounded border-red-200 focus:ring-red-500" />
+               <label htmlFor="urgent-check" className="text-xs font-black uppercase text-red-700 flex items-center gap-1.5 cursor-pointer">Mark as Urgent <Flame size={14} /></label>
             </div>
 
-            <div className="flex items-center space-x-3 bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/40 transition-all">
-               <div className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" id="urgent-check" checked={formData.isUrgent} onChange={(e) => setFormData({...formData, isUrgent: e.target.checked})} className="w-5 h-5 text-red-600 rounded-lg border-red-200 focus:ring-red-500" />
-                  <label htmlFor="urgent-check" className="text-xs font-black uppercase tracking-widest text-red-700 dark:text-red-400 flex items-center gap-1.5 cursor-pointer">Mark as Urgent <Flame size={14} className="inline" fill="currentColor"/></label>
-               </div>
-            </div>
+            <MultiSelectUser label="Notify Colleagues" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={ids => setFormData({...formData, notifyUserIds: ids as any})} />
 
-            <MultiSelectUser label="Notify Colleagues" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={(ids) => setFormData({...formData, notifyUserIds: ids})} />
-
-            <div className="pt-6 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
-                <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-400 text-xs font-black uppercase tracking-widest hover:text-slate-600 transition-colors">Cancel</button>
-                <button type="submit" className="px-8 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95">{isEditing ? 'Update Request' : 'Submit Request'}</button>
+            <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+              <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-400 text-xs font-black uppercase">Cancel</button>
+              <button type="submit" className="px-8 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95">Submit Request</button>
             </div>
         </form>
       </DraggableModal>
 
       {/* Leave Type Modal */}
-      <DraggableModal isOpen={showTypeModal} onClose={() => setShowTypeModal(false)} title={editingType ? 'Edit Leave Type' : 'Add Leave Type'} width="max-w-md">
+      <DraggableModal isOpen={showTypeModal} onClose={() => setShowTypeModal(false)} title={editingType ? 'Edit Leave Policy' : 'Define New Policy'} width="max-w-md">
         <form onSubmit={handleTypeSubmit} className="space-y-4">
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type Name</label><input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} /></div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Days per Year</label><input required type="number" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label><textarea required rows={2} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} /></div>
-            <div className="flex justify-end gap-3 border-t dark:border-slate-700 pt-4"><button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 text-sm">Cancel</button><button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium">Save Type</button></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Type Name</label><input required type="text" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} placeholder="e.g. Wellness Break" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Annual Allowance (Days)</label><input required type="number" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea required rows={2} className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Eligibility details..." /></div>
+            <div className="flex items-center gap-2 py-2">
+              <input type="checkbox" id="active-check" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-emerald-600 rounded border-slate-300" />
+              <label htmlFor="active-check" className="text-xs font-bold text-slate-600 dark:text-slate-300">Visible to Employees</label>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+              <button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 text-sm font-bold uppercase">Cancel</button>
+              <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-black uppercase shadow-sm">Save Policy</button>
+            </div>
         </form>
       </DraggableModal>
     </div>
