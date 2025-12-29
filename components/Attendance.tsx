@@ -84,21 +84,22 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const formatSessionString = (record: AttendanceRecord) => {
       const cinDate = record.checkInTime ? new Date(record.checkInTime) : null;
       const coutDate = record.checkOutTime ? new Date(record.checkOutTime) : null;
-      
       const isNightShift = cinDate && coutDate && cinDate.toDateString() !== coutDate.toDateString();
 
       return (
-          <div className="flex items-center gap-3">
-              <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black text-slate-400 uppercase w-8">Start</span>
+          <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-3">
+                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase w-9 border-r border-slate-100 dark:border-slate-700">Start</span>
+                  <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{record.checkIn}</span>
-                      {isNightShift && <span className="text-[10px] font-medium text-emerald-600">({cinDate?.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})</span>}
+                      {isNightShift && <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">({cinDate?.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})</span>}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] font-black text-slate-400 uppercase w-8">End</span>
+              </div>
+              <div className="flex items-center gap-3">
+                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase w-9 border-r border-slate-100 dark:border-slate-700">End</span>
+                  <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{record.checkOut || '--:--'}</span>
-                      {isNightShift && <span className="text-[10px] font-medium text-rose-500">({coutDate?.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})</span>}
+                      {isNightShift && <span className="text-[10px] font-medium text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded">({coutDate?.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})</span>}
                   </div>
               </div>
           </div>
@@ -157,60 +158,60 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   return (
     <div className="space-y-6">
       {/* Attendance Stats Bar */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col lg:flex-row justify-between items-center gap-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col lg:flex-row justify-between items-center gap-8">
          <div className="text-center lg:text-left">
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Attendance</h2>
-            <div className="mt-1 text-3xl font-mono text-teal-600 dark:text-teal-400 font-bold uppercase tracking-tight">
+            <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Attendance</h2>
+            <div className="mt-1 text-3xl font-mono text-teal-600 dark:text-teal-400 font-black uppercase tracking-tight">
                {currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).toLowerCase()}
             </div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
          </div>
 
          <div className="flex flex-col items-center gap-3">
              {!todayRecord ? (
-                <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-32 h-32 bg-emerald-50 dark:bg-emerald-900/20 rounded-full border-4 border-emerald-100 dark:border-emerald-800 hover:scale-105 transition-transform cursor-pointer group">
-                   <PlayCircle size={36} className="text-emerald-600 mb-1 group-hover:scale-110 transition-transform" />
-                   <span className="font-black text-[10px] text-emerald-700 uppercase tracking-widest">Check In</span>
+                <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-36 h-36 bg-emerald-50 dark:bg-emerald-900/10 rounded-full border-4 border-emerald-100 dark:border-emerald-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-emerald-500/5">
+                   <PlayCircle size={44} className="text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform" />
+                   <span className="font-black text-[10px] text-emerald-700 dark:text-emerald-500 uppercase tracking-widest">Punch In</span>
                 </button>
              ) : todayRecord.checkOut ? (
-                <div className="flex flex-col items-center justify-center w-32 h-32 bg-slate-50 dark:bg-slate-800 rounded-full border-4 border-slate-100 dark:border-slate-700">
-                   <CheckCircle2 size={36} className="text-emerald-500 mb-1" />
-                   <span className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Shift Done</span>
+                <div className="flex flex-col items-center justify-center w-36 h-36 bg-slate-50 dark:bg-slate-900/20 rounded-full border-4 border-slate-100 dark:border-slate-800">
+                   <CheckCircle2 size={44} className="text-emerald-500 mb-1.5" />
+                   <span className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Shift Closed</span>
                 </div>
              ) : (
-                <button onClick={handleCheckOutClick} className="flex flex-col items-center justify-center w-32 h-32 bg-rose-50 dark:bg-rose-900/20 rounded-full border-4 border-rose-100 dark:border-rose-800 hover:scale-105 transition-transform cursor-pointer group">
-                   <StopCircle size={36} className="text-rose-600 mb-1 group-hover:scale-110 transition-transform" />
-                   <span className="font-black text-[10px] text-rose-700 uppercase tracking-widest">Check Out</span>
-                   <span className="text-[10px] font-mono font-bold text-slate-500 mt-1">{calculateDuration(todayRecord)}</span>
+                <button onClick={handleCheckOutClick} className="flex flex-col items-center justify-center w-36 h-36 bg-rose-50 dark:bg-rose-900/10 rounded-full border-4 border-rose-100 dark:border-rose-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-rose-500/5">
+                   <StopCircle size={44} className="text-rose-600 mb-1.5 group-hover:scale-110 transition-transform" />
+                   <span className="font-black text-[10px] text-rose-700 dark:text-rose-500 uppercase tracking-widest">Punch Out</span>
+                   <span className="text-xs font-mono font-bold text-slate-500 mt-1">{calculateDuration(todayRecord)}</span>
                 </button>
              )}
          </div>
 
-         <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 min-w-[220px]">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2"><Clock size={12}/> Current Session</h4>
+         <div className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 min-w-[240px]">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-[0.2em] flex items-center gap-2"><Clock size={14}/> Live Session</h4>
             <div className="space-y-3">
-               <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-medium">Punch In</span><span className="text-xs font-black text-slate-800 dark:text-white uppercase">{todayRecord?.checkIn || '--:--'}</span></div>
-               <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-medium">Logged</span><span className="text-xs font-black text-teal-600">{calculateDuration(todayRecord || {id: 0, employeeId: 0, employeeName: '', date: '', checkIn: '', checkOut: '', status: 'Absent'})}</span></div>
+               <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Clock In</span><span className="text-xs font-black text-slate-800 dark:text-white uppercase">{todayRecord?.checkIn || '--:--'}</span></div>
+               <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Total Logged</span><span className="text-sm font-black text-teal-600 dark:text-teal-400">{calculateDuration(todayRecord || {id: 0, employeeId: 0, employeeName: '', date: '', checkIn: '', checkOut: '', status: 'Absent'})}</span></div>
             </div>
          </div>
       </div>
 
       {/* Records Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest font-black border-b border-slate-200 dark:border-slate-700">
-                <th className="px-6 py-4">Employee</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Shift Details</th>
-                <th className="px-6 py-4">Duration</th>
-                <th className="px-6 py-4 text-center">Action</th>
+              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-500 text-[10px] uppercase tracking-[0.15em] font-black border-b border-slate-200 dark:border-slate-700">
+                <th className="px-8 py-5">Employee Detail</th>
+                <th className="px-6 py-5">Punch Date</th>
+                <th className="px-6 py-5">Shift Session</th>
+                <th className="px-6 py-5">Duration</th>
+                <th className="px-8 py-5 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {paginatedRecords.map((record) => {
-                // Precise Permission Logic
+                // Precise Permission Logic - Unified for Today and Extensions
                 const recordDate = new Date(record.date);
                 const today = new Date();
                 today.setHours(0,0,0,0);
@@ -220,47 +221,51 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 
                 const isOwn = String(record.employeeId) === String(currentUser?.id);
                 
-                // Logic: 
-                // 1. Block Today (diffDays === 0)
-                // 2. Allow Yesterday (diffDays === 1)
-                // 3. Special Weekend Case: If check-in was Friday (5), allow edit on Sat(1), Sun(2), Mon(3)
+                // Rules:
+                // 1. diffDays 0 (Today) -> Allow
+                // 2. diffDays 1 (Yesterday) -> Allow
+                // 3. Friday Case: if record was Friday (5), allow Sat(1), Sun(2), Mon(3)
                 const isFriday = recordDate.getDay() === 5;
-                const canManage = isHR || (isOwn && (diffDays === 1 || (isFriday && diffDays <= 3)));
+                const canManage = isHR || (isOwn && (diffDays <= 1 || (isFriday && diffDays <= 3)));
                 
                 let lockReason = "";
                 if (!canManage) {
-                    if (diffDays === 0) lockReason = "Editing opens tomorrow";
-                    else if (diffDays > 1) lockReason = "Window closed - Contact HR";
-                    else lockReason = "Read Only Access";
+                    if (diffDays > 1) lockReason = "Window Closed - Request HR";
+                    else lockReason = "Read Only";
                 }
 
                 return (
-                  <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
-                    <td className="px-6 py-4">
-                        <div className="text-sm font-bold text-slate-800 dark:text-white leading-tight">{record.employeeName}</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">#{record.employeeId}</div>
+                  <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
+                    <td className="px-8 py-5">
+                        <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5">{record.employeeName}</div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-1.5">ID: <span className="text-teal-600/70">{record.employeeId}</span></div>
                     </td>
-                    <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold text-xs font-mono bg-slate-50 dark:bg-slate-900/50 px-2 py-1 rounded border border-slate-100 dark:border-slate-800 w-fit">
-                            <Calendar size={12} className="text-slate-400" />
+                    <td className="px-6 py-5">
+                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-black text-[11px] font-mono bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 w-fit shadow-sm">
+                            <Calendar size={13} className="text-slate-400" />
                             {record.date}
                         </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-5">
                         {formatSessionString(record)}
                     </td>
-                    <td className="px-6 py-4 font-mono text-sm font-black text-slate-800 dark:text-teal-400">{calculateDuration(record)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-5">
+                        <div className="font-mono text-sm font-black text-slate-800 dark:text-teal-400 flex items-center gap-2">
+                            <Clock size={14} className="text-slate-300" />
+                            {calculateDuration(record)}
+                        </div>
+                    </td>
+                    <td className="px-8 py-5">
                       {canManage ? (
-                        <div className="flex justify-center gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => openEditModal(record)} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded-lg transition-colors shadow-sm bg-white dark:bg-slate-700 border border-slate-100 dark:border-slate-600"><Edit2 size={16} /></button>
-                           <button onClick={() => { setRecordToDelete(record); setShowDeleteConfirm(true); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors shadow-sm bg-white dark:bg-slate-700 border border-slate-100 dark:border-slate-600"><Trash2 size={16} /></button>
+                        <div className="flex justify-center gap-2">
+                           <button onClick={() => openEditModal(record)} className="p-2.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100 dark:border-slate-600" title="Edit Session"><Edit2 size={16} /></button>
+                           <button onClick={() => { setRecordToDelete(record); setShowDeleteConfirm(true); }} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100 dark:border-slate-600" title="Delete Session"><Trash2 size={16} /></button>
                         </div>
                       ) : (
                         <div className="flex justify-center">
                             <div className="group/lock relative">
-                                <Lock size={14} className="text-slate-200 dark:text-slate-700" />
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-[9px] font-bold uppercase rounded-lg opacity-0 group-hover/lock:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-20">
+                                <Lock size={15} className="text-slate-200 dark:text-slate-700" />
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-2 bg-slate-900 text-white text-[9px] font-black uppercase tracking-wider rounded-lg opacity-0 group-hover/lock:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl z-30 ring-1 ring-white/10">
                                     {lockReason}
                                 </div>
                             </div>
@@ -271,49 +276,63 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 );
               })}
               {paginatedRecords.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic font-medium">No activity logs found for this period.</td></tr>
+                <tr><td colSpan={5} className="px-8 py-24 text-center text-slate-300 dark:text-slate-600 italic font-medium">No activity logs discovered for this period.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Manual Edit Modal */}
       <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Correct Session Data" width="max-w-md">
           <form onSubmit={handleEditSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 gap-4">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <label className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Shift Start</label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <input required type="date" className="px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkInDate} onChange={e => setEditForm({...editForm, checkInDate: e.target.value})} />
-                        <input required type="time" className="px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkInTime} onChange={e => setEditForm({...editForm, checkInTime: e.target.value})} />
+              <div className="grid grid-cols-1 gap-5">
+                  <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <label className="block text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4 border-b border-emerald-100 pb-2">Shift Commencement</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Start Date</label>
+                           <input required type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm shadow-inner" value={editForm.checkInDate} onChange={e => setEditForm({...editForm, checkInDate: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Start Time</label>
+                           <input required type="time" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm shadow-inner" value={editForm.checkInTime} onChange={e => setEditForm({...editForm, checkInTime: e.target.value})} />
+                        </div>
                     </div>
                   </div>
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3">Shift End</label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <input required type="date" className="px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkOutDate} onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})} />
-                        <input type="time" className="px-3 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm" value={editForm.checkOutTime} onChange={e => setEditForm({...editForm, checkOutTime: e.target.value})} />
+                  <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <label className="block text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-4 border-b border-rose-100 pb-2">Shift Conclusion</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">End Date</label>
+                           <input required type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm shadow-inner" value={editForm.checkOutDate} onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">End Time</label>
+                           <input type="time" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm shadow-inner" value={editForm.checkOutTime} onChange={e => setEditForm({...editForm, checkOutTime: e.target.value})} />
+                        </div>
                     </div>
                   </div>
               </div>
-              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-100 dark:border-amber-800">
-                  <Info className="text-amber-600 shrink-0" size={16} />
-                  <p className="text-[10px] text-amber-800 dark:text-amber-300 font-bold uppercase tracking-tight leading-normal">Updates are only permitted during the Day+1 window. All manual adjustments are audited.</p>
+              <div className="flex items-start gap-4 bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/50">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-800/40 rounded-lg text-amber-600"><Info size={18} /></div>
+                  <p className="text-[10px] text-amber-800 dark:text-amber-200 font-bold uppercase tracking-tight leading-relaxed">
+                      Session modification is permitted for Today, Yesterday, and the most recent Weekend window. All manual adjustments are flagged for auditing.
+                  </p>
               </div>
-              <button type="submit" className="w-full py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 transition shadow-lg shadow-teal-500/20 text-xs uppercase tracking-widest">Update Record</button>
+              <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black hover:bg-teal-700 transition shadow-xl shadow-teal-500/20 text-xs uppercase tracking-[0.2em] active:scale-[0.98]">Commit Record Update</button>
           </form>
       </DraggableModal>
 
-      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-sm">
-          <div className="text-center py-4">
-              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800"><Trash2 className="text-red-600" size={32} /></div>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Delete Log?</h3>
-              <p className="text-slate-500 text-sm px-4">This action cannot be undone. Standard employees can only delete records within the valid Day+1 window.</p>
+      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Remove Log Record" width="max-w-sm">
+          <div className="text-center py-6">
+              <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-5 border-4 border-red-100 dark:border-red-800"><Trash2 className="text-red-600" size={36} /></div>
+              <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">Delete this entry?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs px-6 leading-relaxed">This action cannot be undone. Standard users can only remove logs within their allowed editing window.</p>
           </div>
-          <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
-              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">Cancel</button>
-              <button onClick={async () => { if (recordToDelete) { await deleteAttendanceRecord(recordToDelete.id); setShowDeleteConfirm(false); } }} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-700 transition-colors">Delete</button>
+          <div className="flex gap-3 mt-4 pt-6 border-t border-slate-100 dark:border-slate-700">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-4 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-colors">Abort</button>
+              <button onClick={async () => { if (recordToDelete) { await deleteAttendanceRecord(recordToDelete.id); setShowDeleteConfirm(false); } }} className="flex-1 px-4 py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-red-500/20 hover:bg-red-700 transition-colors">Purge Record</button>
           </div>
       </DraggableModal>
     </div>
