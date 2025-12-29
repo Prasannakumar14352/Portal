@@ -5,10 +5,12 @@ import {
   mockAttendance, mockTimeEntries, mockNotifications, mockHolidays, mockPayslips, mockRoles
 } from './mockData';
 
-const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA !== 'false';
+// If API URL is provided, default USE_MOCK_DATA to false
 const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true' || (!process.env.VITE_API_BASE_URL && process.env.VITE_USE_MOCK_DATA !== 'false');
 
-console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA (Default)' : 'REAL API'}`);
+console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'REAL API'}`);
+console.log(`[DB Service] Target URL: ${API_BASE}`);
 
 const api = {
     get: async (endpoint: string) => {
@@ -34,7 +36,10 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error(`API PUT Error: ${res.status} ${res.statusText}`);
+        if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(`API PUT Error: ${res.status} ${errBody.error || res.statusText}`);
+        }
         return res.json();
     },
     delete: async (endpoint: string) => {
@@ -251,7 +256,7 @@ const createHybridDb = () => {
                     }
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 } catch (error) {
-                    console.warn(`[DB] Fallback to Mock Data for ${String(prop)}:`, error.message);
+                    console.warn(`[DB] Real API failed for ${String(prop)}. Falling back to Mock Data.`, error.message);
                     return (mockDb[prop as keyof typeof mockDb] as Function)(...args);
                 }
             };

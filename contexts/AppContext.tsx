@@ -593,12 +593,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateAttendanceRecord = async (record: AttendanceRecord) => { 
     try {
+        console.log(`[Context] Updating Record ID: ${record.id}`, record);
         await db.updateAttendance(record); 
         await refreshData(); 
-        showToast("Updated.", "success"); 
+        showToast("Record successfully updated in SQL.", "success"); 
     } catch (err: any) {
-        console.error("Update failed:", err);
-        showToast("Database update failed. Check server logs.", "error");
+        console.error("[Context ERROR] Update failed:", err.message);
+        showToast(`Update Failed: ${err.message}`, "error");
     }
   };
 

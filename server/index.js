@@ -1,8 +1,9 @@
 
 require('dotenv').config();
+const path = require('path');
+
 // Fallback: If running from server/ folder, try to load .env from root if variables are missing
 if (!process.env.DB_NAME) {
-    const path = require('path');
     require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 }
 
@@ -84,37 +85,15 @@ const toStr = (val) => {
 const initDb = async () => {
     try {
         const request = pool.request();
-        console.log("[DB] Initializing schema and migrations...");
+        console.log("[DB] Verifying tables...");
 
         const tables = [
-            { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, employeeId INT, firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(50), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), location NVARCHAR(MAX), phone NVARCHAR(50), jobTitle NVARCHAR(100), workLocation NVARCHAR(100), position NVARCHAR(100))` },
-            { name: 'departments', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U') CREATE TABLE departments (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), managerId NVARCHAR(50))` },
-            { name: 'projects', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='projects' AND xtype='U') CREATE TABLE projects (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX), status NVARCHAR(50), tasks NVARCHAR(MAX), dueDate NVARCHAR(50))` },
-            { name: 'leaves', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U') CREATE TABLE leaves (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(100), type NVARCHAR(50), startDate NVARCHAR(50), endDate NVARCHAR(50), reason NVARCHAR(MAX), status NVARCHAR(50), attachmentUrl NVARCHAR(MAX), managerConsent BIT, notifyUserIds NVARCHAR(MAX), approverId NVARCHAR(50), isUrgent BIT, managerComment NVARCHAR(MAX), hrComment NVARCHAR(MAX), createdAt NVARCHAR(50))` },
-            { name: 'leave_types', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leave_types' AND xtype='U') CREATE TABLE leave_types (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), days INT, description NVARCHAR(MAX), isActive BIT, color NVARCHAR(50))` },
-            { name: 'attendance', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='attendance' AND xtype='U') CREATE TABLE attendance (id NVARCHAR(50) PRIMARY KEY, employeeid NVARCHAR(50), employeeName NVARCHAR(100), date NVARCHAR(50), checkIn NVARCHAR(50), checkOut NVARCHAR(50), checkInTime NVARCHAR(50), checkOutTime NVARCHAR(50), status NVARCHAR(50), notes NVARCHAR(MAX), workLocation NVARCHAR(100))` },
-            { name: 'time_entries', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='time_entries' AND xtype='U') CREATE TABLE time_entries (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), projectId NVARCHAR(50), task NVARCHAR(100), date NVARCHAR(50), durationMinutes INT, extraMinutes INT, description NVARCHAR(MAX), status NVARCHAR(50), isBillable BIT, isExtra BIT)` },
-            { name: 'notifications', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U') CREATE TABLE notifications (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), title NVARCHAR(255), message NVARCHAR(MAX), time NVARCHAR(50), [read] BIT, type NVARCHAR(50))` },
-            { name: 'holidays', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='holidays' AND xtype='U') CREATE TABLE holidays (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), date NVARCHAR(50), type NVARCHAR(50))` },
-            { name: 'payslips', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='payslips' AND xtype='U') CREATE TABLE payslips (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(100), month NVARCHAR(50), amount FLOAT, currency NVARCHAR(10), status NVARCHAR(50), generatedDate NVARCHAR(50), fileData NVARCHAR(MAX), fileName NVARCHAR(255))` },
-            { name: 'roles', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U') CREATE TABLE roles (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), description NVARCHAR(MAX))` },
-            { name: 'positions', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='positions' AND xtype='U') CREATE TABLE positions (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(100), description NVARCHAR(MAX))` }
+            { name: 'attendance', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='attendance' AND xtype='U') CREATE TABLE attendance (id NVARCHAR(50) PRIMARY KEY, employeeId NVARCHAR(50), employeeName NVARCHAR(100), date NVARCHAR(50), checkIn NVARCHAR(50), checkOut NVARCHAR(50), checkInTime NVARCHAR(50), checkOutTime NVARCHAR(50), status NVARCHAR(50), notes NVARCHAR(MAX), workLocation NVARCHAR(100))` }
         ];
 
         for (const table of tables) {
             await request.query(table.query);
         }
-        
-        const migrations = [
-            { table: 'employees', column: 'employeeId', type: 'INT' }, 
-            { table: 'employees', column: 'position', type: 'NVARCHAR(100)' },
-            { table: 'positions', column: 'title', type: 'NVARCHAR(100)' }
-        ];
-
-        for (const m of migrations) {
-            await request.query(`IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'${m.column}' AND Object_ID = Object_ID(N'${m.table}')) ALTER TABLE ${m.table} ADD ${m.column} ${m.type}`);
-        }
-
         console.log("✅ [DB] Initialization complete.");
     } catch (err) {
         console.error("❌ [DB] Initialization FAILED:", err.message);
@@ -123,7 +102,7 @@ const initDb = async () => {
 
 const apiRouter = express.Router();
 
-// --- ATTENDANCE ---
+// --- ATTENDANCE ROUTES ---
 apiRouter.get('/attendance', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM attendance");
@@ -136,7 +115,7 @@ apiRouter.post('/attendance', async (req, res) => {
         const a = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(a.id));
-        request.input('employeeid', sql.NVarChar, toStr(a.employeeId)); // Matching physical DB screenshot
+        request.input('employeeId', sql.NVarChar, toStr(a.employeeId)); // Matching physical DB [employeeId]
         request.input('employeeName', sql.NVarChar, toStr(a.employeeName));
         request.input('date', sql.NVarChar, toStr(a.date));
         request.input('checkIn', sql.NVarChar, toStr(a.checkIn));
@@ -146,17 +125,24 @@ apiRouter.post('/attendance', async (req, res) => {
         request.input('status', sql.NVarChar, toStr(a.status));
         request.input('notes', sql.NVarChar, toStr(a.notes));
         request.input('workLocation', sql.NVarChar, toStr(a.workLocation));
-        await request.query("INSERT INTO attendance (id, employeeid, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeid, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
+        
+        await request.query(`INSERT INTO attendance 
+            (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) 
+            VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)`);
+        
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 apiRouter.put('/attendance/:id', async (req, res) => {
     try {
+        const id = req.params.id;
         const a = req.body;
+        console.log(`[DB] Updating attendance record: ${id}`);
+
         const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('employeeid', sql.NVarChar, toStr(a.employeeId)); // Matching physical DB screenshot
+        request.input('id', sql.NVarChar, toStr(id));
+        request.input('employeeId', sql.NVarChar, toStr(a.employeeId)); // Matching physical DB [employeeId]
         request.input('employeeName', sql.NVarChar, toStr(a.employeeName));
         request.input('date', sql.NVarChar, toStr(a.date));
         request.input('checkIn', sql.NVarChar, toStr(a.checkIn));
@@ -168,17 +154,23 @@ apiRouter.put('/attendance/:id', async (req, res) => {
         request.input('workLocation', sql.NVarChar, toStr(a.workLocation));
         
         const result = await request.query(`UPDATE attendance SET 
-            employeeid=@employeeid, employeeName=@employeeName, date=@date, 
+            employeeId=@employeeId, employeeName=@employeeName, date=@date, 
             checkIn=@checkIn, checkOut=@checkOut, checkInTime=@checkInTime, 
             checkOutTime=@checkOutTime, status=@status, notes=@notes, 
             workLocation=@workLocation 
             WHERE id=@id`);
             
         if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: 'Attendance record not found.' });
+            console.warn(`[DB] Record ${id} not found for update.`);
+            return res.status(404).json({ error: 'Attendance record not found in database.' });
         }
+        
+        console.log(`[DB] Record ${id} updated successfully.`);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error(`[DB ERROR] PUT /attendance/${req.params.id}:`, err.message);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 apiRouter.delete('/attendance/:id', async (req, res) => {
@@ -186,14 +178,12 @@ apiRouter.delete('/attendance/:id', async (req, res) => {
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(req.params.id));
         const result = await request.query("DELETE FROM attendance WHERE id=@id");
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: 'Attendance record not found.' });
-        }
+        if (result.rowsAffected[0] === 0) return res.status(404).json({ error: 'Record not found.' });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- EMPLOYEES ---
+// --- EMPLOYEES ROUTES ---
 apiRouter.get('/employees', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM employees");
@@ -205,65 +195,28 @@ apiRouter.get('/employees', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.post('/employees', async (req, res) => {
-    try {
-        const e = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(e.id));
-        request.input('employeeId', sql.Int, toInt(e.employeeId));
-        request.input('firstName', sql.NVarChar, toStr(e.firstName));
-        request.input('lastName', sql.NVarChar, toStr(e.lastName));
-        request.input('email', sql.NVarChar, toStr(e.email));
-        request.input('password', sql.NVarChar, toStr(e.password));
-        request.input('role', sql.NVarChar, toStr(e.role));
-        request.input('position', sql.NVarChar, toStr(e.position));
-        request.input('department', sql.NVarChar, toStr(e.department));
-        request.input('departmentId', sql.NVarChar, toStr(e.departmentId));
-        request.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds || []));
-        request.input('joinDate', sql.NVarChar, toStr(e.joinDate));
-        request.input('status', sql.NVarChar, toStr(e.status));
-        request.input('salary', sql.Float, toFloat(e.salary));
-        request.input('avatar', sql.NVarChar, toStr(e.avatar));
-        request.input('managerId', sql.NVarChar, toStr(e.managerId));
-        request.input('location', sql.NVarChar, JSON.stringify(e.location));
-        request.input('phone', sql.NVarChar, toStr(e.phone));
-        request.input('jobTitle', sql.NVarChar, toStr(e.jobTitle));
-        request.input('workLocation', sql.NVarChar, toStr(e.workLocation));
-
-        await request.query(`INSERT INTO employees (id, employeeId, firstName, lastName, email, password, role, position, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, location, phone, jobTitle, workLocation) 
-            VALUES (@id, @employeeId, @firstName, @lastName, @email, @password, @role, @position, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @location, @phone, @jobTitle, @workLocation)`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 apiRouter.put('/employees/:id', async (req, res) => {
     try {
         const e = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('employeeId', sql.Int, toInt(e.employeeId));
         request.input('firstName', sql.NVarChar, toStr(e.firstName));
         request.input('lastName', sql.NVarChar, toStr(e.lastName));
         request.input('email', sql.NVarChar, toStr(e.email)); 
         request.input('role', sql.NVarChar, toStr(e.role));
         request.input('position', sql.NVarChar, toStr(e.position));
         request.input('department', sql.NVarChar, toStr(e.department));
-        request.input('departmentId', sql.NVarChar, toStr(e.departmentId));
-        request.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds || []));
         request.input('status', sql.NVarChar, toStr(e.status));
         request.input('salary', sql.Float, toFloat(e.salary));
         request.input('avatar', sql.NVarChar, toStr(e.avatar));
-        request.input('managerId', sql.NVarChar, toStr(e.managerId));
-        request.input('location', sql.NVarChar, JSON.stringify(e.location));
         request.input('phone', sql.NVarChar, toStr(e.phone));
-        request.input('jobTitle', sql.NVarChar, toStr(e.jobTitle));
         request.input('workLocation', sql.NVarChar, toStr(e.workLocation));
 
         const result = await request.query(`UPDATE employees SET 
-            employeeId=@employeeId, firstName=@firstName, lastName=@lastName, email=@email,
-            role=@role, position=@position, department=@department, departmentId=@departmentId, projectIds=@projectIds, 
-            status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, 
-            location=@location, phone=@phone, jobTitle=@jobTitle, workLocation=@workLocation 
+            firstName=@firstName, lastName=@lastName, email=@email,
+            role=@role, position=@position, department=@department, 
+            status=@status, salary=@salary, avatar=@avatar, 
+            phone=@phone, workLocation=@workLocation 
             WHERE id=@id`);
         
         if (result.rowsAffected[0] === 0) return res.status(404).json({ error: 'Employee not found.' });
@@ -271,117 +224,14 @@ apiRouter.put('/employees/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.delete('/employees/:id', async (req, res) => {
-    try {
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        const result = await request.query("DELETE FROM employees WHERE id=@id");
-        if (result.rowsAffected[0] === 0) return res.status(404).json({ error: 'Employee not found.' });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// --- LEAVES ---
-apiRouter.get('/leaves', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM leaves");
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/leaves', async (req, res) => {
-    try {
-        const l = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(l.id));
-        request.input('userId', sql.NVarChar, toStr(l.userId));
-        request.input('userName', sql.NVarChar, toStr(l.userName));
-        request.input('type', sql.NVarChar, toStr(l.type));
-        request.input('startDate', sql.NVarChar, toStr(l.startDate));
-        request.input('endDate', sql.NVarChar, toStr(l.endDate));
-        request.input('reason', sql.NVarChar, toStr(l.reason));
-        request.input('status', sql.NVarChar, toStr(l.status));
-        request.input('managerConsent', sql.Bit, l.managerConsent ? 1 : 0);
-        request.input('notifyUserIds', sql.NVarChar, JSON.stringify(l.notifyUserIds || []));
-        request.input('approverId', sql.NVarChar, toStr(l.approverId));
-        request.input('isUrgent', sql.Bit, l.isUrgent ? 1 : 0);
-        request.input('createdAt', sql.NVarChar, toStr(l.createdAt));
-        await request.query("INSERT INTO leaves (id, userId, userName, type, startDate, endDate, reason, status, managerConsent, notifyUserIds, approverId, isUrgent, createdAt) VALUES (@id, @userId, @userName, @type, @startDate, @endDate, @reason, @status, @managerConsent, @notifyUserIds, @approverId, @isUrgent, @createdAt)");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.put('/leaves/:id', async (req, res) => {
-    try {
-        const l = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('status', sql.NVarChar, toStr(l.status));
-        request.input('managerComment', sql.NVarChar, toStr(l.managerComment));
-        request.input('hrComment', sql.NVarChar, toStr(l.hrComment));
-        const result = await request.query("UPDATE leaves SET status=@status, managerComment=@managerComment, hrComment=@hrComment WHERE id=@id");
-        if (result.rowsAffected[0] === 0) return res.status(404).json({ error: 'Leave request not found.' });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// --- TIME ENTRIES ---
-apiRouter.get('/time_entries', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM time_entries");
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/time_entries', async (req, res) => {
-    try {
-        const t = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(t.id));
-        request.input('userId', sql.NVarChar, toStr(t.userId));
-        request.input('projectId', sql.NVarChar, toStr(t.projectId));
-        request.input('task', sql.NVarChar, toStr(t.task));
-        request.input('date', sql.NVarChar, toStr(t.date));
-        request.input('durationMinutes', sql.Int, toInt(t.durationMinutes));
-        request.input('extraMinutes', sql.Int, toInt(t.extraMinutes));
-        request.input('description', sql.NVarChar, toStr(t.description));
-        request.input('status', sql.NVarChar, toStr(t.status));
-        request.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
-        await request.query("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, extraMinutes, description, status, isBillable) VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @extraMinutes, @description, @status, @isBillable)");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.put('/time_entries/:id', async (req, res) => {
-    try {
-        const t = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('projectId', sql.NVarChar, toStr(t.projectId));
-        request.input('task', sql.NVarChar, toStr(t.task));
-        request.input('date', sql.NVarChar, toStr(t.date));
-        request.input('durationMinutes', sql.Int, toInt(t.durationMinutes));
-        request.input('extraMinutes', sql.Int, toInt(t.extraMinutes));
-        request.input('description', sql.NVarChar, toStr(t.description));
-        request.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
-        const result = await request.query("UPDATE time_entries SET projectId=@projectId, task=@task, date=@date, durationMinutes=@durationMinutes, extraMinutes=@extraMinutes, description=@description, isBillable=@isBillable WHERE id=@id");
-        if (result.rowsAffected[0] === 0) return res.status(404).json({ error: 'Time entry not found.' });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.delete('/time_entries/:id', async (req, res) => {
-    try {
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        const result = await request.query("DELETE FROM time_entries WHERE id=@id");
-        if (result.rowsAffected[0] === 0) return res.status(404).json({ error: 'Time entry not found.' });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Mount routes
+// Mount routes correctly
 app.use('/api', apiRouter);
+
+// --- CATCH-ALL ROUTE ---
+app.use((req, res) => {
+    console.warn(`[404] Route not found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `Route ${req.method} ${req.path} not found on this server.` });
+});
 
 // Start Server
 app.listen(PORT, async () => {
