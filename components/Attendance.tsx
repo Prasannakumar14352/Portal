@@ -50,7 +50,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   
-  // Updated state to handle night shifts (cross-day checkout)
   const [editForm, setEditForm] = useState({ 
     checkInDate: '', 
     checkInTime: '', 
@@ -71,30 +70,17 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     return sessions[sessions.length - 1];
   }, [records, currentUser, currentTime.getDate()]);
 
-  const isHR = currentUser?.role === UserRole.HR;
+  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   
-  const userProjects = useMemo(() => projects.filter(p => p.status === 'Active'), [projects]);
-  const selectedProjectTasks = useMemo(() => {
-    if (!logForm.projectId || logForm.projectId === 'NO_PROJECT') return ['General Administration', 'Internal Meeting', 'Documentation', 'Support'];
-    return projects.find(p => String(p.id) === String(logForm.projectId))?.tasks || [];
-  }, [logForm.projectId, projects]);
-
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const checkInTimeObj = todayRecord?.checkInTime ? new Date(todayRecord.checkInTime) : null;
-  const elapsedMs = checkInTimeObj ? currentTime.getTime() - checkInTimeObj.getTime() : 0;
-  const elapsedHours = elapsedMs / (1000 * 60 * 60);
-  const isEarlyLogout = elapsedHours < 9;
-
-  // New: logic to calculate duration for both historical and active sessions
   const calculateDuration = (record: AttendanceRecord) => {
     const start = record.checkInTime ? new Date(record.checkInTime) : null;
     let end = record.checkOutTime ? new Date(record.checkOutTime) : null;
     
-    // If it's an active session (no checkout yet), calculate based on live time
     if (start && !end && String(record.employeeId) === String(currentUser?.id)) {
         const todayStr = formatDateISO(new Date());
         if (record.date === todayStr || new Date(record.date).getTime() < new Date(todayStr).getTime()) {
@@ -113,7 +99,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     return `${diffHrs}h ${diffMins}m`;
   };
 
-  // Helper to format session string with date awareness for night shifts
+  // Redesigned Session String for cleaner "Night Shift" visualization
   const formatSessionString = (record: AttendanceRecord) => {
       const cinDate = record.checkInTime ? new Date(record.checkInTime) : null;
       const coutDate = record.checkOutTime ? new Date(record.checkOutTime) : null;
@@ -124,27 +110,33 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       if (cinDate && coutDate) {
           const isDifferentDay = cinDate.toDateString() !== coutDate.toDateString();
           if (isDifferentDay) {
+              const cinDayLabel = cinDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+              const coutDayLabel = coutDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
               return (
-                  <div className="flex flex-col leading-tight">
-                      <span className="text-[10px] font-bold text-emerald-600 uppercase">{cinDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
-                      <div className="flex items-center gap-1">
+                  <div className="flex flex-col gap-0.5 py-1">
+                      <div className="flex items-center gap-2">
+                          <span className="text-[10px] w-8 font-black text-slate-400 uppercase">Start</span>
                           <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{cinStr}</span>
-                          <span className="text-[10px] text-slate-400">→</span>
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{coutStr}</span>
+                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">({cinDayLabel})</span>
                       </div>
-                      <span className="text-[10px] font-bold text-rose-500 uppercase">{coutDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-[10px] w-8 font-black text-slate-400 uppercase">End</span>
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{coutStr}</span>
+                          <span className="text-[10px] font-medium text-rose-500 dark:text-rose-400">({coutDayLabel})</span>
+                      </div>
                   </div>
               );
           }
       }
-      return <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{cinStr} - {coutStr}</span>;
+      return <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-tight">{cinStr} — {coutStr}</span>;
   };
 
   const handleCheckOutClick = () => {
     if (!currentUser) return;
     const todayStr = formatDateISO(new Date());
     const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === todayStr);
-    const actionType = isEarlyLogout ? 'early' : 'normal';
+    const actionType = (todayRecord?.checkInTime && (currentTime.getTime() - new Date(todayRecord.checkInTime).getTime()) / 3600000 < 9) ? 'early' : 'normal';
+    
     if (!hasLog) {
         setPendingCheckoutAction(actionType);
         setLogForm({ projectId: '', task: '', hours: '8', minutes: '00', description: '', includeExtra: false, extraHours: '0', extraMinutes: '00' });
@@ -174,17 +166,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     if (pendingCheckoutAction) { proceedToCheckout(pendingCheckoutAction); setPendingCheckoutAction(null); }
   };
 
-  const handleEarlyReasonSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!earlyReason.trim()) return;
-    checkOut(earlyReason);
-    setShowEarlyReasonModal(false);
-    setEarlyReason('');
-  };
-
   const openEditModal = (record: AttendanceRecord) => {
       setEditingRecord(record);
-      
       const cinDateObj = record.checkInTime ? new Date(record.checkInTime) : new Date(record.date);
       const coutDateObj = record.checkOutTime ? new Date(record.checkOutTime) : null;
 
@@ -200,26 +183,22 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const handleEditSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRecord) return;
-
       const newCheckInISO = new Date(`${editForm.checkInDate}T${editForm.checkInTime}:00`).toISOString();
       const newCheckOutISO = editForm.checkOutTime 
         ? new Date(`${editForm.checkOutDate}T${editForm.checkOutTime}:00`).toISOString() 
-        : ""; // Use empty string instead of undefined for SQL compatibility
+        : "";
 
-      const fmtTime = (iso: string) => iso ? formatTime12(new Date(iso)) : '--:--';
-      
       const updatedRecord: AttendanceRecord = { 
         ...editingRecord, 
         date: editForm.checkInDate,
-        checkIn: fmtTime(newCheckInISO), 
+        checkIn: formatTime12(new Date(newCheckInISO)), 
         checkInTime: newCheckInISO, 
-        checkOut: newCheckOutISO ? fmtTime(newCheckOutISO) : "", 
+        checkOut: newCheckOutISO ? formatTime12(new Date(newCheckOutISO)) : "", 
         checkOutTime: newCheckOutISO 
       };
 
       await updateAttendanceRecord(updatedRecord);
       setShowEditModal(false);
-      setEditingRecord(null);
   };
 
   const openDeleteConfirm = (record: AttendanceRecord) => {
@@ -231,7 +210,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     if (recordToDelete) {
       await deleteAttendanceRecord(recordToDelete.id);
       setShowDeleteConfirm(false);
-      setRecordToDelete(null);
     }
   };
 
@@ -265,10 +243,10 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                    <span className="font-bold text-gray-500">Done</span>
                 </div>
              ) : (
-                <button onClick={handleCheckOutClick} className={`flex flex-col items-center justify-center w-36 h-36 rounded-full border-4 hover:scale-105 transition-all cursor-pointer ${isEarlyLogout ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'}`}>
-                   <StopCircle size={40} className={`${isEarlyLogout ? 'text-amber-600' : 'text-red-600'} mb-2`} />
-                   <span className="font-bold">{isEarlyLogout ? 'Early Out' : 'Check Out'}</span>
-                   <span className="text-xs text-slate-500">{calculateDuration(todayRecord)}</span>
+                <button onClick={handleCheckOutClick} className={`flex flex-col items-center justify-center w-36 h-36 rounded-full border-4 hover:scale-105 transition-all cursor-pointer bg-red-50 border-red-100`}>
+                   <StopCircle size={40} className={`text-red-600 mb-2`} />
+                   <span className="font-bold text-red-700 uppercase tracking-widest text-xs">Check Out</span>
+                   <span className="text-xs font-mono font-bold text-slate-500 mt-1">{calculateDuration(todayRecord)}</span>
                 </button>
              )}
          </div>
@@ -287,28 +265,52 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[800px]">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-xs uppercase border-b">
-                <th className="px-6 py-4">Employee</th><th className="px-6 py-4">Check-In Date</th><th className="px-6 py-4">Session</th><th className="px-6 py-4">Duration</th><th className="px-6 py-4 text-center">Action</th>
+              <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[10px] uppercase tracking-widest font-black border-b">
+                <th className="px-6 py-4">Employee</th>
+                <th className="px-6 py-4">Check-In Date</th>
+                <th className="px-6 py-4">Shift Details (Session)</th>
+                <th className="px-6 py-4">Duration</th>
+                <th className="px-6 py-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {paginatedRecords.map((record, index) => {
-                const canManage = isHR || String(record.employeeId) === String(currentUser?.id);
+              {paginatedRecords.map((record) => {
+                // Permission logic based on strict Day+1 requirement
+                const checkInDate = new Date(record.date);
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                checkInDate.setHours(0,0,0,0);
+                const diffDays = Math.floor((today.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+                
+                const isOwnRecord = String(record.employeeId) === String(currentUser?.id);
+                // Employee can only edit if it is Day+1 (next day). HR can always edit.
+                const canManage = isHR || (isOwnRecord && diffDays === 1);
+                
                 return (
-                  <tr key={record.id || index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{record.employeeName}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300 font-bold">{record.date}</td>
-                    <td className="px-6 py-4 uppercase text-slate-700 dark:text-slate-300">
+                  <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="px-6 py-4">
+                        <div className="text-sm font-bold text-slate-800 dark:text-white leading-tight">{record.employeeName}</div>
+                        <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">#{record.employeeId}</div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300 font-bold font-mono text-sm">{record.date}</td>
+                    <td className="px-6 py-4">
                         {formatSessionString(record)}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm font-bold text-slate-800 dark:text-teal-400">{calculateDuration(record)}</td>
                     <td className="px-6 py-4 text-center">
                       {canManage ? (
                         <div className="flex justify-center gap-2">
-                           <button onClick={() => openEditModal(record)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit Session"><Edit2 size={16} /></button>
-                           <button onClick={() => openDeleteConfirm(record)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors" title="Delete Session"><Trash2 size={16} /></button>
+                           <button onClick={() => openEditModal(record)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors bg-slate-50 dark:bg-slate-700 rounded-lg shadow-sm" title="Edit Session"><Edit2 size={16} /></button>
+                           <button onClick={() => openDeleteConfirm(record)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors bg-slate-50 dark:bg-slate-700 rounded-lg shadow-sm" title="Delete Session"><Trash2 size={16} /></button>
                         </div>
-                      ) : '-'}
+                      ) : (
+                        <div className="group relative inline-block">
+                           <Lock size={14} className="text-slate-200 mx-auto" />
+                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-[9px] font-bold uppercase rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-10">
+                              {isOwnRecord && diffDays > 1 ? "Window Closed - Request HR" : "Read Only"}
+                           </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -321,11 +323,10 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Manual Edit Modal - Updated for Night Shifts */}
+      {/* Manual Edit Modal */}
       <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Attendance Session" width="max-w-md">
           <form onSubmit={handleEditSubmit} className="space-y-6">
               <div className="space-y-4">
-                  {/* Check In Group */}
                   <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <label className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Shift Start (Check-In)</label>
                     <div className="grid grid-cols-2 gap-3">
@@ -340,7 +341,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                     </div>
                   </div>
 
-                  {/* Check Out Group */}
                   <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <label className="block text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3">Shift End (Check-Out)</label>
                     <div className="grid grid-cols-2 gap-3">
@@ -358,7 +358,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
               <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-800 flex items-start gap-2">
                   <Info className="text-amber-600 shrink-0 mt-0.5" size={14} />
-                  <p className="text-[10px] text-amber-800 dark:text-amber-200 leading-relaxed font-medium">Night shift records will calculate hours correctly across midnight. Ensure the checkout date is accurate.</p>
+                  <p className="text-[10px] text-amber-800 dark:text-amber-200 leading-relaxed font-medium">Employee edit window is limited to the day immediately following the shift. HR can edit at any time.</p>
               </div>
 
               <div className="pt-2">
@@ -367,16 +367,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           </form>
       </DraggableModal>
 
-      {/* Delete Confirmation Modal */}
       <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-sm">
           <div className="text-center py-4">
               <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
                   <Trash2 className="text-red-600 dark:text-red-400" size={32} />
               </div>
               <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Are you sure?</h3>
-              <p className="text-slate-500 dark:text-slate-400 text-sm px-4">
-                  This action will permanently remove this attendance entry. This cannot be undone.
-              </p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm px-4">This cannot be undone. Standard employees can only delete their own records during the Day+1 window.</p>
           </div>
           <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
