@@ -476,6 +476,20 @@ apiRouter.put('/notifications/:id/read', async (req, res) => {
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Robust mark-all-read handler supporting multiple methods to prevent environmental routing issues
+const handleMarkAllRead = async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('userId', sql.NVarChar, req.params.userId);
+        await request.query(`UPDATE notifications SET [read]=1 WHERE userId=@userId`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+apiRouter.put('/notifications/read-all/:userId', handleMarkAllRead);
+apiRouter.get('/notifications/read-all/:userId', handleMarkAllRead); // Fallback for envs misinterpreting methods
+
 generateCRUDRoutes('notifications');
 
 // --- HOLIDAYS ---
@@ -504,6 +518,7 @@ apiRouter.post('/payslips', async (req, res) => {
         request.input('month', sql.NVarChar, toStr(p.month));
         request.input('amount', sql.Float, toFloat(p.amount));
         request.input('currency', sql.NVarChar, toStr(p.currency));
+        request.status = toStr(p.status);
         request.input('status', sql.NVarChar, toStr(p.status));
         request.input('generatedDate', sql.NVarChar, toStr(p.generatedDate));
         request.input('fileData', sql.NVarChar, toStr(p.fileData));
