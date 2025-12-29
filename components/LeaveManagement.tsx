@@ -2,8 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Upload, Paperclip, CheckSquare, Search, Edit2, Calendar as CalendarIcon, 
-  List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers, Filter, UserCheck, BookOpen
+  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -65,7 +64,7 @@ const MultiSelectUser = ({
         {selectedIds.map(id => {
           const user = options.find(u => String(u.id) === id);
           return (
-            <span key={id} className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1.5 border border-emerald-100">
+            <span key={id} className="bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1.5 border border-teal-100">
               {user?.name}
               <X size={10} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleSelect(id); }} />
             </span>
@@ -77,8 +76,8 @@ const MultiSelectUser = ({
       {isOpen && (
         <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 p-2">
             {options.map(user => (
-              <div key={user.id} onClick={() => handleSelect(String(user.id))} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.includes(String(user.id)) ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''}`}>
-                <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.includes(String(user.id)) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-200'}`}>
+              <div key={user.id} onClick={() => handleSelect(String(user.id))} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.includes(String(user.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
+                <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.includes(String(user.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-200'}`}>
                   {selectedIds.includes(String(user.id)) && <CheckCircle size={10} className="text-white" />}
                 </div>
                 <span className="text-sm font-bold text-slate-700 dark:text-white">{user.name}</span>
@@ -98,7 +97,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const { showToast } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
-  const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar' | 'team'>('requests');
+  const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar'>('requests');
+  const [currentCalDate, setCurrentCalDate] = useState(new Date());
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editingType, setEditingType] = useState<string | null>(null);
 
@@ -128,10 +128,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
   };
 
-  const getBalance = (typeName: string, limit: number) => {
-    const used = leaves
+  const getUsedDays = (typeName: string) => {
+    return leaves
       .filter(l => String(l.userId) === String(currentUser?.id) && l.type === typeName && l.status === LeaveStatusEnum.APPROVED)
       .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate, l.durationType), 0);
+  };
+
+  const getBalance = (typeName: string, limit: number) => {
+    const used = getUsedDays(typeName);
     return Math.max(0, limit - used);
   };
 
@@ -145,13 +149,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     setShowModal(true);
   };
 
-  const handleTypeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingType) updateLeaveType(editingType, typeData);
-    else addLeaveType({ ...typeData, id: Math.random().toString(36).substr(2, 9) });
-    setShowTypeModal(false);
-  };
-
   const handleLeaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalData = {
@@ -162,6 +159,43 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     else addLeave(finalData);
     setShowModal(false);
   };
+
+  const handleTypeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingType) updateLeaveType(editingType, typeData);
+    else addLeaveType({ ...typeData, id: Math.random().toString(36).substr(2, 9) });
+    setShowTypeModal(false);
+  };
+
+  // --- Calendar Logic ---
+  const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const startDayOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+
+  const calendarDays = useMemo(() => {
+    const days = [];
+    const totalDays = daysInMonth(currentCalDate);
+    const startOffset = startDayOfMonth(currentCalDate);
+    
+    // Previous month filler
+    for (let i = 0; i < startOffset; i++) days.push({ date: null });
+    
+    // Actual days
+    for (let d = 1; d <= totalDays; d++) {
+      const dateStr = `${currentCalDate.getFullYear()}-${String(currentCalDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayLeaves = leaves.filter(l => {
+          if (String(l.userId) !== String(currentUser?.id)) return false;
+          const start = new Date(l.startDate);
+          const end = new Date(l.endDate);
+          const current = new Date(dateStr);
+          start.setHours(0,0,0,0);
+          end.setHours(0,0,0,0);
+          current.setHours(0,0,0,0);
+          return current >= start && current <= end;
+      });
+      days.push({ date: dateStr, leaves: dayLeaves });
+    }
+    return days;
+  }, [currentCalDate, leaves, currentUser]);
 
   const StatusBadge = ({ status }: { status: string }) => {
     const styles: Record<string, string> = {
@@ -183,14 +217,27 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto">
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
-            {['requests', 'balances', 'types', 'calendar'].map(m => (
-                <button key={m} onClick={() => setViewMode(m as any)} className={`px-4 py-1.5 rounded-md text-sm transition capitalize ${viewMode === m ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>{m}</button>
+            {[
+                { id: 'requests', label: 'Requests', icon: BookOpen },
+                { id: 'balances', label: 'Balances', icon: PieChart },
+                { id: 'types', label: 'Policies', icon: Info },
+                { id: 'calendar', label: 'Calendar', icon: Calendar }
+            ].map(tab => (
+                <button 
+                  key={tab.id} 
+                  onClick={() => setViewMode(tab.id as any)} 
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm transition ${viewMode === tab.id ? 'bg-white dark:bg-slate-700 shadow text-teal-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <tab.icon size={14} />
+                  <span>{tab.label}</span>
+                </button>
             ))}
           </div>
-          <button onClick={handleOpenCreate} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition flex items-center space-x-2 text-sm font-bold uppercase tracking-tight shadow-lg shadow-emerald-500/20"><Plus size={18} /><span>New Request</span></button>
+          <button onClick={handleOpenCreate} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-bold uppercase tracking-tight shadow-lg shadow-teal-500/20"><Plus size={18} /><span>New Request</span></button>
         </div>
       </div>
 
+      {/* REQUESTS VIEW */}
       {viewMode === 'requests' && (
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
@@ -200,13 +247,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {leaves.map(leave => (
-                    <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-sm">{leave.userName}</td>
-                      <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400 text-xs uppercase">{leave.type}</td>
+                    <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
+                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{leave.userName}</td>
+                      <td className="px-6 py-4 font-bold text-teal-600 dark:text-teal-400 text-xs uppercase">{leave.type}</td>
                       <td className="px-6 py-4 font-mono text-[10px] text-slate-500">
                         {leave.durationType === 'Half Day' ? leave.startDate : `${leave.startDate} to ${leave.endDate}`}
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">{getDaysDiff(leave.startDate, leave.endDate, leave.durationType)} Days {leave.durationType === 'Half Day' && <span className="ml-1 text-[8px] font-black uppercase bg-amber-50 text-amber-600 px-1 py-0.5 rounded border border-amber-100">Half</span>}</td>
+                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">
+                        {getDaysDiff(leave.startDate, leave.endDate, leave.durationType)} Days 
+                        {leave.durationType === 'Half Day' && <span className="ml-1 text-[8px] font-black uppercase bg-amber-50 text-amber-600 px-1 py-0.5 rounded border border-amber-100">Half</span>}
+                      </td>
                       <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
                     </tr>
                   ))}
@@ -217,10 +267,46 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         </div>
       )}
 
+      {/* BALANCES VIEW */}
+      {viewMode === 'balances' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {leaveTypes.filter(t => t.isActive).map(type => {
+                const used = getUsedDays(type.name);
+                const total = type.days;
+                const percent = Math.min(100, Math.round((used / total) * 100));
+                return (
+                    <div key={type.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl text-teal-600">
+                                <PieChart size={24} />
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Remaining</span>
+                                <p className="text-2xl font-black text-slate-800 dark:text-white leading-none">{total - used}</p>
+                            </div>
+                        </div>
+                        <h4 className="font-bold text-slate-800 dark:text-white mb-1">{type.name}</h4>
+                        <p className="text-xs text-slate-500 mb-4">{type.description}</p>
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                                <span>Used: {used}</span>
+                                <span>Total: {total}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div className="h-full bg-teal-600" style={{ width: `${percent}%` }}></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+      )}
+
+      {/* TYPES (POLICIES) VIEW */}
       {viewMode === 'types' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><BookOpen className="text-emerald-600" /> Organizational Leave Policies</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><BookOpen className="text-teal-600" /> Organizational Leave Policies</h3>
             {isHR && (
               <button onClick={() => { setEditingType(null); setTypeData({ name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600' }); setShowTypeModal(true); }} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-4 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-white hover:bg-slate-50 flex items-center gap-2 shadow-sm transition-all"><Plus size={16} /> Add Leave Type</button>
             )}
@@ -229,24 +315,23 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             {leaveTypes.map(type => (
               <div key={type.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm relative group hover:shadow-md transition-all">
                   <div className="flex justify-between items-start mb-4">
-                    <div className={`p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 ${type.color || 'text-emerald-600'}`}>
-                      <Calendar size={24} />
+                    <div className={`p-3 rounded-xl bg-teal-50 dark:bg-teal-900/20 text-teal-600`}>
+                      <CalendarDays size={24} />
                     </div>
                     {isHR && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"><Edit2 size={16}/></button>
-                        <button onClick={() => { if(window.confirm('Delete this policy?')) deleteLeaveType(type.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                      <div className="flex gap-1">
+                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg"><Info size={16}/></button>
                       </div>
                     )}
                   </div>
                   <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{type.name}</h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2 h-10">{type.description}</p>
-                  <div className="flex justify-between items-end">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2 h-10 leading-relaxed">{type.description}</p>
+                  <div className="flex justify-between items-end pt-4 border-t border-slate-50 dark:border-slate-700/50">
                     <div>
                       <span className="block text-2xl font-black text-slate-800 dark:text-white">{type.days}</span>
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Days / Year</span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${type.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>{type.isActive ? 'Active' : 'Inactive'}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${type.isActive ? 'bg-teal-50 text-teal-600 border border-teal-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>{type.isActive ? 'Active' : 'Inactive'}</span>
                   </div>
               </div>
             ))}
@@ -254,7 +339,45 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         </div>
       )}
 
-      {/* Leave Request Modal */}
+      {/* CALENDAR VIEW */}
+      {viewMode === 'calendar' && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-6 border-b flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                      {currentCalDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                  </h3>
+                  <div className="flex gap-2">
+                      <button onClick={() => setCurrentCalDate(new Date(currentCalDate.setMonth(currentCalDate.getMonth() - 1)))} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"><ChevronLeft size={20}/></button>
+                      <button onClick={() => setCurrentCalDate(new Date(currentCalDate.setMonth(currentCalDate.getMonth() + 1)))} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"><ChevronRight size={20}/></button>
+                  </div>
+              </div>
+              <div className="grid grid-cols-7 border-b dark:border-slate-700">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                      <div key={d} className="py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 border-r last:border-0 dark:border-slate-700">{d}</div>
+                  ))}
+              </div>
+              <div className="grid grid-cols-7">
+                  {calendarDays.map((day, idx) => (
+                      <div key={idx} className={`min-h-[120px] p-2 border-r border-b last:border-r-0 dark:border-slate-700 transition-colors ${!day.date ? 'bg-slate-50/50 dark:bg-slate-900/20' : 'hover:bg-slate-50/50'}`}>
+                          {day.date && (
+                              <>
+                                <span className="text-[10px] font-bold text-slate-400">{day.date.split('-')[2]}</span>
+                                <div className="mt-2 space-y-1">
+                                    {day.leaves?.map(l => (
+                                        <div key={l.id} className="text-[9px] font-bold p-1 bg-teal-50 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400 rounded border border-teal-100 dark:border-teal-800 line-clamp-1 truncate" title={l.type}>
+                                            {l.type} {l.durationType === 'Half Day' ? '(H)' : ''}
+                                        </div>
+                                    ))}
+                                </div>
+                              </>
+                          )}
+                      </div>
+                  ))}
+              </div>
+          </div>
+      )}
+
+      {/* NEW REQUEST MODAL */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? 'Edit Request' : 'New Leave Request'} width="max-w-xl">
         <form onSubmit={handleLeaveSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -262,7 +385,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Leave Category</label>
                 <div className="relative">
                   <select 
-                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-700 dark:text-white font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none" 
+                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-700 dark:text-white font-bold outline-none focus:ring-2 focus:ring-teal-500/20 appearance-none" 
                     value={formData.type} 
                     onChange={e => setFormData({...formData, type: e.target.value})} 
                     required
@@ -275,7 +398,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                 </div>
                 {formData.type && (
-                  <p className="text-[10px] text-emerald-600 mt-2 font-black uppercase ml-1">
+                  <p className="text-[10px] text-teal-600 mt-2 font-black uppercase ml-1">
                     {getBalance(formData.type, leaveTypes.find(lt => lt.name === formData.type)?.days || 0)} Days Remaining
                   </p>
                 )}
@@ -285,7 +408,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Approving Manager</label>
                 <div className="relative">
                   <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <select required className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 dark:text-white font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none" value={formData.approverId} onChange={e => setFormData({...formData, approverId: e.target.value})}>
+                  <select required className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 dark:text-white font-bold text-sm outline-none focus:ring-2 focus:ring-teal-500/20 appearance-none" value={formData.approverId} onChange={e => setFormData({...formData, approverId: e.target.value})}>
                     <option value="" disabled>Select Approver...</option>
                     {availableManagers.map(mgr => <option key={mgr.id} value={String(mgr.id)}>{mgr.name}</option>)}
                   </select>
@@ -299,7 +422,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     <button 
                         type="button" 
                         onClick={() => setFormData({...formData, durationType: 'Full Day'})}
-                        className={`py-2.5 rounded-xl text-xs font-black uppercase transition-all border ${formData.durationType === 'Full Day' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
+                        className={`py-2.5 rounded-xl text-xs font-black uppercase transition-all border ${formData.durationType === 'Full Day' ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
                     >
                         Full Day
                     </button>
@@ -326,7 +449,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               )}
             </div>
 
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">Reason for Absence</label><textarea required rows={3} className="w-full border rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Why are you taking leave?"></textarea></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">Reason for Absence</label><textarea required rows={3} className="w-full border rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500/20" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Why are you taking leave?"></textarea></div>
 
             <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 flex items-center gap-3">
                <input type="checkbox" id="urgent-check" checked={formData.isUrgent} onChange={e => setFormData({...formData, isUrgent: e.target.checked})} className="w-5 h-5 text-red-600 rounded border-red-200 focus:ring-red-500" />
@@ -337,24 +460,24 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
             <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
               <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-400 text-xs font-black uppercase">Cancel</button>
-              <button type="submit" className="px-8 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95">Submit Request</button>
+              <button type="submit" className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition-all active:scale-95">Submit Request</button>
             </div>
         </form>
       </DraggableModal>
 
-      {/* Leave Type Modal */}
+      {/* POLICY MODAL */}
       <DraggableModal isOpen={showTypeModal} onClose={() => setShowTypeModal(false)} title={editingType ? 'Edit Leave Policy' : 'Define New Policy'} width="max-w-md">
         <form onSubmit={handleTypeSubmit} className="space-y-4">
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Type Name</label><input required type="text" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} placeholder="e.g. Wellness Break" /></div>
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Annual Allowance (Days)</label><input required type="number" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea required rows={2} className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Eligibility details..." /></div>
             <div className="flex items-center gap-2 py-2">
-              <input type="checkbox" id="active-check" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-emerald-600 rounded border-slate-300" />
+              <input type="checkbox" id="active-check" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-teal-600 rounded border-slate-300" />
               <label htmlFor="active-check" className="text-xs font-bold text-slate-600 dark:text-slate-300">Visible to Employees</label>
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
               <button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 text-sm font-bold uppercase">Cancel</button>
-              <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-black uppercase shadow-sm">Save Policy</button>
+              <button type="submit" className="px-6 py-2 bg-teal-600 text-white rounded-lg text-sm font-black uppercase shadow-sm">Save Policy</button>
             </div>
         </form>
       </DraggableModal>
