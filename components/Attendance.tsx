@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar } from 'lucide-react';
+import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -31,6 +31,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentTime, setCurrentTime] = useState(new Date());
   
+  // Date Filtering State
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [filterStartDate, setFilterStartDate] = useState(formatDateISO(firstDayOfMonth));
+  const [filterEndDate, setFilterEndDate] = useState(formatDateISO(today));
+
   const [showEarlyReasonModal, setShowEarlyReasonModal] = useState(false);
   const [showTimeLogModal, setShowTimeLogModal] = useState(false);
   const [pendingCheckoutAction, setPendingCheckoutAction] = useState<'normal' | 'early' | null>(null);
@@ -149,11 +155,34 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       setShowEditModal(false);
   };
 
+  const filteredRecords = useMemo(() => {
+    let filtered = [...records];
+    
+    // Role based filtering
+    if (!isHR && currentUser) {
+      filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
+    }
+
+    // Date range filtering
+    if (filterStartDate) {
+      filtered = filtered.filter(r => r.date >= filterStartDate);
+    }
+    if (filterEndDate) {
+      filtered = filtered.filter(r => r.date <= filterEndDate);
+    }
+
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [records, isHR, currentUser, filterStartDate, filterEndDate]);
+
   const paginatedRecords = useMemo(() => {
-    let filtered = records;
-    if (!isHR && currentUser) filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [records, isHR, currentUser, currentPage, itemsPerPage]);
+    return filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredRecords, currentPage, itemsPerPage]);
+
+  const resetFilters = () => {
+    setFilterStartDate(formatDateISO(firstDayOfMonth));
+    setFilterEndDate(formatDateISO(today));
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -194,6 +223,40 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Total Logged</span><span className="text-sm font-black text-teal-600 dark:text-teal-400">{calculateDuration(todayRecord || {id: 0, employeeId: 0, employeeName: '', date: '', checkIn: '', checkOut: '', status: 'Absent'})}</span></div>
             </div>
          </div>
+      </div>
+
+      {/* Date Range Filter Bar */}
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full">
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                    <Calendar size={12} /> From Date
+                  </label>
+                  <input 
+                    type="date" 
+                    value={filterStartDate} 
+                    onChange={e => { setFilterStartDate(e.target.value); setCurrentPage(1); }}
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                  />
+              </div>
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                    <Calendar size={12} /> To Date
+                  </label>
+                  <input 
+                    type="date" 
+                    value={filterEndDate} 
+                    onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }}
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                  />
+              </div>
+          </div>
+          <button 
+            onClick={resetFilters}
+            className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg"
+          >
+              <RotateCcw size={14} /> Reset
+          </button>
       </div>
 
       {/* Records Table */}
@@ -281,6 +344,31 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Logic Integrated */}
+        {filteredRecords.length > itemsPerPage && (
+          <div className="px-8 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Showing {(currentPage-1)*itemsPerPage + 1} to {Math.min(currentPage*itemsPerPage, filteredRecords.length)} of {filteredRecords.length} logs
+              </p>
+              <div className="flex gap-2">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                    className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 disabled:opacity-30 hover:text-teal-600 transition-colors shadow-sm"
+                  >
+                      <ChevronLeft size={16} />
+                  </button>
+                  <button 
+                    disabled={currentPage * itemsPerPage >= filteredRecords.length}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 disabled:opacity-30 hover:text-teal-600 transition-colors shadow-sm"
+                  >
+                      <ChevronRight size={16} />
+                  </button>
+              </div>
+          </div>
+        )}
       </div>
 
       {/* Manual Edit Modal */}

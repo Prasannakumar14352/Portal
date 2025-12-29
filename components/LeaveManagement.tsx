@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame
+  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -107,7 +107,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   });
 
   const [typeData, setTypeData] = useState({
-    name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600'
+    name: '', days: 10, description: '', isActive: true, color: 'text-teal-600'
   });
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
@@ -308,7 +308,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><BookOpen className="text-teal-600" /> Organizational Leave Policies</h3>
             {isHR && (
-              <button onClick={() => { setEditingType(null); setTypeData({ name: '', days: 10, description: '', isActive: true, color: 'text-emerald-600' }); setShowTypeModal(true); }} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-4 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-white hover:bg-slate-50 flex items-center gap-2 shadow-sm transition-all"><Plus size={16} /> Add Leave Type</button>
+              <button onClick={() => { setEditingType(null); setTypeData({ name: '', days: 10, description: '', isActive: true, color: 'text-teal-600' }); setShowTypeModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 flex items-center gap-2 shadow-sm transition-all"><Plus size={16} /> Add Leave Type</button>
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -319,8 +319,9 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                       <CalendarDays size={24} />
                     </div>
                     {isHR && (
-                      <div className="flex gap-1">
-                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg"><Info size={16}/></button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Edit2 size={16}/></button>
+                        <button onClick={() => { if(window.confirm('Delete this policy permanently?')) deleteLeaveType(type.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={16}/></button>
                       </div>
                     )}
                   </div>
@@ -470,14 +471,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         <form onSubmit={handleTypeSubmit} className="space-y-4">
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Type Name</label><input required type="text" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.name} onChange={e => setTypeData({...typeData, name: e.target.value})} placeholder="e.g. Wellness Break" /></div>
             <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Annual Allowance (Days)</label><input required type="number" className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.days} onChange={e => setTypeData({...typeData, days: parseInt(e.target.value)})} /></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea required rows={2} className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none" value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Eligibility details..." /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea required rows={2} className="w-full border rounded-xl p-3 text-sm dark:bg-slate-700 dark:text-white outline-none value={typeData.description} onChange={e => setTypeData({...typeData, description: e.target.value})} placeholder="Eligibility details..." /></div>
             <div className="flex items-center gap-2 py-2">
               <input type="checkbox" id="active-check" checked={typeData.isActive} onChange={e => setTypeData({...typeData, isActive: e.target.checked})} className="w-4 h-4 text-teal-600 rounded border-slate-300" />
               <label htmlFor="active-check" className="text-xs font-bold text-slate-600 dark:text-slate-300">Visible to Employees</label>
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
               <button type="button" onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-slate-500 text-sm font-bold uppercase">Cancel</button>
-              <button type="submit" className="px-6 py-2 bg-teal-600 text-white rounded-lg text-sm font-black uppercase shadow-sm">Save Policy</button>
+              <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-black uppercase shadow-sm">Save Policy</button>
             </div>
         </form>
       </DraggableModal>

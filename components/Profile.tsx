@@ -68,6 +68,9 @@ const Profile = () => {
     });
     if (user.location) {
       setLocation({ lat: user.location.latitude, lng: user.location.longitude });
+    } else {
+        // Default to a central location if none exists
+        setLocation({ lat: 20.5937, lng: 78.9629 });
     }
   };
 
@@ -80,7 +83,6 @@ const Profile = () => {
 
   // Permission logic
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
-  
   const canEditAdminFields = isEditMode && isHR;
   const canEditPersonalFields = isEditMode;
 
@@ -140,24 +142,29 @@ const Profile = () => {
 
           const marker = new Graphic({
             geometry: { type: "point", longitude: location.lng, latitude: location.lat },
-            symbol: { type: "simple-marker", color: [13, 148, 136], size: "12px", outline: { color: [255, 255, 255], width: 2 } }
+            symbol: { 
+                type: "simple-marker", 
+                color: [13, 148, 136], 
+                size: "14px", 
+                outline: { color: [255, 255, 255], width: 3 } 
+            }
           });
           markerRef.current = marker;
           layer.add(marker);
 
-          // Interactive Logic for Location Selection
+          // Interactive Selection
           view.on("click", async (event: any) => {
-            // Only allow interaction in Edit Mode
-            if (!viewRef.current.container.parentElement.classList.contains('map-editing')) return;
+            // Use current local state ref to check editing status
+            if (!mapDiv.current?.classList.contains('map-editing')) return;
 
             const lat = event.mapPoint.latitude;
             const lng = event.mapPoint.longitude;
 
-            // Move Marker
+            // Visual Update
             markerRef.current.geometry = event.mapPoint;
             setLocation({ lat, lng });
 
-            // Reverse Geocode to get address
+            // Reverse Geocode
             try {
               const response = await locator.locationToAddress("https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer", {
                 location: event.mapPoint
@@ -166,25 +173,24 @@ const Profile = () => {
                 setFormData(prev => ({ ...prev, address: response.address }));
               }
             } catch (err) {
-              console.warn("Reverse geocode failed", err);
+              console.warn("Geocoding failed", err);
             }
           });
 
           view.when(() => setIsMapLoaded(true));
         });
-      } catch (e) { console.error("Map failed", e); }
+      } catch (e) { console.error("ArcGIS Error", e); }
     };
 
     if (!viewRef.current) initMap();
     
     return () => { cleanup = true; };
-  }, [location]);
+  }, [location === null]); // Only run on first location set
 
-  // Sync marker position when location state changes externally or via map click
+  // Sync marker position when location changes (including initial load)
   useEffect(() => {
-    if (markerRef.current && location) {
+    if (markerRef.current && location && viewRef.current) {
       markerRef.current.geometry = { type: "point", longitude: location.lng, latitude: location.lat };
-      if (viewRef.current) viewRef.current.center = [location.lng, location.lat];
     }
   }, [location]);
 
@@ -212,23 +218,25 @@ const Profile = () => {
             hireDate: formData.hireDate,
             bio: formData.bio
         } as any;
+        
         if (location) {
-            updates.location = { latitude: location.lat, longitude: location.lng, address: formData.address };
+            updates.location = { 
+                latitude: location.lat, 
+                longitude: location.lng, 
+                address: formData.address 
+            };
         }
+        
         await updateUser(profileUser.id, updates);
-        showToast("Profile updated successfully", "success");
+        showToast("Profile records synchronized", "success");
         setIsEditMode(false);
     } catch (err) {
-        showToast("Failed to update profile", "error");
+        showToast("Error updating profile", "error");
     } finally {
         setIsSaving(false);
         setShowConfirm(false);
     }
   };
-
-  if (!profileUser) return (
-    <div className="h-96 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div></div>
-  );
 
   const InputField = ({ label, icon: Icon, value, onChange, disabled, type = "text", placeholder = "" }: any) => (
     <div className="space-y-1.5">
@@ -250,11 +258,10 @@ const Profile = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
       
-      {/* Header Area */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">My Profile</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">View and manage your personal employment record.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Manage your personal and professional identity.</p>
         </div>
         <div className="flex gap-3">
           {!isEditMode ? (
@@ -263,7 +270,7 @@ const Profile = () => {
               className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-3 rounded-2xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all active:scale-95"
             >
               <Edit3 size={18} />
-              <span>Edit Profile</span>
+              <span>Modify Details</span>
             </button>
           ) : (
             <>
@@ -280,7 +287,7 @@ const Profile = () => {
                 className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-teal-500/20 transition-all active:scale-95 disabled:opacity-50"
               >
                 {isSaving ? <Clock className="animate-spin" size={18} /> : <Save size={18} />}
-                <span>Save Changes</span>
+                <span>Confirm & Save</span>
               </button>
             </>
           )}
@@ -289,17 +296,16 @@ const Profile = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Left Column */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 flex flex-col items-center text-center">
             <div className="relative group mb-6">
-                <div className={`w-32 h-32 rounded-full border-4 ${isEditMode ? 'border-teal-500/30 animate-pulse' : 'border-white dark:border-slate-900'} shadow-2xl overflow-hidden bg-slate-100 dark:bg-slate-700`}>
+                <div className={`w-32 h-32 rounded-full border-4 ${isEditMode ? 'border-teal-500/50 scale-105' : 'border-white dark:border-slate-900'} shadow-2xl overflow-hidden bg-slate-100 dark:bg-slate-700 transition-all`}>
                     <img src={formData.avatar} alt="" className="w-full h-full object-cover" />
                 </div>
                 {isEditMode && (
                   <button 
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute bottom-1 right-1 bg-teal-600 text-white p-2.5 rounded-full shadow-lg hover:bg-teal-700 transition-transform hover:scale-110 active:scale-95"
+                      className="absolute bottom-1 right-1 bg-teal-600 text-white p-2.5 rounded-full shadow-lg hover:bg-teal-700 transition-transform hover:scale-110 active:scale-95 z-10"
                   >
                       <Camera size={18} />
                   </button>
@@ -312,61 +318,57 @@ const Profile = () => {
             
             <div className="flex flex-wrap justify-center gap-2 mb-6">
                 <span className="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-[10px] font-black uppercase tracking-tighter border border-slate-200 dark:border-slate-600">{profileUser.role}</span>
-                <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-tighter border border-emerald-100 dark:border-emerald-800">Active</span>
+                <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-tighter border border-emerald-100 dark:border-emerald-800">Verified</span>
             </div>
 
             <div className="w-full space-y-4 pt-6 border-t border-slate-100 dark:border-slate-700 text-left">
                 <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Mail size={16} /><span className="text-sm font-medium truncate">{formData.email}</span></div>
-                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Hash size={16} /><span className="text-sm font-medium">ID: {profileUser.employeeId}</span></div>
+                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Hash size={16} /><span className="text-sm font-medium">EMP ID: {profileUser.employeeId}</span></div>
                 <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Calendar size={16} /><span className="text-sm font-medium">Joined {new Date(formData.hireDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span></div>
             </div>
           </div>
 
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                <h4 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2"><Globe size={16} className="text-teal-600" /> Location</h4>
-                {isEditMode && <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded animate-pulse uppercase tracking-wider">Click map to set</span>}
+                <h4 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2"><Globe size={16} className="text-teal-600" /> Work Location</h4>
+                {isEditMode && <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full animate-pulse uppercase tracking-widest border border-emerald-100">Interactive Selection Active</span>}
             </div>
-            <div className={`h-48 relative bg-slate-50 dark:bg-slate-900 ${isEditMode ? 'map-editing cursor-crosshair ring-2 ring-inset ring-teal-500/20' : ''}`}>
-                <div ref={mapDiv} className="w-full h-full"></div>
-                {!isMapLoaded && <div className="absolute inset-0 flex items-center justify-center"><span className="text-[10px] font-bold text-slate-400 animate-pulse">Loading Map...</span></div>}
-                {isEditMode && isMapLoaded && (
-                  <div className="absolute top-2 left-2 z-10 bg-teal-600 text-white px-2 py-1 rounded shadow-lg text-[9px] font-bold uppercase pointer-events-none">
-                    Select New Location
-                  </div>
-                )}
+            <div 
+              ref={mapDiv} 
+              className={`h-48 relative bg-slate-50 dark:bg-slate-900 transition-all ${isEditMode ? 'map-editing cursor-crosshair ring-2 ring-inset ring-teal-500/20' : ''}`}
+            >
+                {!isMapLoaded && <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-800 z-20"><span className="text-[10px] font-bold text-slate-400 animate-pulse">Initializing Maps...</span></div>}
             </div>
             <div className="p-5">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Registered Address</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Registered Address</p>
                 <div className="flex gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <MapPin size={16} className="shrink-0 mt-0.5 text-teal-600" />
-                    <p className="leading-relaxed font-medium">{formData.address || 'No address provided'}</p>
+                    <p className="leading-relaxed font-medium text-xs">{formData.address || 'No address provided'}</p>
                 </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column */}
         <div className="lg:col-span-8 space-y-8">
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
                 <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400"><UserIcon size={20} /></div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Personal Information</h3>
-                    {!isEditMode && <span className="ml-auto text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded uppercase tracking-widest">Read Only</span>}
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Profile Context</h3>
+                    {!isEditMode && <span className="ml-auto text-[9px] font-black text-slate-400 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full uppercase tracking-widest">Locked Profile</span>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputField label="Full Name" icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} disabled={!canEditAdminFields} />
-                    <InputField label="Contact Number" icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} placeholder="+1 (555) 000-0000" disabled={!canEditPersonalFields} />
+                    <InputField label="Official Name" icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} disabled={!canEditAdminFields} />
+                    <InputField label="Direct Contact" icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} placeholder="+1 (555) 000-0000" disabled={!canEditPersonalFields} />
                     <div className="md:col-span-2 space-y-1.5">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">About Me (Bio)</label>
-                        <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20'}`}>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Professional Bio</label>
+                        <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20 shadow-sm'}`}>
                             <AlignLeft size={18} className="text-slate-400 mt-0.5" />
                             <textarea 
                                 rows={3}
                                 disabled={!canEditPersonalFields}
                                 value={formData.bio}
                                 onChange={e => setFormData({...formData, bio: e.target.value})}
-                                placeholder="Tell us about yourself..."
+                                placeholder="Describe your expertise and current focus..."
                                 className="w-full bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-200 placeholder-slate-400 resize-none"
                             />
                         </div>
@@ -377,68 +379,54 @@ const Profile = () => {
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
                 <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl text-emerald-600 dark:text-emerald-400"><Briefcase size={20} /></div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Employment & Work</h3>
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Organization & Role</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputField label="Job Title / Position" icon={UserSquare} value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} disabled={!canEditAdminFields} />
+                    <InputField label="Job Title" icon={UserSquare} value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} disabled={!canEditAdminFields} />
                     <div className="space-y-1.5">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Department</label>
-                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!canEditAdminFields ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20'}`}>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Department</label>
+                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!canEditAdminFields ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20 shadow-sm'}`}>
                             <Building2 size={18} className={!canEditAdminFields ? 'text-slate-300' : 'text-slate-400'} />
                             <select 
                                 disabled={!canEditAdminFields}
                                 value={formData.departmentId}
                                 onChange={e => setFormData({...formData, departmentId: e.target.value})}
-                                className="w-full bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-200"
+                                className="w-full bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-200 appearance-none"
                             >
-                                <option value="">Select Department</option>
+                                <option value="">General Allocation</option>
                                 {departments.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                             </select>
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Work Preferences</label>
-                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20'}`}>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Working Model</label>
+                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20 shadow-sm'}`}>
                             <Clock size={18} className="text-slate-400" />
                             <select 
                                 disabled={!isEditMode}
                                 value={formData.workLocation}
                                 onChange={e => setFormData({...formData, workLocation: e.target.value})}
-                                className="w-full bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-200"
+                                className="w-full bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-slate-200 appearance-none"
                             >
                                 {WORK_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
                             </select>
                         </div>
                     </div>
-                    <InputField label="Joining Date" icon={Calendar} type="date" value={formData.hireDate} onChange={(v: string) => setFormData({...formData, hireDate: v})} disabled={!canEditAdminFields} />
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-amber-50 dark:bg-amber-900/30 rounded-xl text-amber-600 dark:text-amber-400"><MapPin size={20} /></div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Location Details</h3>
-                </div>
-                <div className="grid grid-cols-1 gap-6">
-                    <InputField label="Primary Address" icon={MapPin} value={formData.address} onChange={(v: string) => setFormData({...formData, address: v})} disabled={!canEditPersonalFields} placeholder="123 Corporate Blvd, Tech City" />
-                    <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-start gap-4">
-                        <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-                        <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">Location updates are monitored for attendance verification purposes. {isEditMode ? 'You can click on the map to automatically set your address.' : 'Please ensure your primary work address is correct.'}</p>
-                    </div>
+                    <InputField label="Corporate Join Date" icon={Calendar} type="date" value={formData.hireDate} onChange={(v: string) => setFormData({...formData, hireDate: v})} disabled={!canEditAdminFields} />
                 </div>
             </div>
         </div>
       </div>
 
-      <DraggableModal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Update Profile?" width="max-w-md">
+      <DraggableModal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Validate Record Updates" width="max-w-md">
           <div className="text-center py-4">
-              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-100 dark:border-emerald-800"><BadgeCheck className="text-emerald-600" size={32} /></div>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Review Changes</h3>
-              <p className="text-slate-500 text-sm px-4">Are you sure you want to save these changes? Administrative details will be audited.</p>
+              <div className="w-16 h-16 bg-teal-50 dark:bg-teal-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-teal-100 dark:border-teal-800 shadow-sm"><BadgeCheck className="text-teal-600" size={32} /></div>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Sync Profile Records</h3>
+              <p className="text-slate-500 text-sm px-4 leading-relaxed font-medium">Saving these changes will update your official employment record and synchronize your location coordinates for internal tracking.</p>
           </div>
           <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
-              <button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest">Go Back</button>
-              <button onClick={confirmSave} className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95">Yes, Update</button>
+              <button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-colors">Discard</button>
+              <button onClick={confirmSave} className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition-all">Save Changes</button>
           </div>
       </DraggableModal>
     </div>
