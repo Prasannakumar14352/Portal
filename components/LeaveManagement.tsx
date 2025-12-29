@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User } from '../types';
+import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
   Upload, Paperclip, CheckSquare, Search, Edit2, Calendar as CalendarIcon, 
   List, Settings, Trash2, Plus, Calendar, CheckCircle, XCircle, Users, AlertTriangle, Flame, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, X, CheckCheck, PieChart, Layers, Filter, UserCheck, BookOpen
@@ -103,7 +103,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [editingType, setEditingType] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    type: '', startDate: '', endDate: '', reason: '', notifyUserIds: [], approverId: '', isUrgent: false
+    type: '', startDate: '', endDate: '', durationType: 'Full Day' as LeaveDurationType, reason: '', notifyUserIds: [], approverId: '', isUrgent: false
   });
 
   const [typeData, setTypeData] = useState({
@@ -119,8 +119,9 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     );
   }, [users, currentUser]);
 
-  const getDaysDiff = (start: string, end: string) => {
+  const getDaysDiff = (start: string, end: string, durationType: LeaveDurationType = 'Full Day') => {
     if (!start || !end) return 0;
+    if (durationType === 'Half Day') return 0.5;
     const s = new Date(start);
     const e = new Date(end);
     const diffTime = e.getTime() - s.getTime();
@@ -130,7 +131,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const getBalance = (typeName: string, limit: number) => {
     const used = leaves
       .filter(l => String(l.userId) === String(currentUser?.id) && l.type === typeName && l.status === LeaveStatusEnum.APPROVED)
-      .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate), 0);
+      .reduce((acc, l) => acc + getDaysDiff(l.startDate, l.endDate, l.durationType), 0);
     return Math.max(0, limit - used);
   };
 
@@ -138,7 +139,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     setIsEditing(null);
     setFormData({ 
       type: leaveTypes.filter(t => t.isActive)[0]?.name || '', 
-      startDate: '', endDate: '', reason: '', notifyUserIds: [], 
+      startDate: '', endDate: '', durationType: 'Full Day', reason: '', notifyUserIds: [], 
       approverId: String(currentUser?.managerId || ''), isUrgent: false
     });
     setShowModal(true);
@@ -153,8 +154,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   const handleLeaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEditing) editLeave(isEditing, formData);
-    else addLeave(formData);
+    const finalData = {
+        ...formData,
+        endDate: formData.durationType === 'Half Day' ? formData.startDate : formData.endDate
+    };
+    if (isEditing) editLeave(isEditing, finalData);
+    else addLeave(finalData);
     setShowModal(false);
   };
 
@@ -198,8 +203,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                       <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-sm">{leave.userName}</td>
                       <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400 text-xs uppercase">{leave.type}</td>
-                      <td className="px-6 py-4 font-mono text-[10px] text-slate-500">{leave.startDate} to {leave.endDate}</td>
-                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">{getDaysDiff(leave.startDate, leave.endDate)} Days</td>
+                      <td className="px-6 py-4 font-mono text-[10px] text-slate-500">
+                        {leave.durationType === 'Half Day' ? leave.startDate : `${leave.startDate} to ${leave.endDate}`}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">{getDaysDiff(leave.startDate, leave.endDate, leave.durationType)} Days {leave.durationType === 'Half Day' && <span className="ml-1 text-[8px] font-black uppercase bg-amber-50 text-amber-600 px-1 py-0.5 rounded border border-amber-100">Half</span>}</td>
                       <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
                     </tr>
                   ))}
@@ -286,9 +293,37 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">From Date</label><input required type="date" className="w-full border rounded-xl px-4 py-2.5 text-sm dark:bg-slate-700 dark:text-white font-bold outline-none" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} /></div>
-              <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">To Date</label><input required type="date" className="w-full border rounded-xl px-4 py-2.5 text-sm dark:bg-slate-700 dark:text-white font-bold outline-none" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} /></div>
+            <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Duration Type</label>
+                <div className="grid grid-cols-2 gap-3">
+                    <button 
+                        type="button" 
+                        onClick={() => setFormData({...formData, durationType: 'Full Day'})}
+                        className={`py-2.5 rounded-xl text-xs font-black uppercase transition-all border ${formData.durationType === 'Full Day' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
+                    >
+                        Full Day
+                    </button>
+                    <button 
+                        type="button" 
+                        onClick={() => setFormData({...formData, durationType: 'Half Day'})}
+                        className={`py-2.5 rounded-xl text-xs font-black uppercase transition-all border ${formData.durationType === 'Half Day' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
+                    >
+                        Half Day
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-500 uppercase ml-1">{formData.durationType === 'Half Day' ? 'Request Date' : 'From Date'}</label>
+                <input required type="date" className="w-full border rounded-xl px-4 py-2.5 text-sm dark:bg-slate-700 dark:text-white font-bold outline-none" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+              </div>
+              {formData.durationType === 'Full Day' && (
+                  <div className="space-y-1.5 animate-in fade-in slide-in-from-right-1 duration-200">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase ml-1">To Date</label>
+                    <input required type="date" className="w-full border rounded-xl px-4 py-2.5 text-sm dark:bg-slate-700 dark:text-white font-bold outline-none" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                  </div>
+              )}
             </div>
 
             <div><label className="block text-[10px] font-black text-slate-500 uppercase ml-1">Reason for Absence</label><textarea required rows={3} className="w-full border rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Why are you taking leave?"></textarea></div>

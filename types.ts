@@ -103,6 +103,8 @@ export enum LeaveStatus {
   REJECTED = 'Rejected'
 }
 
+export type LeaveDurationType = 'Full Day' | 'Half Day';
+
 export interface LeaveRequest {
   id: string | number;
   userId: string | number;
@@ -110,6 +112,7 @@ export interface LeaveRequest {
   type: string;
   startDate: string;
   endDate: string;
+  durationType?: LeaveDurationType;
   reason: string;
   status: LeaveStatus;
   attachmentUrl?: string;
