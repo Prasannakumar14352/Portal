@@ -293,115 +293,69 @@ apiRouter.delete('/employees/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.get('/departments', async (req, res) => {
+// --- ATTENDANCE ---
+apiRouter.get('/attendance', async (req, res) => {
     try {
-        const result = await pool.request().query("SELECT * FROM departments");
+        const result = await pool.request().query("SELECT * FROM attendance");
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.post('/departments', async (req, res) => {
+apiRouter.post('/attendance', async (req, res) => {
     try {
-        const d = req.body;
+        const a = req.body;
         const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(d.id));
-        request.input('name', sql.NVarChar, toStr(d.name));
-        request.input('description', sql.NVarChar, toStr(d.description));
-        request.input('managerId', sql.NVarChar, toStr(d.managerId));
-        await request.query("INSERT INTO departments (id, name, description, managerId) VALUES (@id, @name, @description, @managerId)");
+        request.input('id', sql.NVarChar, toStr(a.id));
+        request.input('employeeId', sql.NVarChar, toStr(a.employeeId));
+        request.input('employeeName', sql.NVarChar, toStr(a.employeeName));
+        request.input('date', sql.NVarChar, toStr(a.date));
+        request.input('checkIn', sql.NVarChar, toStr(a.checkIn));
+        request.input('checkOut', sql.NVarChar, toStr(a.checkOut));
+        request.input('checkInTime', sql.NVarChar, toStr(a.checkInTime));
+        request.input('checkOutTime', sql.NVarChar, toStr(a.checkOutTime));
+        request.input('status', sql.NVarChar, toStr(a.status));
+        request.input('notes', sql.NVarChar, toStr(a.notes));
+        request.input('workLocation', sql.NVarChar, toStr(a.workLocation));
+        await request.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.put('/departments/:id', async (req, res) => {
+apiRouter.put('/attendance/:id', async (req, res) => {
     try {
-        const d = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('name', sql.NVarChar, toStr(d.name));
-        request.input('description', sql.NVarChar, toStr(d.description));
-        request.input('managerId', sql.NVarChar, toStr(d.managerId));
-        await request.query("UPDATE departments SET name=@name, description=@description, managerId=@managerId WHERE id=@id");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.delete('/departments/:id', async (req, res) => {
-    try {
+        const a = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(req.params.id));
-        await request.query("DELETE FROM departments WHERE id=@id");
+        request.input('employeeId', sql.NVarChar, toStr(a.employeeId));
+        request.input('employeeName', sql.NVarChar, toStr(a.employeeName));
+        request.input('date', sql.NVarChar, toStr(a.date));
+        request.input('checkIn', sql.NVarChar, toStr(a.checkIn));
+        request.input('checkOut', sql.NVarChar, toStr(a.checkOut));
+        request.input('checkInTime', sql.NVarChar, toStr(a.checkInTime));
+        request.input('checkOutTime', sql.NVarChar, toStr(a.checkOutTime));
+        request.input('status', sql.NVarChar, toStr(a.status));
+        request.input('notes', sql.NVarChar, toStr(a.notes));
+        request.input('workLocation', sql.NVarChar, toStr(a.workLocation));
+        await request.query(`UPDATE attendance SET 
+            employeeId=@employeeId, employeeName=@employeeName, date=@date, 
+            checkIn=@checkIn, checkOut=@checkOut, checkInTime=@checkInTime, 
+            checkOutTime=@checkOutTime, status=@status, notes=@notes, 
+            workLocation=@workLocation 
+            WHERE id=@id`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.get('/projects', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM projects");
-        res.json(result.recordset.map(p => ({ ...p, tasks: parseJSON(p.tasks) || [] })));
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/projects', async (req, res) => {
-    try {
-        const p = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(p.id));
-        request.input('name', sql.NVarChar, toStr(p.name));
-        request.input('description', sql.NVarChar, toStr(p.description));
-        request.input('status', sql.NVarChar, toStr(p.status));
-        request.input('tasks', sql.NVarChar, JSON.stringify(p.tasks || []));
-        request.input('dueDate', sql.NVarChar, toStr(p.dueDate));
-        await request.query("INSERT INTO projects (id, name, description, status, tasks, dueDate) VALUES (@id, @name, @description, @status, @tasks, @dueDate)");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.put('/projects/:id', async (req, res) => {
-    try {
-        const p = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(req.params.id));
-        request.input('name', sql.NVarChar, toStr(p.name));
-        request.input('description', sql.NVarChar, toStr(p.description));
-        request.input('status', sql.NVarChar, toStr(p.status));
-        request.input('tasks', sql.NVarChar, JSON.stringify(p.tasks || []));
-        await request.query("UPDATE projects SET name=@name, description=@description, status=@status, tasks=@tasks WHERE id=@id");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.delete('/projects/:id', async (req, res) => {
+apiRouter.delete('/attendance/:id', async (req, res) => {
     try {
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(req.params.id));
-        await request.query("DELETE FROM projects WHERE id=@id");
+        await request.query("DELETE FROM attendance WHERE id=@id");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.get('/leave_types', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM leave_types");
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/leave_types', async (req, res) => {
-    try {
-        const t = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(t.id));
-        request.input('name', sql.NVarChar, toStr(t.name));
-        request.input('days', sql.Int, toInt(t.days));
-        request.input('description', sql.NVarChar, toStr(t.description));
-        request.input('isActive', sql.Bit, t.isActive ? 1 : 0);
-        request.input('color', sql.NVarChar, toStr(t.color));
-        await request.query("INSERT INTO leave_types (id, name, days, description, isActive, color) VALUES (@id, @name, @days, @description, @isActive, @color)");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
+// --- LEAVES ---
 apiRouter.get('/leaves', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM leaves");
@@ -431,33 +385,20 @@ apiRouter.post('/leaves', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.get('/attendance', async (req, res) => {
+apiRouter.put('/leaves/:id', async (req, res) => {
     try {
-        const result = await pool.request().query("SELECT * FROM attendance");
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/attendance', async (req, res) => {
-    try {
-        const a = req.body;
+        const l = req.body;
         const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(a.id));
-        request.input('employeeId', sql.NVarChar, toStr(a.employeeId));
-        request.input('employeeName', sql.NVarChar, toStr(a.employeeName));
-        request.input('date', sql.NVarChar, toStr(a.date));
-        request.input('checkIn', sql.NVarChar, toStr(a.checkIn));
-        request.input('checkOut', sql.NVarChar, toStr(a.checkOut));
-        request.input('checkInTime', sql.NVarChar, toStr(a.checkInTime));
-        request.input('checkOutTime', sql.NVarChar, toStr(a.checkOutTime));
-        request.input('status', sql.NVarChar, toStr(a.status));
-        request.input('notes', sql.NVarChar, toStr(a.notes));
-        request.input('workLocation', sql.NVarChar, toStr(a.workLocation));
-        await request.query("INSERT INTO attendance (id, employeeId, employeeName, date, checkIn, checkOut, checkInTime, checkOutTime, status, notes, workLocation) VALUES (@id, @employeeId, @employeeName, @date, @checkIn, @checkOut, @checkInTime, @checkOutTime, @status, @notes, @workLocation)");
+        request.input('id', sql.NVarChar, toStr(req.params.id));
+        request.input('status', sql.NVarChar, toStr(l.status));
+        request.input('managerComment', sql.NVarChar, toStr(l.managerComment));
+        request.input('hrComment', sql.NVarChar, toStr(l.hrComment));
+        await request.query("UPDATE leaves SET status=@status, managerComment=@managerComment, hrComment=@hrComment WHERE id=@id");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- TIME ENTRIES ---
 apiRouter.get('/time_entries', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM time_entries");
@@ -479,12 +420,38 @@ apiRouter.post('/time_entries', async (req, res) => {
         request.input('description', sql.NVarChar, toStr(t.description));
         request.input('status', sql.NVarChar, toStr(t.status));
         request.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
-        request.input('isExtra', sql.Bit, (toInt(t.extraMinutes) > 0) ? 1 : 0);
-        await request.query("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, extraMinutes, description, status, isBillable, isExtra) VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @extraMinutes, @description, @status, @isBillable, @isExtra)");
+        await request.query("INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, extraMinutes, description, status, isBillable) VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @extraMinutes, @description, @status, @isBillable)");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+apiRouter.put('/time_entries/:id', async (req, res) => {
+    try {
+        const t = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(req.params.id));
+        request.input('projectId', sql.NVarChar, toStr(t.projectId));
+        request.input('task', sql.NVarChar, toStr(t.task));
+        request.input('date', sql.NVarChar, toStr(t.date));
+        request.input('durationMinutes', sql.Int, toInt(t.durationMinutes));
+        request.input('extraMinutes', sql.Int, toInt(t.extraMinutes));
+        request.input('description', sql.NVarChar, toStr(t.description));
+        request.input('isBillable', sql.Bit, t.isBillable ? 1 : 0);
+        await request.query("UPDATE time_entries SET projectId=@projectId, task=@task, date=@date, durationMinutes=@durationMinutes, extraMinutes=@extraMinutes, description=@description, isBillable=@isBillable WHERE id=@id");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.delete('/time_entries/:id', async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(req.params.id));
+        await request.query("DELETE FROM time_entries WHERE id=@id");
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- HOLIDAYS ---
 apiRouter.get('/holidays', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM holidays");
@@ -505,41 +472,11 @@ apiRouter.post('/holidays', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.get('/payslips', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM payslips");
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/payslips', async (req, res) => {
-    try {
-        const p = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(p.id));
-        request.input('userId', sql.NVarChar, toStr(p.userId));
-        request.input('userName', sql.NVarChar, toStr(p.userName));
-        request.input('month', sql.NVarChar, toStr(p.month));
-        request.input('amount', sql.Float, toFloat(p.amount));
-        request.input('status', sql.NVarChar, toStr(p.status));
-        request.input('generatedDate', sql.NVarChar, toStr(p.generatedDate));
-        await request.query("INSERT INTO payslips (id, userId, userName, month, amount, status, generatedDate) VALUES (@id, @userId, @userName, @month, @amount, @status, @generatedDate)");
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.get('/notifications', async (req, res) => {
-    try {
-        const result = await pool.request().query("SELECT * FROM notifications");
-        res.json(result.recordset);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.put('/notifications/:id/read', async (req, res) => {
+apiRouter.delete('/holidays/:id', async (req, res) => {
     try {
         const request = pool.request();
         request.input('id', sql.NVarChar, toStr(req.params.id));
-        await request.query("UPDATE notifications SET [read] = 1 WHERE id = @id");
+        await request.query("DELETE FROM holidays WHERE id=@id");
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
