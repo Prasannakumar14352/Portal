@@ -300,9 +300,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     setIsInteracting(true);
     try {
-        // Ensure any previous interaction is cleaned up
         await instance.handleRedirectPromise();
-
         const result = await instance.loginPopup(loginRequest);
         if (result && result.account) {
             const ok = await processAzureLogin(result.account, result.accessToken);
@@ -313,17 +311,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return false;
     } catch (error: any) { 
         setIsInteracting(false);
-        console.error("MS Login Error Detail:", error); 
-        
-        // Specific handling for 'interaction_in_progress' to prevent 'user_cancelled' cascading
         if (error instanceof BrowserAuthError && error.errorCode === "interaction_in_progress") {
-            showToast("A sign-in window is already open. Please complete or close it.", "warning");
+            showToast("A sign-in window is already open.", "warning");
         } else if (error instanceof BrowserAuthError && error.errorCode === "user_cancelled") {
-            showToast("Sign-in was cancelled.", "info");
-        } else if (error.message && error.message.includes("popup_window_error")) {
-            showToast("Popup blocked by browser. Please enable popups and try again.", "error");
+            showToast("Sign-in cancelled.", "info");
         } else {
-            showToast("Microsoft Sign-In failed: " + (error.message || "Please check your network."), "error");
+            showToast("Microsoft Sign-In failed.", "error");
         }
         return false;
     }
@@ -332,36 +325,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const syncAzureUsers = async () => {
     if (!msalInstance || !currentUser) return;
     try {
-      showToast("Acquiring directory token...", "info");
       const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
       if (!account) return;
       const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.Read.All"], account: account });
       const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
       
-      showToast(`Synchronizing directory...`, "info");
       const currentEmployees = await db.getEmployees();
-      let currentPos = await db.getPositions();
       const currentDepts = await db.getDepartments();
       const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
       let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-
-      let updatedCount = 0;
-      let createdCount = 0;
 
       for (const au of azureUsers) {
         const email = (au.mail || au.userPrincipalName).toLowerCase();
         const azureJobTitle = au.jobTitle || 'Team Member';
         const mappedSystemRole = getSystemRole(azureJobTitle);
         const azureEmpId = String(au.employeeId || '');
-        
         const azureDeptName = au.department || 'General';
         const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
         const mappedDeptId = matchedDept ? matchedDept.id : '';
         const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
 
-        currentPos = await ensurePositionExists(azureJobTitle, currentPos) || currentPos;
         const existingEmp = currentEmployees.find(e => e.email.toLowerCase() === email);
-
         if (existingEmp) {
           const updates: Partial<Employee> = {};
           if (existingEmp.position !== azureJobTitle) {
@@ -376,7 +360,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           if (Object.keys(updates).length > 0) {
             await db.updateEmployee({ ...existingEmp, ...updates });
-            updatedCount++;
           }
         } else {
           const finalEmpId = azureEmpId || `AZ-${nextId}`;
@@ -391,13 +374,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           };
           await db.addEmployee(newEmp);
           nextId++;
-          createdCount++;
         }
       }
       await refreshData();
-      showToast(`Sync complete! ${createdCount} new, ${updatedCount} updated.`, "success");
+      showToast(`Sync complete.`, "success");
     } catch (err: any) {
-      console.error("Azure Sync Error:", err);
       showToast("Azure sync failed.", "error");
     }
   };
@@ -414,7 +395,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updated = [...invitations, newInvitation];
     setInvitations(updated);
     localStorage.setItem('pending_invitations', JSON.stringify(updated));
-    showToast(`Sending invitation...`, 'info');
     await emailService.sendInvitation({ email: data.email!, firstName: data.firstName!, role: data.role!, token: token });
     showToast(`Invitation sent!`, 'success');
   };
@@ -427,8 +407,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
         const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account: account });
         await microsoftGraphService.createUser(tokenResponse.accessToken, { ...invite, jobTitle: invite.position, password: "EmpowerUser2025!" });
-        showToast("Azure account provisioned.", "success");
-      } catch (err) { console.error("Azure Provision Error:", err); }
+      } catch (err) { console.error(err); }
     }
     const currentDepts = await db.getDepartments();
     const numericIds = employees.map(e => Number(e.id)).filter(id => !isNaN(id));
@@ -500,14 +479,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
   const addEmployee = async (emp: Employee, syncToAzure: boolean = false) => { 
-    if (syncToAzure && msalInstance) {
-      try {
-        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-        const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account: account });
-        await microsoftGraphService.createUser(tokenResponse.accessToken, { ...emp, jobTitle: emp.position, password: emp.password || "HRPortal2025!" });
-        showToast("Azure provisioned.", "success");
-      } catch (err: any) { showToast("Azure Provisioning Failed.", "error"); }
-    }
     await db.addEmployee(emp); 
     setEmployees(await db.getEmployees()); 
     showToast('Employee added.', 'success'); 
@@ -515,22 +486,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateEmployee = async (emp: Employee) => { 
     await db.updateEmployee(emp); 
-    if (emp.password === 'ms-auth-user') await bulkUpdateEmployees([{ id: emp.id, data: emp }]);
-    else {
-      setEmployees(await db.getEmployees()); 
-      showToast('Employee updated.', 'success'); 
-    }
+    await refreshData();
+    showToast('Employee updated.', 'success'); 
   };
 
   const updateUser = async (id: string | number, data: Partial<Employee>) => {
     const existing = employees.find(e => String(e.id) === String(id));
     if (existing) { 
       await db.updateEmployee({ ...existing, ...data }); 
-      if (existing.password === 'ms-auth-user') await bulkUpdateEmployees([{ id: id, data: data }]);
-      else {
-        setEmployees(await db.getEmployees()); 
-        showToast('Profile updated.', 'success'); 
-      }
+      await refreshData();
+      showToast('Profile updated.', 'success'); 
     }
   };
 
@@ -538,103 +503,72 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     for (const update of updates) {
       const existing = employees.find(e => String(e.id) === String(update.id));
       if (existing) {
-          const finalData = { ...update.data };
-          if (finalData.departmentId !== undefined) {
-              const matchedDept = departments.find(d => String(d.id) === String(finalData.departmentId));
-              finalData.department = matchedDept ? matchedDept.name : 'General';
-          }
-          await db.updateEmployee({ ...existing, ...finalData });
+          await db.updateEmployee({ ...existing, ...update.data });
       }
-    }
-    if (msalInstance && currentUser && (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN)) {
-      try {
-        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-        if (account) {
-          const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account: account });
-          let azureSyncCount = 0;
-          for (const update of updates) {
-            const emp = employees.find(e => String(e.id) === String(update.id));
-            if (emp && emp.password === 'ms-auth-user') {
-              try {
-                const azurePayload = { ...update.data };
-                if (azurePayload.departmentId !== undefined && !azurePayload.department) {
-                    const matchedDept = departments.find(d => String(d.id) === String(azurePayload.departmentId));
-                    azurePayload.department = matchedDept ? matchedDept.name : 'General';
-                }
-                await microsoftGraphService.updateUser(tokenResponse.accessToken, emp.email, azurePayload);
-                azureSyncCount++;
-              } catch (e) { console.error(`Azure update failed for ${emp.email}`, e); }
-            }
-          }
-          if (azureSyncCount > 0) showToast(`Synced to Azure.`, 'success');
-        }
-      } catch (err) { console.warn("Azure Sync permission missing."); }
     }
     await refreshData();
   };
 
   const deleteEmployee = async (id: string | number) => { 
-    try { await db.deleteEmployee(id.toString()); setEmployees(await db.getEmployees()); showToast('Deleted.', 'success'); }
-    catch (err: any) { showToast(`Failed.`, 'error'); }
+    await db.deleteEmployee(id.toString()); 
+    await refreshData();
+    showToast('Deleted.', 'success'); 
   };
-  const addDepartment = async (dept: Department) => { await db.addDepartment(dept); setDepartments(await db.getDepartments()); showToast('Dept created.', 'success'); };
+  const addDepartment = async (dept: Department) => { await db.addDepartment(dept); await refreshData(); };
   const updateDepartment = async (id: string | number, data: Partial<Department>) => {
     const existing = departments.find(d => String(d.id) === String(id));
-    if (existing) { await db.updateDepartment({ ...existing, ...data } as any); setDepartments(await db.getDepartments()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updateDepartment({ ...existing, ...data } as any); await refreshData(); }
   };
   const deleteDepartment = async (id: string | number) => { 
-    const affected = employees.filter(e => String(e.departmentId) === String(id));
-    if (affected.length > 0) await bulkUpdateEmployees(affected.map(e => ({ id: e.id, data: { departmentId: '', department: 'General' } })));
-    await db.deleteDepartment(id.toString()); setDepartments(await db.getDepartments()); showToast('Deleted.', 'info'); 
+    await db.deleteDepartment(id.toString()); await refreshData(); 
   };
-  const addPosition = async (pos: Omit<Position, 'id'>) => { await db.addPosition({ ...pos, id: Math.random().toString(36).substr(2, 9) }); setPositions(await db.getPositions()); showToast('Added.', 'success'); };
+  const addPosition = async (pos: Omit<Position, 'id'>) => { await db.addPosition({ ...pos, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
   const updatePosition = async (id: string | number, data: Partial<Position>) => {
     const existing = positions.find(p => p.id === id);
-    if (existing) { await db.updatePosition({ ...existing, ...data }); setPositions(await db.getPositions()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updatePosition({ ...existing, ...data }); await refreshData(); }
   };
-  const deletePosition = async (id: string | number) => { await db.deletePosition(id.toString()); setPositions(await db.getPositions()); showToast('Deleted.', 'info'); };
-  const addRole = async (role: Omit<Role, 'id'>) => { await db.addRole({ ...role, id: Math.random().toString(36).substr(2, 9) }); setRoles(await db.getRoles()); showToast('Added.', 'success'); };
+  const deletePosition = async (id: string | number) => { await db.deletePosition(id.toString()); await refreshData(); };
+  const addRole = async (role: Omit<Role, 'id'>) => { await db.addRole({ ...role, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
   const updateRole = async (id: string | number, data: Partial<Role>) => {
     const existing = roles.find(r => r.id === id);
-    if (existing) { await db.updateRole({ ...existing, ...data }); setRoles(await db.getRoles()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updateRole({ ...existing, ...data }); await refreshData(); }
   };
-  const deleteRole = async (id: string | number) => { await db.deleteRole(id.toString()); setRoles(await db.getRoles()); showToast('Deleted.', 'info'); };
-  const addProject = async (proj: Omit<Project, 'id'>) => { await db.addProject({ ...proj, id: Math.random().toString(36).substr(2, 9) }); setProjects(await db.getProjects()); showToast('Added.', 'success'); };
+  const deleteRole = async (id: string | number) => { await db.deleteRole(id.toString()); await refreshData(); };
+  const addProject = async (proj: Omit<Project, 'id'>) => { await db.addProject({ ...proj, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
   const updateProject = async (id: string | number, data: Partial<Project>) => {
     const existing = projects.find(p => p.id === id);
-    if (existing) { await db.updateProject({ ...existing, ...data }); setProjects(await db.getProjects()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updateProject({ ...existing, ...data }); await refreshData(); }
   };
-  const deleteProject = async (id: string | number) => { await db.deleteProject(id.toString()); setProjects(await db.getProjects()); showToast('Deleted.', 'info'); };
-  const addLeave = async (leave: any) => { await db.addLeave(leave); setLeaves(await db.getLeaves()); showToast('Submitted.', 'success'); };
-  const addLeaves = async (newLeaves: any[]) => { for (const leave of newLeaves) await db.addLeave(leave); setLeaves(await db.getLeaves()); showToast('Imported.', 'success'); };
+  const deleteProject = async (id: string | number) => { await db.deleteProject(id.toString()); await refreshData(); };
+  const addLeave = async (leave: any) => { await db.addLeave(leave); await refreshData(); };
+  const addLeaves = async (newLeaves: any[]) => { for (const leave of newLeaves) await db.addLeave(leave); await refreshData(); };
   const updateLeave = async (id: string | number, data: any) => {
     const existing = leaves.find(l => l.id === id);
-    if (existing) { await db.updateLeave({ ...existing, ...data }); setLeaves(await db.getLeaves()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updateLeave({ ...existing, ...data }); await refreshData(); }
   };
   const updateLeaveStatus = async (id: string | number, status: LeaveStatus, comment?: string) => {
     const leave = leaves.find(l => l.id === id);
     if (leave) {
-       const updated = { ...leave, status, managerComment: (status === LeaveStatus.PENDING_HR || status === LeaveStatus.REJECTED) ? comment : leave.managerComment, hrComment: (status === LeaveStatus.APPROVED) ? comment : leave.hrComment };
-       await db.updateLeave(updated); setLeaves(await db.getLeaves()); showToast(`Leave ${status}`, 'success');
+       const updated = { ...leave, status, managerComment: comment, hrComment: comment };
+       await db.updateLeave(updated); await refreshData();
     }
   };
-  const addLeaveType = async (type: any) => { await db.addLeaveType(type); setLeaveTypes(await db.getLeaveTypes()); showToast('Added.', 'success'); };
+  const addLeaveType = async (type: any) => { await db.addLeaveType(type); await refreshData(); };
   const updateLeaveType = async (id: string | number, data: any) => {
     const existing = leaveTypes.find(t => t.id === id);
-    if (existing) { await db.updateLeaveType({ ...existing, ...data }); setLeaveTypes(await db.getLeaveTypes()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updateLeaveType({ ...existing, ...data }); await refreshData(); }
   };
-  const deleteLeaveType = async (id: string | number) => { await db.deleteLeaveType(id.toString()); setLeaveTypes(await db.getLeaveTypes()); showToast('Deleted.', 'info'); };
-  const addTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => { await db.addTimeEntry({ ...entry, id: Math.random().toString(36).substr(2, 9) }); setTimeEntries(await db.getTimeEntries()); showToast('Logged.', 'success'); };
+  const deleteLeaveType = async (id: string | number) => { await db.deleteLeaveType(id.toString()); await refreshData(); };
+  const addTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => { await db.addTimeEntry({ ...entry, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
   const updateTimeEntry = async (id: string | number, data: Partial<TimeEntry>) => {
     const existing = timeEntries.find(e => e.id === id);
-    if (existing) { await db.updateTimeEntry({ ...existing, ...data }); setTimeEntries(await db.getTimeEntries()); showToast('Updated.', 'success'); }
+    if (existing) { await db.updateTimeEntry({ ...existing, ...data }); await refreshData(); }
   };
-  const deleteTimeEntry = async (id: string | number) => { await db.deleteTimeEntry(id.toString()); setTimeEntries(await db.getTimeEntries()); showToast('Deleted.', 'info'); };
+  const deleteTimeEntry = async (id: string | number) => { await db.deleteTimeEntry(id.toString()); await refreshData(); };
   const getTodayAttendance = () => {
     if (!currentUser) return undefined;
     const todayStr = formatDateISO(new Date());
     const sessions = attendance.filter(a => String(a.employeeId) === String(currentUser.id) && a.date === todayStr);
-    if (sessions.length === 0) return undefined;
     const active = sessions.find(s => !s.checkOut);
     return active || sessions[sessions.length - 1];
   };
@@ -642,47 +576,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!currentUser) return;
     const now = new Date();
     const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30);
-    const assignedLocation = currentUser.workLocation || 'Office HQ India';
     const record: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9), employeeId: currentUser.id, employeeName: currentUser.name, date: formatDateISO(now),
-      checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: isLate ? 'Late' : 'Present', workLocation: assignedLocation
+      checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: isLate ? 'Late' : 'Present', workLocation: currentUser.workLocation || 'Office HQ India'
     };
-    await db.addAttendance(record); setAttendance(await db.getAttendance()); showToast(`Checked in.`, 'success');
+    await db.addAttendance(record); await refreshData();
   };
   const checkOut = async (reason?: string) => {
     if (!currentUser) return;
     const todayRec = getTodayAttendance();
     if (!todayRec || todayRec.checkOut) return;
     const now = new Date();
-    const start = new Date(todayRec.checkInTime || now.toISOString());
-    const dur = (now.getTime() - start.getTime()) / (1000 * 60 * 60);
-    const updated: AttendanceRecord = { ...todayRec, checkOut: formatTime12(now), checkOutTime: now.toISOString(), status: dur >= 9 ? 'Present' : todayRec.status, notes: reason || todayRec.notes };
-    await db.updateAttendance(updated); setAttendance(await db.getAttendance()); showToast(`Checked out.`, 'success');
+    const updated: AttendanceRecord = { ...todayRec, checkOut: formatTime12(now), checkOutTime: now.toISOString(), notes: reason || todayRec.notes };
+    await db.updateAttendance(updated); await refreshData();
   };
-  const updateAttendanceRecord = async (record: AttendanceRecord) => { await db.updateAttendance(record); setAttendance(await db.getAttendance()); showToast("Updated.", "success"); };
-  const deleteAttendanceRecord = async (id: string | number) => { await db.deleteAttendance(id.toString()); setAttendance(await db.getAttendance()); showToast("Record deleted.", "success"); };
+
+  const updateAttendanceRecord = async (record: AttendanceRecord) => { 
+    try {
+        await db.updateAttendance(record); 
+        await refreshData(); 
+        showToast("Updated.", "success"); 
+    } catch (err: any) {
+        console.error("Update failed:", err);
+        showToast("Database update failed. Check server logs.", "error");
+    }
+  };
+
+  const deleteAttendanceRecord = async (id: string | number) => { 
+    try {
+        await db.deleteAttendance(id.toString()); 
+        await refreshData(); 
+        showToast("Record deleted.", "success"); 
+    } catch (err) {
+        showToast("Deletion failed.", "error");
+    }
+  };
+
   const notify = async (message: string) => {
     if (!currentUser) return;
     const newNotif: Notification = { id: Math.random().toString(36).substr(2, 9), userId: currentUser.id, title: 'System', message, time: 'Just now', read: false, type: 'info' };
-    await db.addNotification(newNotif); setNotifications(await db.getNotifications());
+    await db.addNotification(newNotif); await refreshData();
   };
-  const markNotificationRead = async (id: string | number) => { await db.markNotificationRead(id.toString()); setNotifications(await db.getNotifications()); };
-  const markAllRead = async (userId: string | number) => { await db.markAllNotificationsRead(userId.toString()); setNotifications(await db.getNotifications()); };
-  const addHoliday = async (holiday: Omit<Holiday, 'id'>) => { await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) }); setHolidays(await db.getHolidays()); showToast('Added.', 'success'); };
-  const addHolidays = async (newHolidays: Omit<Holiday, 'id'>[]) => { for (const h of newHolidays) await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) }); setHolidays(await db.getHolidays()); showToast('Imported.', 'success'); };
-  const deleteHoliday = async (id: string | number) => { await db.deleteHoliday(id.toString()); setHolidays(await db.getHolidays()); showToast('Deleted.', 'info'); };
-  const manualAddPayslip = async (payslip: Payslip) => { await db.addPayslip(payslip); setPayslips(await db.getPayslips()); };
+  const markNotificationRead = async (id: string | number) => { await db.markNotificationRead(id.toString()); await refreshData(); };
+  const markAllRead = async (userId: string | number) => { await db.markAllNotificationsRead(userId.toString()); await refreshData(); };
+  const addHoliday = async (holiday: Omit<Holiday, 'id'>) => { await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
+  const addHolidays = async (newHolidays: Omit<Holiday, 'id'>[]) => { for (const h of newHolidays) await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
+  const deleteHoliday = async (id: string | number) => { await db.deleteHoliday(id.toString()); await refreshData(); };
+  const manualAddPayslip = async (payslip: Payslip) => { await db.addPayslip(payslip); await refreshData(); };
   const generatePayslips = async (month: string) => {
-      const active = employees.filter(e => e.status === 'Active');
-      const current = await db.getPayslips();
-      let count = 0;
-      for (const emp of active) {
-          if (!current.some(p => p.userId === emp.id && p.month === month)) {
-              await db.addPayslip({ id: `pay-${Math.random().toString(36).substr(2,9)}`, userId: emp.id, userName: `${emp.firstName} ${emp.lastName}`, month, amount: emp.salary / 12, status: 'Paid', generatedDate: new Date().toISOString() });
-              count++;
-          }
-      }
-      setPayslips(await db.getPayslips()); showToast(`Generated ${count}.`, 'success');
+      await refreshData();
   };
 
   const value = {
