@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
@@ -221,7 +222,7 @@ const Organization = () => {
     addDepartment, updateDepartment, deleteDepartment, 
     positions, addPosition, updatePosition, deletePosition,
     employees, addEmployee, updateEmployee, deleteEmployee,
-    addProject, updateProject, deleteProject, sendProjectAssignmentEmail
+    addProject, updateProject, deleteProject, sendProjectAssignmentEmail, showToast
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
@@ -340,9 +341,14 @@ const Organization = () => {
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    showToast("Processing project assignments...", "info");
+    
     let targetProjId: string = String(projectForm.id);
     
+    console.group(`[Project Submission] ${projectForm.name}`);
+    
     if (projectForm.id) {
+        console.log("Updating existing project...");
         await updateProject(projectForm.id, { 
           name: projectForm.name,
           description: projectForm.description,
@@ -351,6 +357,7 @@ const Organization = () => {
           dueDate: projectForm.dueDate
         });
     } else {
+        console.log("Creating new project bundle...");
         targetProjId = Math.random().toString(36).substr(2, 9);
         await addProject({ 
           id: targetProjId,
@@ -363,7 +370,7 @@ const Organization = () => {
     }
 
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
-    const notificationPromises: Promise<any>[] = [];
+    const notificationRequests: { email: string, name: string, empId: string | number }[] = [];
     
     for (const emp of employees) {
         const isSelected = (projectForm.employeeIds || []).some(sid => String(sid) === String(emp.id));
@@ -371,33 +378,47 @@ const Organization = () => {
         const hasProject = currentProjects.includes(String(targetProjId));
 
         if (isSelected && !hasProject) {
-            // Newly assigned to this project
+            console.log(`+ Adding NEW member: ${emp.firstName} ${emp.lastName}`);
             updates.push({ id: emp.id, data: { projectIds: [...currentProjects, targetProjId] } });
-            
-            // Send In-App Notification
-            notificationPromises.push(notify(`You have been assigned to project: ${projectForm.name}`, emp.id));
-            
-            // Send SMTP Email Notification
-            notificationPromises.push(sendProjectAssignmentEmail({
-                email: emp.email,
-                firstName: emp.firstName,
-                projectName: projectForm.name,
-                projectDescription: projectForm.description
-            }));
-            
+            notificationRequests.push({ email: emp.email, name: emp.firstName, empId: emp.id });
         } else if (!isSelected && hasProject) {
+            console.log(`- Removing member: ${emp.firstName} ${emp.lastName}`);
             updates.push({ id: emp.id, data: { projectIds: currentProjects.filter(p => String(p) !== String(targetProjId)) } });
         }
     }
 
-    if (updates.length > 0) await bulkUpdateEmployees(updates);
+    if (updates.length > 0) {
+        await bulkUpdateEmployees(updates);
+        console.log(`✅ Synced project assignments for ${updates.length} employees`);
+    }
     
-    // Non-blocking wait for notifications
-    Promise.allSettled(notificationPromises).then(() => {
-        console.log("All project notifications processed.");
-    });
+    // Process Notifications
+    if (notificationRequests.length > 0) {
+        console.log(`📧 Dispatching ${notificationRequests.length} email notifications...`);
+        for (const req of notificationRequests) {
+            try {
+                // Trigger in-app alert
+                await notify(`Assigned to project: ${projectForm.name}`, req.empId);
+                
+                // Trigger SMTP email
+                await sendProjectAssignmentEmail({
+                    email: req.email,
+                    firstName: req.name,
+                    projectName: projectForm.name,
+                    projectDescription: projectForm.description
+                });
+                console.log(`✅ Notification SENT to ${req.email}`);
+            } catch (err) {
+                console.error(`❌ Notification FAILED for ${req.email}:`, err);
+                showToast(`Failed to notify ${req.name}`, "error");
+            }
+        }
+        showToast(`Project saved. ${notificationRequests.length} notifications sent.`, "success");
+    } else {
+        showToast("Project configuration updated.", "success");
+    }
 
-    notify(`Project "${projectForm.name}" configuration saved.`);
+    console.groupEnd();
     setShowProjectModal(false);
   };
 
