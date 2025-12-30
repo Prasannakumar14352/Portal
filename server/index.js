@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -16,12 +15,13 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 // --- SMTP CONFIGURATION ---
+const SMTP_USER = process.env.GMAIL_USER || 'sprasannakris@gmail.com';
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: false, // true for 465, false for other ports
     auth: {
-        user: process.env.GMAIL_USER || 'sprasannakris@gmail.com',
+        user: SMTP_USER,
         pass: process.env.GMAIL_APP_PASSWORD || 'izsf mcrs odmv jvib',
     },
 });
@@ -125,7 +125,7 @@ apiRouter.post('/invitations', async (req, res) => {
         const acceptLink = `${req.headers.origin || 'http://localhost:5173'}/accept-invite?token=${i.token}`;
         
         const mailOptions = {
-            from: `"EmpowerCorp HR" <${process.env.GMAIL_USER || 'sprasannakris@gmail.com'}>`,
+            from: `"EmpowerCorp HR" <${SMTP_USER}>`,
             to: i.email,
             subject: `Invitation to join EmpowerCorp HR Portal`,
             html: `
@@ -157,9 +157,10 @@ apiRouter.post('/invitations', async (req, res) => {
 apiRouter.post('/notify/project-assignment', async (req, res) => {
     try {
         const { email, firstName, projectName, projectDescription } = req.body;
+        console.log(`📩 [EMAIL REQUEST] Sending assignment for project "${projectName}" to "${email}"`);
         
         const mailOptions = {
-            from: `"EmpowerCorp Projects" <${process.env.GMAIL_USER || 'sprasannakris@gmail.com'}>`,
+            from: `"EmpowerCorp Projects" <${SMTP_USER}>`,
             to: email,
             subject: `New Project Assignment: ${projectName}`,
             html: `
@@ -180,12 +181,12 @@ apiRouter.post('/notify/project-assignment', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ [EMAIL] Project assignment sent to ${email}`);
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`✅ [EMAIL SUCCESS] Sent to ${email}. ID: ${info.messageId}`);
         res.json({ success: true });
     } catch (err) {
         console.error('❌ [EMAIL ERROR]:', err.message);
-        res.status(500).json({ error: 'Failed to send assignment email' });
+        res.status(500).json({ error: 'Failed to send assignment email: ' + err.message });
     }
 });
 

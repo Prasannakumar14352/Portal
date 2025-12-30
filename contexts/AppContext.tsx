@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -66,7 +65,7 @@ interface AppContextType {
   addRole: (role: Omit<Role, 'id'>) => Promise<void>;
   updateRole: (id: string | number, data: Partial<Role>) => Promise<void>;
   deleteRole: (id: string | number) => Promise<void>;
-  addProject: (proj: Omit<Project, 'id'>) => Promise<void>;
+  addProject: (proj: Omit<Project, 'id'> & { id?: string | number }) => Promise<void>;
   updateProject: (id: string | number, data: Partial<Project>) => Promise<void>;
   deleteProject: (id: string | number) => Promise<void>;
   addLeave: (leave: any) => Promise<void>; 
@@ -452,11 +451,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const sendProjectAssignmentEmail = async (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => {
     try {
         const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-        await fetch(`${API_BASE}/notify/project-assignment`, {
+        const res = await fetch(`${API_BASE}/notify/project-assignment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        if (!res.ok) throw new Error("Backend rejection");
         console.log(`[Email Service] Project assignment email request sent for ${data.email}`);
     } catch (err) {
         console.error("Failed to trigger project email:", err);
@@ -482,7 +482,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addRole: async (r: any) => { await db.addRole({...r, id: Math.random().toString(36).substr(2,9)}); await refreshData(); },
     updateRole: async (id: any, data: any) => { const ex = roles.find(r => String(r.id) === String(id)); if(ex) { await db.updateRole({...ex, ...data}); await refreshData(); } },
     deleteRole: async (id: any) => { await db.deleteRole(id.toString()); await refreshData(); },
-    addProject: async (p: any) => { await db.addProject({...p, id: Math.random().toString(36).substr(2,9)}); await refreshData(); },
+    addProject: async (p: any) => { const finalId = p.id || Math.random().toString(36).substr(2,9); await db.addProject({...p, id: finalId}); await refreshData(); },
     updateProject: async (id: any, data: any) => { const ex = projects.find(p => String(p.id) === String(id)); if(ex) { await db.updateProject({...ex, ...data}); await refreshData(); } },
     deleteProject: async (id: any) => { await db.deleteProject(id.toString()); await refreshData(); },
     addLeave: async (l: any) => { await db.addLeave(l); await refreshData(); },

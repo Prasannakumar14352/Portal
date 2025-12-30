@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
@@ -192,7 +191,7 @@ const EmployeePicker: React.FC<{
        </div>
        <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl divide-y divide-slate-50 dark:divide-slate-700/50">
           {filtered.map(emp => {
-            const isSelected = selectedIds.includes(emp.id);
+            const isSelected = selectedIds.some(sid => String(sid) === String(emp.id));
             return (
               <div key={emp.id} onClick={() => onToggle(emp.id)} className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                 <div className="flex items-center gap-3">
@@ -297,8 +296,10 @@ const Organization = () => {
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
     employees.forEach(emp => {
       const selectedIds = [...(deptForm.employeeIds || [])];
-      if (deptForm.managerId && !selectedIds.includes(deptForm.managerId)) selectedIds.push(deptForm.managerId);
-      const isSelected = selectedIds.includes(emp.id);
+      if (deptForm.managerId && !selectedIds.some(sid => String(sid) === String(deptForm.managerId))) {
+          selectedIds.push(deptForm.managerId);
+      }
+      const isSelected = selectedIds.some(sid => String(sid) === String(emp.id));
       const currentlyInDept = String(emp.departmentId) === String(targetDeptId);
       if (isSelected && !currentlyInDept) {
         updates.push({ id: emp.id, data: { departmentId: targetDeptId, department: deptForm.name } });
@@ -339,7 +340,7 @@ const Organization = () => {
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let targetProjId = projectForm.id;
+    let targetProjId: string = String(projectForm.id);
     
     if (projectForm.id) {
         await updateProject(projectForm.id, { 
@@ -362,9 +363,10 @@ const Organization = () => {
     }
 
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
+    const notificationPromises: Promise<any>[] = [];
     
     for (const emp of employees) {
-        const isSelected = (projectForm.employeeIds || []).includes(emp.id);
+        const isSelected = (projectForm.employeeIds || []).some(sid => String(sid) === String(emp.id));
         const currentProjects = (emp.projectIds || []).map(String);
         const hasProject = currentProjects.includes(String(targetProjId));
 
@@ -373,23 +375,29 @@ const Organization = () => {
             updates.push({ id: emp.id, data: { projectIds: [...currentProjects, targetProjId] } });
             
             // Send In-App Notification
-            await notify(`You have been assigned to project: ${projectForm.name}`, emp.id);
+            notificationPromises.push(notify(`You have been assigned to project: ${projectForm.name}`, emp.id));
             
             // Send SMTP Email Notification
-            await sendProjectAssignmentEmail({
+            notificationPromises.push(sendProjectAssignmentEmail({
                 email: emp.email,
                 firstName: emp.firstName,
                 projectName: projectForm.name,
                 projectDescription: projectForm.description
-            });
+            }));
             
         } else if (!isSelected && hasProject) {
-            updates.push({ id: emp.id, data: { projectIds: currentProjects.filter(p => p !== String(targetProjId)) } });
+            updates.push({ id: emp.id, data: { projectIds: currentProjects.filter(p => String(p) !== String(targetProjId)) } });
         }
     }
 
     if (updates.length > 0) await bulkUpdateEmployees(updates);
-    notify(`Project "${projectForm.name}" saved.`);
+    
+    // Non-blocking wait for notifications
+    Promise.allSettled(notificationPromises).then(() => {
+        console.log("All project notifications processed.");
+    });
+
+    notify(`Project "${projectForm.name}" configuration saved.`);
     setShowProjectModal(false);
   };
 
@@ -404,7 +412,7 @@ const Organization = () => {
             await deleteDepartment(deleteTarget.id);
             notify(`Department deleted.`);
         } else {
-            const affectedEmployees = employees.filter(e => e.projectIds?.map(String).includes(String(deleteTarget.id)));
+            const affectedEmployees = employees.filter(e => (e.projectIds || []).some(p => String(p) === String(deleteTarget.id)));
             if (affectedEmployees.length > 0) {
                 const updates = affectedEmployees.map(e => ({
                     id: e.id,
@@ -427,7 +435,7 @@ const Organization = () => {
   };
 
   const openProjectEdit = (project: Project) => {
-      const projMembers = employees.filter(e => e.projectIds?.map(String).includes(String(project.id))).map(e => e.id);
+      const projMembers = employees.filter(e => (e.projectIds || []).some(p => String(p) === String(project.id))).map(e => e.id);
       setProjectForm({ 
         id: project.id,
         name: project.name,
@@ -535,7 +543,7 @@ const Organization = () => {
                   
                   <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col">
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 ml-1">Resource Allocation (Team)</label>
-                      <EmployeePicker selectedIds={projectForm.employeeIds || []} onToggle={(id) => setProjectForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={employees} />
+                      <EmployeePicker selectedIds={projectForm.employeeIds || []} onToggle={(id) => setProjectForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.some((sid:any) => String(sid) === String(id)) ? cur.filter((i:any)=>String(i)!==String(id)) : [...cur, id] }; })} allEmployees={employees} />
                   </div>
               </div>
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
@@ -561,7 +569,7 @@ const Organization = () => {
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Department Members</label>
-                    <EmployeePicker selectedIds={deptForm.employeeIds || []} onToggle={(id) => setDeptForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.includes(id) ? cur.filter((i:any)=>i!==id) : [...cur, id] }; })} allEmployees={availableEmployeesForDeptPicker} />
+                    <EmployeePicker selectedIds={deptForm.employeeIds || []} onToggle={(id) => setDeptForm((prev: any) => { const cur = prev.employeeIds || []; return { ...prev, employeeIds: cur.some((sid:any)=>String(sid)===String(id)) ? cur.filter((i:any)=>String(i)!==String(id)) : [...cur, id] }; })} allEmployees={availableEmployeesForDeptPicker} />
                   </div>
               </div>
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
@@ -608,7 +616,7 @@ const Organization = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projects.map(project => {
-                        const projectMemberCount = employees.filter(e => e.projectIds?.map(String).includes(String(project.id))).length;
+                        const projectMemberCount = employees.filter(e => (e.projectIds || []).some(pid => String(pid) === String(project.id))).length;
                         return (
                             <div key={project.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">
                                 {isPowerUser && (
