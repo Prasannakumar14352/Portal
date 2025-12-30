@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2
+  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2, CheckCircle2, XCircle
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -94,7 +94,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast } = useAppContext();
+  const { showToast, notify, sendLeaveRequestEmail, sendLeaveStatusEmail, employees } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar'>('requests');
@@ -149,15 +149,81 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     setShowModal(true);
   };
 
-  const handleLeaveSubmit = (e: React.FormEvent) => {
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalData = {
         ...formData,
         endDate: formData.durationType === 'Half Day' ? formData.startDate : formData.endDate
     };
-    if (isEditing) editLeave(isEditing, finalData);
-    else addLeave(finalData);
+    
+    // UI Local update
+    if (isEditing) await editLeave(isEditing, finalData);
+    else await addLeave(finalData);
+
+    // Notification Logic
+    const manager = employees.find(emp => String(emp.id) === String(formData.approverId));
+    const colleagueEmails = employees
+      .filter(emp => formData.notifyUserIds.some(id => String(id) === String(emp.id)))
+      .map(emp => emp.email);
+
+    if (manager) {
+        showToast("Dispatching notifications...", "info");
+        
+        // SMTP Email
+        await sendLeaveRequestEmail({
+            to: manager.email,
+            cc: colleagueEmails,
+            employeeName: currentUser?.name || 'Employee',
+            type: formData.type,
+            startDate: finalData.startDate,
+            endDate: finalData.endDate,
+            reason: formData.reason
+        });
+
+        // In-App
+        await notify(`${currentUser?.name} submitted a ${formData.type} request.`, manager.id);
+        colleagueEmails.forEach(async (_, idx) => {
+            await notify(`${currentUser?.name} is applying for leave.`, formData.notifyUserIds[idx]);
+        });
+    }
+
     setShowModal(false);
+    showToast("Leave request submitted successfully.", "success");
+  };
+
+  const handleStatusUpdate = async (leave: LeaveRequest, newStatus: LeaveStatusEnum, comment: string = '') => {
+      await updateLeaveStatus(leave.id, newStatus, comment);
+      
+      const employee = employees.find(emp => String(emp.id) === String(leave.userId));
+      const hrUsers = employees.filter(emp => emp.role === UserRole.HR || emp.role === UserRole.ADMIN);
+
+      if (employee) {
+          // Notify Employee
+          await notify(`Your leave request status is now: ${newStatus}`, employee.id);
+          await sendLeaveStatusEmail({
+              to: employee.email,
+              employeeName: employee.firstName,
+              status: newStatus,
+              type: leave.type,
+              managerComment: comment,
+              hrAction: isHR
+          });
+
+          // If Manager approves -> Notify HR
+          if (newStatus === LeaveStatusEnum.PENDING_HR || (newStatus === LeaveStatusEnum.APPROVED && !isHR)) {
+              for (const hr of hrUsers) {
+                  await notify(`${leave.userName}'s leave request needs HR approval.`, hr.id);
+                  await sendLeaveStatusEmail({
+                      to: hr.email,
+                      employeeName: leave.userName,
+                      status: 'Awaiting HR Approval',
+                      type: leave.type,
+                      managerComment: comment
+                  });
+              }
+          }
+      }
+      showToast(`Status updated to ${newStatus}`, "success");
   };
 
   const handleTypeSubmit = (e: React.FormEvent) => {
@@ -167,7 +233,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     setShowTypeModal(false);
   };
 
-  // --- Calendar Logic ---
   const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const startDayOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
@@ -175,11 +240,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     const days = [];
     const totalDays = daysInMonth(currentCalDate);
     const startOffset = startDayOfMonth(currentCalDate);
-    
-    // Previous month filler
     for (let i = 0; i < startOffset; i++) days.push({ date: null });
-    
-    // Actual days
     for (let d = 1; d <= totalDays; d++) {
       const dateStr = `${currentCalDate.getFullYear()}-${String(currentCalDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dayLeaves = leaves.filter(l => {
@@ -201,7 +262,9 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     const styles: Record<string, string> = {
       [LeaveStatusEnum.APPROVED]: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
       [LeaveStatusEnum.REJECTED]: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-      'Pending': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      [LeaveStatusEnum.PENDING_MANAGER]: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      [LeaveStatusEnum.PENDING_HR]: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      'Pending': 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
     };
     const styleClass = styles[status] || styles['Pending'];
     return <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${styleClass}`}>{status}</span>;
@@ -243,24 +306,37 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
-                  <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Duration</th><th className="px-6 py-4">Status</th></tr>
+                  <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Duration</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {leaves.map(leave => (
-                    <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
-                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{leave.userName}</td>
-                      <td className="px-6 py-4 font-bold text-teal-600 dark:text-teal-400 text-xs uppercase">{leave.type}</td>
-                      <td className="px-6 py-4 font-mono text-[10px] text-slate-500">
-                        {leave.durationType === 'Half Day' ? leave.startDate : `${leave.startDate} to ${leave.endDate}`}
-                      </td>
-                      <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">
-                        {getDaysDiff(leave.startDate, leave.endDate, leave.durationType)} Days 
-                        {leave.durationType === 'Half Day' && <span className="ml-1 text-[8px] font-black uppercase bg-amber-50 text-amber-600 px-1 py-0.5 rounded border border-amber-100">Half</span>}
-                      </td>
-                      <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
-                    </tr>
-                  ))}
-                  {leaves.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No records found.</td></tr>}
+                  {leaves.map(leave => {
+                      const canApprove = (currentUser?.role === UserRole.MANAGER && String(leave.approverId) === String(currentUser?.id)) || isHR;
+                      const isPending = leave.status === LeaveStatusEnum.PENDING_MANAGER || leave.status === LeaveStatusEnum.PENDING_HR;
+                      
+                      return (
+                        <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
+                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{leave.userName}</td>
+                          <td className="px-6 py-4 font-bold text-teal-600 dark:text-teal-400 text-xs uppercase">{leave.type}</td>
+                          <td className="px-6 py-4 font-mono text-[10px] text-slate-500">
+                            {leave.durationType === 'Half Day' ? leave.startDate : `${leave.startDate} to ${leave.endDate}`}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-white text-xs">
+                            {getDaysDiff(leave.startDate, leave.endDate, leave.durationType)} Days 
+                            {leave.durationType === 'Half Day' && <span className="ml-1 text-[8px] font-black uppercase bg-amber-50 text-amber-600 px-1 py-0.5 rounded border border-amber-100">Half</span>}
+                          </td>
+                          <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
+                          <td className="px-6 py-4 text-right">
+                              {canApprove && isPending && (
+                                  <div className="flex justify-end gap-2">
+                                      <button onClick={() => handleStatusUpdate(leave, LeaveStatusEnum.APPROVED)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition shadow-sm border border-emerald-100" title="Approve"><CheckCircle2 size={16}/></button>
+                                      <button onClick={() => { const reason = window.prompt("Reason for rejection:"); if(reason) handleStatusUpdate(leave, LeaveStatusEnum.REJECTED, reason); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition shadow-sm border border-rose-100" title="Reject"><XCircle size={16}/></button>
+                                  </div>
+                              )}
+                          </td>
+                        </tr>
+                      );
+                  })}
+                  {leaves.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">No records found.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -457,7 +533,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                <label htmlFor="urgent-check" className="text-xs font-black uppercase text-red-700 flex items-center gap-1.5 cursor-pointer">Mark as Urgent <Flame size={14} /></label>
             </div>
 
-            <MultiSelectUser label="Notify Colleagues" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={ids => setFormData({...formData, notifyUserIds: ids as any})} />
+            <MultiSelectUser label="Notify Colleagues (CC)" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={ids => setFormData({...formData, notifyUserIds: ids as any})} />
 
             <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
               <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-400 text-xs font-black uppercase">Cancel</button>

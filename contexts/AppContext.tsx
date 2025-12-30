@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -85,6 +86,8 @@ interface AppContextType {
   getTodayAttendance: () => AttendanceRecord | undefined;
   notify: (message: string, userId?: string | number) => Promise<void>; 
   sendProjectAssignmentEmail: (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => Promise<void>;
+  sendLeaveRequestEmail: (data: { to: string, cc?: string[], employeeName: string, type: string, startDate: string, endDate: string, reason: string }) => Promise<void>;
+  sendLeaveStatusEmail: (data: { to: string, employeeName: string, status: string, type: string, managerComment?: string, hrAction?: boolean }) => Promise<void>;
   markNotificationRead: (id: string | number) => Promise<void>;
   markAllRead: (userId: string | number) => Promise<void>;
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
@@ -117,6 +120,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [msalInstance, setMsalInstance] = useState<PublicClientApplication | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
+
+  const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
   const refreshData = async () => {
     try {
@@ -439,27 +444,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await db.addNotification({ 
         id: Math.random().toString(36).substr(2,9), 
         userId: targetId, 
-        title: 'Project Update', 
+        title: 'System Notification', 
         message: message, 
         time: 'Just now', 
         read: false,
-        type: 'success'
+        type: 'info'
     }); 
     await refreshData();
   };
 
   const sendProjectAssignmentEmail = async (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => {
     try {
-        const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
         const res = await fetch(`${API_BASE}/notify/project-assignment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error("Backend rejection");
-        console.log(`[Email Service] Project assignment email request sent for ${data.email}`);
     } catch (err) {
         console.error("Failed to trigger project email:", err);
+    }
+  };
+
+  const sendLeaveRequestEmail = async (data: any) => {
+    try {
+      const res = await fetch(`${API_BASE}/notify/leave-request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Leave email failed");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const sendLeaveStatusEmail = async (data: any) => {
+    try {
+      const res = await fetch(`${API_BASE}/notify/leave-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Leave status email failed");
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -502,6 +531,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getTodayAttendance: () => { if(!currentUser) return undefined; const today = formatDateISO(new Date()); return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today); },
     notify,
     sendProjectAssignmentEmail,
+    sendLeaveRequestEmail,
+    sendLeaveStatusEmail,
     markNotificationRead: async (id: any) => { await db.markNotificationRead(id.toString()); await refreshData(); },
     markAllRead: async (u: any) => { await db.markAllNotificationsRead(u.toString()); await refreshData(); },
     addHoliday: async (h: any) => { await db.addHoliday({...h, id: Math.random().toString(36).substr(2,9)}); await refreshData(); },

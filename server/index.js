@@ -227,7 +227,66 @@ apiRouter.post('/notify/project-assignment', async (req, res) => {
     }
 });
 
-// --- REMAINING ROUTES (Briefly summarized for context) ---
+// --- LEAVE NOTIFICATIONS ---
+apiRouter.post('/notify/leave-request', async (req, res) => {
+    try {
+        const { to, cc, employeeName, type, startDate, endDate, reason } = req.body;
+        console.log(`📩 [LEAVE REQ] Notifying ${to} (CC: ${cc}) about ${employeeName}'s leave`);
+
+        const mailOptions = {
+            from: `"EmpowerCorp HR" <${SMTP_USER}>`,
+            to: to,
+            cc: cc,
+            subject: `Leave Request: ${employeeName} - ${type}`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                    <h2 style="color: #0d9488;">New Leave Request</h2>
+                    <p><strong>Employee:</strong> ${employeeName}</p>
+                    <p><strong>Type:</strong> ${type}</p>
+                    <p><strong>Period:</strong> ${startDate} to ${endDate}</p>
+                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0d9488; margin: 20px 0;">
+                        <p style="margin: 0; color: #334155;"><strong>Reason:</strong> ${reason}</p>
+                    </div>
+                    <p>Please review this request in the HR Portal.</p>
+                </div>`
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        res.json({ success: true, messageId: info.messageId });
+    } catch (err) {
+        console.error(`❌ [LEAVE REQ ERROR]:`, err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+apiRouter.post('/notify/leave-status', async (req, res) => {
+    try {
+        const { to, employeeName, status, type, managerComment, hrAction } = req.body;
+        console.log(`📩 [LEAVE STATUS] Notifying ${to} about ${employeeName}'s leave status: ${status}`);
+
+        const mailOptions = {
+            from: `"EmpowerCorp HR" <${SMTP_USER}>`,
+            to: to,
+            subject: `Leave Request Update: ${employeeName} - ${status}`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                    <h2 style="color: ${status === 'Approved' ? '#059669' : '#dc2626'};">Leave Request ${status}</h2>
+                    <p>Hello,</p>
+                    <p>The leave request for <strong>${employeeName}</strong> (${type}) has been <strong>${status.toLowerCase()}</strong>${hrAction ? ' by HR' : ' by the manager'}.</p>
+                    ${managerComment ? `<div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #94a3b8; margin: 20px 0;"><p style="margin: 0;"><strong>Comment:</strong> ${managerComment}</p></div>` : ''}
+                    <p>Login to the portal for more details.</p>
+                </div>`
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        res.json({ success: true, messageId: info.messageId });
+    } catch (err) {
+        console.error(`❌ [LEAVE STATUS ERROR]:`, err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- DEPARTMENTS ---
 apiRouter.get('/departments', async (req, res) => { try { const r = await pool.request().query("SELECT * FROM departments"); res.json(r.recordset); } catch (err) { res.status(500).json({ error: err.message }); } });
 apiRouter.post('/departments', async (req, res) => { try { const d = req.body; const r = pool.request(); r.input('id', sql.NVarChar, toStr(d.id)); r.input('name', sql.NVarChar, toStr(d.name)); r.input('description', sql.NVarChar, toStr(d.description)); r.input('managerId', sql.NVarChar, toStr(d.managerId)); await r.query(`INSERT INTO departments (id, name, description, managerId) VALUES (@id, @name, @description, @managerId)`); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
 setupCrud('positions', 'positions');
