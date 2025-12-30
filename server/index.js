@@ -107,7 +107,6 @@ apiRouter.post('/invitations', async (req, res) => {
         const i = req.body;
         const request = pool.request();
         
-        // 1. Save to Database
         request.input('id', sql.NVarChar, toStr(i.id));
         request.input('email', sql.NVarChar, toStr(i.email));
         request.input('firstName', sql.NVarChar, toStr(i.firstName));
@@ -123,7 +122,6 @@ apiRouter.post('/invitations', async (req, res) => {
         await request.query(`INSERT INTO invitations (id, email, firstName, lastName, role, position, department, salary, invitedDate, token, provisionInAzure) 
                              VALUES (@id, @email, @firstName, @lastName, @role, @position, @department, @salary, @invitedDate, @token, @provisionInAzure)`);
 
-        // 2. Send Email Automatically
         const acceptLink = `${req.headers.origin || 'http://localhost:5173'}/accept-invite?token=${i.token}`;
         
         const mailOptions = {
@@ -152,6 +150,42 @@ apiRouter.post('/invitations', async (req, res) => {
     } catch (err) { 
         console.error('❌ [INVITE ERROR]:', err.message);
         res.status(500).json({ error: err.message }); 
+    }
+});
+
+// --- PROJECT ASSIGNMENT EMAIL ---
+apiRouter.post('/notify/project-assignment', async (req, res) => {
+    try {
+        const { email, firstName, projectName, projectDescription } = req.body;
+        
+        const mailOptions = {
+            from: `"EmpowerCorp Projects" <${process.env.GMAIL_USER || 'sprasannakris@gmail.com'}>`,
+            to: email,
+            subject: `New Project Assignment: ${projectName}`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                    <h2 style="color: #0f766e;">Project Assignment: ${projectName}</h2>
+                    <p>Hello ${firstName},</p>
+                    <p>You have been officially assigned to a new project: <strong>${projectName}</strong>.</p>
+                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0f766e; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0; font-size: 14px; color: #334155;">${projectDescription || 'No description provided.'}</p>
+                    </div>
+                    <p>Log in to the portal to view the project details and start logging your time.</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${req.headers.origin || 'http://localhost:5173'}/time-logs" style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Go to Time Logs</a>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 20px 0;" />
+                    <p style="font-size: 11px; color: #94a3b8;">&copy; 2025 EmpowerCorp Project Management</p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ [EMAIL] Project assignment sent to ${email}`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('❌ [EMAIL ERROR]:', err.message);
+        res.status(500).json({ error: 'Failed to send assignment email' });
     }
 });
 

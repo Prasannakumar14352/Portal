@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
@@ -221,7 +222,7 @@ const Organization = () => {
     addDepartment, updateDepartment, deleteDepartment, 
     positions, addPosition, updatePosition, deletePosition,
     employees, addEmployee, updateEmployee, deleteEmployee,
-    addProject, updateProject, deleteProject
+    addProject, updateProject, deleteProject, sendProjectAssignmentEmail
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
@@ -240,7 +241,6 @@ const Organization = () => {
   const [deptForm, setDeptForm] = useState<any>({ id: '', name: '', description: '', managerId: '', employeeIds: [] });
   const [posForm, setPosForm] = useState<any>({ id: '', title: '', description: '' });
   
-  // Project form state
   const [projectForm, setProjectForm] = useState<any>({ 
     id: '', 
     name: '', 
@@ -362,17 +362,31 @@ const Organization = () => {
     }
 
     const updates: { id: string | number, data: Partial<Employee> }[] = [];
-    employees.forEach(emp => {
+    
+    for (const emp of employees) {
         const isSelected = (projectForm.employeeIds || []).includes(emp.id);
         const currentProjects = (emp.projectIds || []).map(String);
         const hasProject = currentProjects.includes(String(targetProjId));
 
         if (isSelected && !hasProject) {
+            // Newly assigned to this project
             updates.push({ id: emp.id, data: { projectIds: [...currentProjects, targetProjId] } });
+            
+            // Send In-App Notification
+            await notify(`You have been assigned to project: ${projectForm.name}`, emp.id);
+            
+            // Send SMTP Email Notification
+            await sendProjectAssignmentEmail({
+                email: emp.email,
+                firstName: emp.firstName,
+                projectName: projectForm.name,
+                projectDescription: projectForm.description
+            });
+            
         } else if (!isSelected && hasProject) {
             updates.push({ id: emp.id, data: { projectIds: currentProjects.filter(p => p !== String(targetProjId)) } });
         }
-    });
+    }
 
     if (updates.length > 0) await bulkUpdateEmployees(updates);
     notify(`Project "${projectForm.name}" saved.`);
@@ -439,7 +453,6 @@ const Organization = () => {
       }
   };
 
-  // --- Chart Panning & Zooming Logic ---
   const handleWheel = (e: React.WheelEvent) => {
     const delta = e.deltaY * -0.001;
     const newZoom = Math.min(1.5, Math.max(0.3, chartZoom + delta));
@@ -447,7 +460,7 @@ const Organization = () => {
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return; 
     setIsPanning(true);
     panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
   };
@@ -478,7 +491,6 @@ const Organization = () => {
           .dark .org-tree li::before, .dark .org-tree li::after, .dark .org-tree ul ul::before { border-color: #475569; }
        `}</style>
 
-       {/* Project Modal with Improved Task Management */}
        <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={projectForm.id ? "Edit Project" : "Create Project"} width="max-w-4xl">
            <form onSubmit={handleProjectSubmit} className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -496,7 +508,6 @@ const Organization = () => {
                           <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Target Milestone</label><input type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white font-medium" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} /></div>
                       </div>
                       
-                      {/* Interactive Task Manager */}
                       <div className="space-y-3">
                           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><ListTodo size={14} className="text-emerald-600"/> Associated Deliverables</label>
                           <div className="flex gap-2">
@@ -534,7 +545,6 @@ const Organization = () => {
            </form>
        </DraggableModal>
 
-       {/* Department Modal */}
        <DraggableModal isOpen={showDeptModal} onClose={() => setShowDeptModal(false)} title={deptForm.id ? "Edit Department" : "Add Department"} width="max-w-2xl">
           <form onSubmit={handleDeptSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -561,7 +571,6 @@ const Organization = () => {
           </form>
        </DraggableModal>
 
-       {/* Deletion Confirm */}
        <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Deletion" width="max-w-md">
            <div className="text-center py-4">
               <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
@@ -578,7 +587,6 @@ const Organization = () => {
            </div>
        </DraggableModal>
 
-       {/* Tab Navigation */}
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage company structure, projects and locations.</p></div>
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto custom-scrollbar">
@@ -588,7 +596,6 @@ const Organization = () => {
           </div>
        </div>
 
-       {/* Projects Tab Content */}
        {activeTab === 'projects' && (
            <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -621,7 +628,6 @@ const Organization = () => {
                                 <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1 tracking-tight">{project.name}</h4>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 h-10 line-clamp-2 leading-relaxed mb-4">{project.description}</p>
                                 
-                                {/* Associated Tasks Summary */}
                                 <div className="space-y-2 mb-5">
                                     <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-1 border-slate-50 dark:border-slate-700">
                                         <span>Milestones</span>
@@ -664,7 +670,6 @@ const Organization = () => {
            </div>
        )}
 
-       {/* Departments Tab */}
        {activeTab === 'departments' && (
            <div className="space-y-4">
                <div className="flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><Building2 className="text-emerald-600" /> Departments</h3>{isPowerUser && <button onClick={() => { setDeptForm({ id: '', name: '', description: '', managerId: '', employeeIds: [] }); setShowDeptModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 font-bold shadow-sm"><Plus size={16} /> Add Dept</button>}</div>
@@ -690,7 +695,6 @@ const Organization = () => {
            </div>
        )}
 
-       {/* Org Chart Tab */}
        {activeTab === 'chart' && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -735,13 +739,10 @@ const Organization = () => {
           </div>
        )}
 
-       {/* Map Tab */}
        {activeTab === 'locations' && <div className="space-y-4"><h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-white"><MapPin className="text-emerald-600" /> Employee Global Map</h3><GraphicsLayerMap users={employees} /></div>}
        
-       {/* Employees Tab */}
        {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
        
-       {/* Positions Tab */}
        {activeTab === 'positions' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Job Roles & Positions</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 font-bold shadow-sm"><Plus size={16} /> Add Position</button>}</div>

@@ -84,7 +84,8 @@ interface AppContextType {
   updateAttendanceRecord: (record: AttendanceRecord) => Promise<void>; 
   deleteAttendanceRecord: (id: string | number) => Promise<void>;
   getTodayAttendance: () => AttendanceRecord | undefined;
-  notify: (message: string) => Promise<void>; 
+  notify: (message: string, userId?: string | number) => Promise<void>; 
+  sendProjectAssignmentEmail: (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => Promise<void>;
   markNotificationRead: (id: string | number) => Promise<void>;
   markAllRead: (userId: string | number) => Promise<void>;
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
@@ -264,9 +265,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           provisionInAzure: data.provisionInAzure || false
         };
         
-        // This call now triggers both DB save AND Email delivery on the server
         await db.addInvitation(newInvitation);
-        
         await refreshData();
         showToast(`Invitation sent and saved for ${data.email}`, 'success');
     } catch (err: any) {
@@ -435,6 +434,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     else document.documentElement.classList.remove('dark');
   };
 
+  const notify = async (message: string, userId?: string | number) => {
+    const targetId = userId || currentUser?.id;
+    if(!targetId) return;
+    await db.addNotification({ 
+        id: Math.random().toString(36).substr(2,9), 
+        userId: targetId, 
+        title: 'Project Update', 
+        message: message, 
+        time: 'Just now', 
+        read: false,
+        type: 'success'
+    }); 
+    await refreshData();
+  };
+
+  const sendProjectAssignmentEmail = async (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => {
+    try {
+        const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+        await fetch(`${API_BASE}/notify/project-assignment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        console.log(`[Email Service] Project assignment email request sent for ${data.email}`);
+    } catch (err) {
+        console.error("Failed to trigger project email:", err);
+    }
+  };
+
   const value = {
     employees, users: employees, invitations, departments, roles, positions, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
@@ -472,7 +500,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     updateAttendanceRecord: async (r: any) => { await db.updateAttendance(r); await refreshData(); },
     deleteAttendanceRecord: async (id: any) => { await db.deleteAttendance(id.toString()); await refreshData(); },
     getTodayAttendance: () => { if(!currentUser) return undefined; const today = formatDateISO(new Date()); return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today); },
-    notify: async (m: string) => { if(!currentUser) return; await db.addNotification({ id: Math.random().toString(36).substr(2,9), userId: currentUser.id, title: 'Alert', message: m, time: 'Just now', read: false }); await refreshData(); },
+    notify,
+    sendProjectAssignmentEmail,
     markNotificationRead: async (id: any) => { await db.markNotificationRead(id.toString()); await refreshData(); },
     markAllRead: async (u: any) => { await db.markAllNotificationsRead(u.toString()); await refreshData(); },
     addHoliday: async (h: any) => { await db.addHoliday({...h, id: Math.random().toString(36).substr(2,9)}); await refreshData(); },
