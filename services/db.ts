@@ -1,5 +1,5 @@
 
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role, Position } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role, Position, Invitation } from '../types';
 import { 
   mockEmployees, mockDepartments, mockProjects, mockLeaves, mockLeaveTypes, 
   mockAttendance, mockTimeEntries, mockNotifications, mockHolidays, mockPayslips, mockRoles
@@ -65,7 +65,8 @@ const store = {
     timeEntries: [...mockTimeEntries],
     notifications: [...mockNotifications],
     holidays: [...mockHolidays],
-    payslips: [...mockPayslips]
+    payslips: [...mockPayslips],
+    invitations: [] as Invitation[]
 };
 
 const mockDb = {
@@ -182,7 +183,13 @@ const mockDb = {
         return Promise.resolve();
     },
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
-    addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); }
+    addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); },
+    getInvitations: async (): Promise<Invitation[]> => Promise.resolve([...store.invitations]),
+    addInvitation: async (invite: Invitation) => { store.invitations.push(invite); return Promise.resolve(invite); },
+    deleteInvitation: async (id: string) => {
+        store.invitations = store.invitations.filter(i => String(i.id) !== String(id));
+        return Promise.resolve();
+    }
 };
 
 const apiDb = {
@@ -240,7 +247,11 @@ const apiDb = {
   deleteHoliday: (id: string) => api.delete(`/holidays/${id}`),
 
   getPayslips: () => api.get('/payslips'),
-  addPayslip: (payslip: Payslip) => api.post('/payslips', payslip)
+  addPayslip: (payslip: Payslip) => api.post('/payslips', payslip),
+
+  getInvitations: () => api.get('/invitations'),
+  addInvitation: (invite: Invitation) => api.post('/invitations', invite),
+  deleteInvitation: (id: string) => api.delete(`/invitations/${id}`)
 };
 
 const createHybridDb = () => {

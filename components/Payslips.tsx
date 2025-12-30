@@ -9,9 +9,9 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Handle ES Module import structure where GlobalWorkerOptions might be on 'default'
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
 
-// Configure PDF.js worker
+// Configure PDF.js worker - Using a specific stable version
 if (pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 }
 
 const Payslips = () => {
@@ -41,7 +41,6 @@ const Payslips = () => {
         fullText = items.map(item => item.str).join(' ');
 
         // Regex looks for "Net Pay" followed by optional currency symbol/code and then the amount
-        // Example matches: "Net Pay: $1,234.00", "Net Pay ₹ 50000", "Total Pay: Rs. 45000"
         const regex = /(?:Net\s*Pay(?:able)?|Total\s*Pay)[^0-9]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i;
         const match = fullText.match(regex);
         
@@ -198,7 +197,6 @@ const Payslips = () => {
             (isHR && p.userName.toLowerCase().includes(searchTerm.toLowerCase()))
         );
     }
-    // Sort by date desc (assuming generatedDate matches chronological order roughly)
     return filtered.sort((a, b) => new Date(b.generatedDate).getTime() - new Date(a.generatedDate).getTime());
   }, [payslips, currentUser, isHR, searchTerm]);
 
@@ -208,25 +206,17 @@ const Payslips = () => {
       currentPage * itemsPerPage
   );
 
-  // Summary Logic
   const summaryStats = useMemo(() => {
-      // Calculate based on ALL visible slips for the user
       const userSlips = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
-      
       const totalCount = userSlips.length;
       const totalAmount = userSlips.reduce((sum, p) => sum + p.amount, 0);
-      
-      // Determine year from month string e.g. "Sep 2024"
       const thisYearAmount = userSlips.reduce((sum, p) => {
           if (p.month.includes(currentYear.toString())) {
               return sum + p.amount;
           }
           return sum;
       }, 0);
-      
       const thisYearCount = userSlips.filter(p => p.month.includes(currentYear.toString())).length;
-      
-      // Use the currency of the latest payslip for summary display, or default to ₹
       const displayCurrency = userSlips.length > 0 ? (userSlips[0].currency || '₹') : '₹';
 
       return { totalCount, totalAmount, thisYearAmount, thisYearCount, displayCurrency };
@@ -234,7 +224,6 @@ const Payslips = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-        {/* Header & HR Controls */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
             <div>
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Payslips</h2>
@@ -277,7 +266,6 @@ const Payslips = () => {
             </div>
         )}
 
-        {/* All Payslips List */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">All Payslips</h3>
@@ -341,7 +329,6 @@ const Payslips = () => {
                     )}
                 </div>
 
-                {/* Pagination */}
                 {visiblePayslips.length > 0 && (
                     <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -381,7 +368,6 @@ const Payslips = () => {
             </div>
         </div>
 
-        {/* Earnings Summary Card - Only visible to non-admin (non-HR) users */}
         {!isHR && (
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">Earnings Summary</h3>

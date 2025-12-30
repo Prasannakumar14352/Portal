@@ -31,8 +31,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | number | null>(null);
-
+  
   const [provisionInAzure, setProvisionInAzure] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
@@ -73,14 +72,13 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   const handleAzureSyncFromPortal = async () => {
     setIsSyncing(true);
-    await syncAzureUsers(); // Pulls from Azure
+    await syncAzureUsers();
     setIsSyncing(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingEmployee) {
-      // Logic inside AppContext will detect if this is an Azure user and push changes UP to the portal
       onUpdateEmployee({ ...editingEmployee, ...formData } as Employee);
       setShowModal(false);
     } else {
@@ -91,6 +89,12 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       setShowModal(false);
       setActiveTab('invitations');
     }
+  };
+
+  const copyInviteLink = (inv: Invitation) => {
+      const link = `${window.location.origin}/accept-invite?token=${inv.token}`;
+      navigator.clipboard.writeText(link);
+      showToast("Invitation link copied to clipboard!", "success");
   };
 
   const openAddModal = () => {
@@ -218,7 +222,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                             <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-white text-sm">
                                 {emp.firstName} {emp.lastName}
                                 {emp.password === 'ms-auth-user' && (
-                                    /* Fix: Wrapped Cloud icon in span to handle tooltip as lucide icons don't support title prop directly */
                                     <span title="Synced with Azure Portal">
                                         <Cloud size={14} className="text-blue-500" />
                                     </span>
@@ -272,16 +275,25 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1">
+                           <button 
+                             onClick={() => copyInviteLink(inv)}
+                             className="p-2 text-slate-400 hover:text-teal-600 transition-colors"
+                             title="Copy Invitation Link"
+                           >
+                             <Copy size={16}/>
+                           </button>
                            <button 
                              onClick={() => acceptInvitation(inv.id)}
                              className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"
+                             title="Confirm Onboarding"
                            >
-                             <CheckCircle size={12}/> Accept (Demo)
+                             <CheckCircle size={12}/> Accept
                            </button>
                            <button 
                              onClick={() => revokeInvitation(inv.id)}
                              className="text-slate-400 hover:text-red-600 p-2"
+                             title="Revoke Invitation"
                            >
                              <XCircle size={18} />
                            </button>
@@ -363,7 +375,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   <div>
                       <p className="text-sm font-bold text-teal-900 dark:text-teal-200 uppercase tracking-tight">Onboarding Invitation</p>
                       <p className="text-xs text-teal-700 dark:text-teal-400 leading-relaxed">
-                          We will send an invitation email. Once they accept, they will be added to the directory and synced with Azure (if enabled).
+                          We will generate an invitation. You can copy the link manually if the email notification is restricted in your sandbox environment.
                       </p>
                   </div>
               </div>
@@ -424,7 +436,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                    <Cloud className="text-blue-600" size={20} />
                    <div>
                        <p className="text-sm font-bold text-blue-900 dark:text-blue-200 leading-tight">Provision in Azure Portal</p>
-                       <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">Create user in Azure Entra ID when they accept.</p>
+                       <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">Auto-create user in Entra ID when accepted.</p>
                    </div>
                 </div>
                 <div 
@@ -438,7 +450,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
           <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
-            <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest">{editingEmployee ? (editingEmployee.password === 'ms-auth-user' ? 'Update & Sync' : 'Update Locally') : 'Send Invitation'}</button>
+            <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest">{editingEmployee ? (editingEmployee.password === 'ms-auth-user' ? 'Update & Sync' : 'Update Locally') : 'Generate Invitation'}</button>
           </div>
         </form>
       </DraggableModal>

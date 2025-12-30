@@ -120,10 +120,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshData = async () => {
     try {
-      const [empData, deptData, roleData, posData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData] = await Promise.all([
+      const [empData, deptData, roleData, posData, projData, leaveData, typeData, attendData, timeData, notifData, holidayData, payslipData, inviteData] = await Promise.all([
         db.getEmployees(), db.getDepartments(), db.getRoles(), db.getPositions(), db.getProjects(),
         db.getLeaves(), db.getLeaveTypes(), db.getAttendance(), db.getTimeEntries(),
-        db.getNotifications(), db.getHolidays(), db.getPayslips()
+        db.getNotifications(), db.getHolidays(), db.getPayslips(), db.getInvitations()
       ]);
       setEmployees(empData);
       setDepartments(deptData);
@@ -137,9 +137,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setNotifications(notifData);
       setHolidays(holidayData);
       setPayslips(payslipData);
-      
-      const savedInvites = localStorage.getItem('pending_invitations');
-      if (savedInvites) setInvitations(JSON.parse(savedInvites));
+      setInvitations(inviteData);
     } catch (error) {
       console.error("Failed to refresh data:", error);
     }
@@ -326,7 +324,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!msalInstance || !currentUser) return;
     try {
       const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-      if (!account) return;
+      if (!account) {
+        showToast("Please sign in with Microsoft to sync Azure users.", "warning");
+        return;
+      }
       const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.Read.All"], account: account });
       const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
       
@@ -392,47 +393,80 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       salary: data.salary || 0, invitedDate: formatDateISO(new Date()), token,
       provisionInAzure: data.provisionInAzure || false
     };
-    const updated = [...invitations, newInvitation];
-    setInvitations(updated);
-    localStorage.setItem('pending_invitations', JSON.stringify(updated));
+    
+    await db.addInvitation(newInvitation);
     await emailService.sendInvitation({ email: data.email!, firstName: data.firstName!, role: data.role!, token: token });
-    showToast(`Invitation sent!`, 'success');
+    await refreshData();
+    showToast(`Invitation created for ${data.email}`, 'success');
   };
 
   const acceptInvitation = async (id: string) => {
     const invite = invitations.find(inv => inv.id === id);
     if (!invite) return;
-    if (invite.provisionInAzure && msalInstance) {
-      try {
-        const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-        const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account: account });
-        await microsoftGraphService.createUser(tokenResponse.accessToken, { ...invite, jobTitle: invite.position, password: "EmpowerUser2025!" });
-      } catch (err) { console.error(err); }
+
+    // --- Azure Provisioning Check ---
+    if (invite.provisionInAzure) {
+      if (!msalInstance) {
+          showToast("Azure creation skipped: Microsoft service not initialized.", "warning");
+      } else {
+          const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+          if (!account) {
+              showToast("Azure creation failed: HR Manager must be signed in with Microsoft.", "error");
+              return;
+          }
+          try {
+              const tokenResponse = await msalInstance.acquireTokenSilent({ 
+                  scopes: ["User.ReadWrite.All", "User.Read.All"], 
+                  account: account 
+              });
+              
+              // Check if user already exists to avoid 409
+              const existingAzureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
+              const alreadyInAzure = existingAzureUsers.some(au => au.mail?.toLowerCase() === invite.email.toLowerCase() || au.userPrincipalName?.toLowerCase() === invite.email.toLowerCase());
+              
+              if (alreadyInAzure) {
+                  showToast("User already exists in Azure AD. Linking locally...", "info");
+              } else {
+                  await microsoftGraphService.createUser(tokenResponse.accessToken, { 
+                      ...invite, 
+                      jobTitle: invite.position, 
+                      password: "EmpowerUser2025!" 
+                  });
+                  showToast("Provisioned in Azure successfully.", "success");
+              }
+          } catch (err: any) { 
+              console.error("Azure Provisioning Error:", err);
+              showToast(`Azure Error: ${err.message}`, "error");
+              return; // Halt if Azure provisioning was requested but failed
+          }
+      }
     }
+
+    // --- Local Record Creation ---
     const currentDepts = await db.getDepartments();
     const numericIds = employees.map(e => Number(e.id)).filter(id => !isNaN(id));
     const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
     const matchedDept = currentDepts.find(d => d.name === invite.department);
+    
     const newEmp: Employee = {
       id: nextId, employeeId: `${nextId}`, firstName: invite.firstName, lastName: invite.lastName, email: invite.email,
-      password: 'initial-password', role: invite.role, position: invite.position, department: invite.department,
+      password: invite.provisionInAzure ? 'ms-auth-user' : 'initial-password', 
+      role: invite.role, position: invite.position, department: invite.department,
       departmentId: matchedDept ? matchedDept.id : '', joinDate: formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
       salary: invite.salary, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.firstName + ' ' + invite.lastName)}&background=0D9488&color=fff`,
       jobTitle: invite.position, phone: '', workLocation: 'Office HQ India'
     };
+    
     await db.addEmployee(newEmp);
-    const updatedInvitations = invitations.filter(inv => inv.id !== id);
-    setInvitations(updatedInvitations);
-    localStorage.setItem('pending_invitations', JSON.stringify(updatedInvitations));
+    await db.deleteInvitation(id);
     await refreshData();
-    showToast(`${invite.firstName} added!`, 'success');
+    showToast(`${invite.firstName} officially onboarded!`, 'success');
   };
 
   const revokeInvitation = async (id: string) => {
-    const updated = invitations.filter(inv => inv.id !== id);
-    setInvitations(updated);
-    localStorage.setItem('pending_invitations', JSON.stringify(updated));
-    showToast("Revoked.", "info");
+    await db.deleteInvitation(id);
+    await refreshData();
+    showToast("Invitation revoked.", "info");
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -593,12 +627,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateAttendanceRecord = async (record: AttendanceRecord) => { 
     try {
-        console.log(`[Context] Updating Record ID: ${record.id}`, record);
         await db.updateAttendance(record); 
         await refreshData(); 
-        showToast("Record successfully updated in SQL.", "success"); 
+        showToast("Record successfully updated.", "success"); 
     } catch (err: any) {
-        console.error("[Context ERROR] Update failed:", err.message);
         showToast(`Update Failed: ${err.message}`, "error");
     }
   };

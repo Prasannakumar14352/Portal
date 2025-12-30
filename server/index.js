@@ -106,7 +106,8 @@ const initDb = async () => {
             { name: 'time_entries', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='time_entries' AND xtype='U') CREATE TABLE time_entries (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), projectId NVARCHAR(50), task NVARCHAR(255), date NVARCHAR(50), durationMinutes INT, extraMinutes INT, description NVARCHAR(MAX), status NVARCHAR(50), isBillable BIT)` },
             { name: 'notifications', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U') CREATE TABLE notifications (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), title NVARCHAR(255), message NVARCHAR(MAX), time NVARCHAR(100), [read] BIT, type NVARCHAR(50))` },
             { name: 'holidays', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='holidays' AND xtype='U') CREATE TABLE holidays (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(255), date NVARCHAR(50), type NVARCHAR(50))` },
-            { name: 'payslips', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='payslips' AND xtype='U') CREATE TABLE payslips (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(255), month NVARCHAR(50), amount FLOAT, currency NVARCHAR(10), status NVARCHAR(50), generatedDate NVARCHAR(50), fileData NVARCHAR(MAX), fileName NVARCHAR(255))` }
+            { name: 'payslips', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='payslips' AND xtype='U') CREATE TABLE payslips (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(255), month NVARCHAR(50), amount FLOAT, currency NVARCHAR(10), status NVARCHAR(50), generatedDate NVARCHAR(50), fileData NVARCHAR(MAX), fileName NVARCHAR(255))` },
+            { name: 'invitations', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='invitations' AND xtype='U') CREATE TABLE invitations (id NVARCHAR(50) PRIMARY KEY, email NVARCHAR(255), firstName NVARCHAR(100), lastName NVARCHAR(100), role NVARCHAR(100), position NVARCHAR(100), department NVARCHAR(100), salary FLOAT, invitedDate NVARCHAR(50), token NVARCHAR(100), provisionInAzure BIT)` }
         ];
 
         for (const table of tables) {
@@ -140,6 +141,86 @@ const generateCRUDRoutes = (tableName, idField = 'id') => {
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 };
+
+// --- INVITATIONS ---
+apiRouter.get('/invitations', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM invitations");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.post('/invitations', async (req, res) => {
+    try {
+        const i = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(i.id));
+        request.input('email', sql.NVarChar, toStr(i.email));
+        request.input('firstName', sql.NVarChar, toStr(i.firstName));
+        request.input('lastName', sql.NVarChar, toStr(i.lastName));
+        request.input('role', sql.NVarChar, toStr(i.role));
+        request.input('position', sql.NVarChar, toStr(i.position));
+        request.input('department', sql.NVarChar, toStr(i.department));
+        request.input('salary', sql.Float, toFloat(i.salary));
+        request.input('invitedDate', sql.NVarChar, toStr(i.invitedDate));
+        request.input('token', sql.NVarChar, toStr(i.token));
+        request.input('provisionInAzure', sql.Bit, toBit(i.provisionInAzure));
+
+        await request.query(`INSERT INTO invitations 
+            (id, email, firstName, lastName, role, position, department, salary, invitedDate, token, provisionInAzure) 
+            VALUES (@id, @email, @firstName, @lastName, @role, @position, @department, @salary, @invitedDate, @token, @provisionInAzure)`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.delete('/invitations/:id', async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('id', sql.NVarChar, req.params.id);
+        await request.query(`DELETE FROM invitations WHERE id=@id`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- NOTIFICATIONS ---
+const handleMarkAllRead = async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('userId', sql.NVarChar, req.params.userId);
+        await request.query(`UPDATE notifications SET [read]=1 WHERE userId=@userId`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+apiRouter.put('/notifications/read-all/:userId', handleMarkAllRead);
+apiRouter.get('/notifications/read-all/:userId', handleMarkAllRead); 
+
+apiRouter.put('/notifications/:id/read', async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('id', sql.NVarChar, req.params.id);
+        await request.query(`UPDATE notifications SET [read]=1 WHERE id=@id`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.post('/notifications', async (req, res) => {
+    try {
+        const n = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(n.id));
+        request.input('userId', sql.NVarChar, toStr(n.userId));
+        request.input('title', sql.NVarChar, toStr(n.title));
+        request.input('message', sql.NVarChar, toStr(n.message));
+        request.input('time', sql.NVarChar, toStr(n.time));
+        request.input('read', sql.Bit, toBit(n.read));
+        request.input('type', sql.NVarChar, toStr(n.type));
+        await request.query(`INSERT INTO notifications (id, userId, title, message, time, [read], type) VALUES (@id, @userId, @title, @message, @time, @read, @type)`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+generateCRUDRoutes('notifications');
 
 // --- EMPLOYEES ---
 apiRouter.get('/employees', async (req, res) => {
@@ -451,47 +532,6 @@ apiRouter.post('/time_entries', async (req, res) => {
 });
 generateCRUDRoutes('time_entries');
 
-// --- NOTIFICATIONS ---
-apiRouter.post('/notifications', async (req, res) => {
-    try {
-        const n = req.body;
-        const request = pool.request();
-        request.input('id', sql.NVarChar, toStr(n.id));
-        request.input('userId', sql.NVarChar, toStr(n.userId));
-        request.input('title', sql.NVarChar, toStr(n.title));
-        request.input('message', sql.NVarChar, toStr(n.message));
-        request.input('time', sql.NVarChar, toStr(n.time));
-        request.input('read', sql.Bit, toBit(n.read));
-        request.input('type', sql.NVarChar, toStr(n.type));
-        await request.query(`INSERT INTO notifications (id, userId, title, message, time, [read], type) VALUES (@id, @userId, @title, @message, @time, @read, @type)`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.put('/notifications/:id/read', async (req, res) => {
-    try {
-        const request = pool.request();
-        request.input('id', sql.NVarChar, req.params.id);
-        await request.query(`UPDATE notifications SET [read]=1 WHERE id=@id`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Robust mark-all-read handler supporting multiple methods to prevent environmental routing issues
-const handleMarkAllRead = async (req, res) => {
-    try {
-        const request = pool.request();
-        request.input('userId', sql.NVarChar, req.params.userId);
-        await request.query(`UPDATE notifications SET [read]=1 WHERE userId=@userId`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-};
-
-apiRouter.put('/notifications/read-all/:userId', handleMarkAllRead);
-apiRouter.get('/notifications/read-all/:userId', handleMarkAllRead); // Fallback for envs misinterpreting methods
-
-generateCRUDRoutes('notifications');
-
 // --- HOLIDAYS ---
 apiRouter.post('/holidays', async (req, res) => {
     try {
@@ -518,7 +558,6 @@ apiRouter.post('/payslips', async (req, res) => {
         request.input('month', sql.NVarChar, toStr(p.month));
         request.input('amount', sql.Float, toFloat(p.amount));
         request.input('currency', sql.NVarChar, toStr(p.currency));
-        request.status = toStr(p.status);
         request.input('status', sql.NVarChar, toStr(p.status));
         request.input('generatedDate', sql.NVarChar, toStr(p.generatedDate));
         request.input('fileData', sql.NVarChar, toStr(p.fileData));
