@@ -132,6 +132,11 @@ const mockDb = {
         if(idx !== -1) store.leaves[idx] = leave;
         return Promise.resolve(leave);
     },
+    // Fix: Added missing deleteLeave method to mockDb
+    deleteLeave: async (id: string) => {
+        store.leaves = store.leaves.filter(l => String(l.id) !== String(id));
+        return Promise.resolve();
+    },
     getLeaveTypes: async (): Promise<LeaveTypeConfig[]> => Promise.resolve([...store.leaveTypes]),
     addLeaveType: async (type: LeaveTypeConfig) => { store.leaveTypes.push(type); return Promise.resolve(type); },
     updateLeaveType: async (type: LeaveTypeConfig) => {
@@ -221,6 +226,8 @@ const apiDb = {
   getLeaves: () => api.get('/leaves'),
   addLeave: (leave: LeaveRequest) => api.post('/leaves', leave),
   updateLeave: (leave: LeaveRequest) => api.put(`/leaves/${leave.id}`, leave),
+  // Fix: Added missing deleteLeave method to apiDb
+  deleteLeave: (id: string) => api.delete(`/leaves/${id}`),
 
   getLeaveTypes: () => api.get('/leave_types'),
   addLeaveType: (type: LeaveTypeConfig) => api.post('/leave_types', type),

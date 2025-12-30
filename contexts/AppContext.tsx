@@ -72,6 +72,7 @@ interface AppContextType {
   addLeave: (leave: any) => Promise<void>; 
   addLeaves: (leaves: any[]) => Promise<void>;
   updateLeave: (id: string | number, data: any) => Promise<void>;
+  deleteLeave: (id: string | number) => Promise<void>;
   updateLeaveStatus: (id: string | number, status: LeaveStatus, comment?: string) => Promise<void>;
   addLeaveType: (type: any) => Promise<void>;
   updateLeaveType: (id: string | number, data: any) => Promise<void>;
@@ -86,7 +87,7 @@ interface AppContextType {
   getTodayAttendance: () => AttendanceRecord | undefined;
   notify: (message: string, userId?: string | number) => Promise<void>; 
   sendProjectAssignmentEmail: (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => Promise<void>;
-  sendLeaveRequestEmail: (data: { to: string, cc?: string[], employeeName: string, type: string, startDate: string, endDate: string, reason: string }) => Promise<void>;
+  sendLeaveRequestEmail: (data: { to: string, cc?: string[], employeeName: string, type: string, startDate: string, endDate: string, reason: string, isUpdate?: boolean, isWithdrawal?: boolean }) => Promise<void>;
   sendLeaveStatusEmail: (data: { to: string, employeeName: string, status: string, type: string, managerComment?: string, hrAction?: boolean }) => Promise<void>;
   markNotificationRead: (id: string | number) => Promise<void>;
   markAllRead: (userId: string | number) => Promise<void>;
@@ -444,7 +445,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await db.addNotification({ 
         id: Math.random().toString(36).substr(2,9), 
         userId: targetId, 
-        title: 'System Notification', 
+        title: 'Leave Update', 
         message: message, 
         time: 'Just now', 
         read: false,
@@ -517,6 +518,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addLeave: async (l: any) => { await db.addLeave(l); await refreshData(); },
     addLeaves: async (ls: any[]) => { for(const l of ls) await db.addLeave(l); await refreshData(); },
     updateLeave: async (id: any, d: any) => { const ex = leaves.find(l => String(l.id) === String(id)); if(ex) { await db.updateLeave({...ex, ...d}); await refreshData(); } },
+    deleteLeave: async (id: any) => { await db.deleteLeave(id.toString()); await refreshData(); },
     updateLeaveStatus: async (id: any, s: any, c: any) => { const ex = leaves.find(l => String(l.id) === String(id)); if(ex) { await db.updateLeave({...ex, status: s, managerComment: c}); await refreshData(); } },
     addLeaveType: async (t: any) => { await db.addLeaveType(t); await refreshData(); },
     updateLeaveType: async (id: any, d: any) => { const ex = leaveTypes.find(t => String(t.id) === String(id)); if(ex) { await db.updateLeaveType({...ex, ...d}); await refreshData(); } },

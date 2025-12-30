@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2, CheckCircle2, XCircle
+  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -46,8 +46,9 @@ const MultiSelectUser = ({
   }, []);
 
   const handleSelect = (id: string) => {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter(sid => sid !== id));
+    const idStr = String(id);
+    if (selectedIds.map(String).includes(idStr)) {
+      onChange(selectedIds.filter(sid => String(sid) !== idStr));
     } else {
       onChange([...selectedIds, id]);
     }
@@ -62,11 +63,11 @@ const MultiSelectUser = ({
       >
         {selectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1">Select colleagues...</span>}
         {selectedIds.map(id => {
-          const user = options.find(u => String(u.id) === id);
+          const user = options.find(u => String(u.id) === String(id));
           return (
-            <span key={id} className="bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1.5 border border-teal-100">
+            <span key={String(id)} className="bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase px-2 py-1 rounded flex items-center gap-1.5 border border-teal-100">
               {user?.name}
-              <X size={10} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleSelect(id); }} />
+              <X size={10} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleSelect(String(id)); }} />
             </span>
           );
         })}
@@ -76,9 +77,9 @@ const MultiSelectUser = ({
       {isOpen && (
         <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 p-2">
             {options.map(user => (
-              <div key={user.id} onClick={() => handleSelect(String(user.id))} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.includes(String(user.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
-                <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.includes(String(user.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-200'}`}>
-                  {selectedIds.includes(String(user.id)) && <CheckCircle size={10} className="text-white" />}
+              <div key={user.id} onClick={() => handleSelect(String(user.id))} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
+                <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-200'}`}>
+                  {selectedIds.map(String).includes(String(user.id)) && <CheckCircle size={10} className="text-white" />}
                 </div>
                 <span className="text-sm font-bold text-slate-700 dark:text-white">{user.name}</span>
               </div>
@@ -94,16 +95,19 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast, notify, sendLeaveRequestEmail, sendLeaveStatusEmail, employees } = useAppContext();
+  const { showToast, notify, sendLeaveRequestEmail, sendLeaveStatusEmail, employees, deleteLeave } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [leaveToDelete, setLeaveToDelete] = useState<LeaveRequest | null>(null);
+  
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar'>('requests');
   const [currentCalDate, setCurrentCalDate] = useState(new Date());
-  const [isEditing, setIsEditing] = useState<string | null>(null);
+  const [isEditingId, setIsEditingId] = useState<string | number | null>(null);
   const [editingType, setEditingType] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    type: '', startDate: '', endDate: '', durationType: 'Full Day' as LeaveDurationType, reason: '', notifyUserIds: [], approverId: '', isUrgent: false
+    type: '', startDate: '', endDate: '', durationType: 'Full Day' as LeaveDurationType, reason: '', notifyUserIds: [] as (string|number)[], approverId: '', isUrgent: false
   });
 
   const [typeData, setTypeData] = useState({
@@ -140,13 +144,56 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   };
 
   const handleOpenCreate = () => {
-    setIsEditing(null);
+    setIsEditingId(null);
     setFormData({ 
       type: leaveTypes.filter(t => t.isActive)[0]?.name || '', 
       startDate: '', endDate: '', durationType: 'Full Day', reason: '', notifyUserIds: [], 
       approverId: String(currentUser?.managerId || ''), isUrgent: false
     });
     setShowModal(true);
+  };
+
+  const handleEditClick = (leave: LeaveRequest) => {
+    setIsEditingId(leave.id);
+    setFormData({
+      type: leave.type,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      durationType: leave.durationType || 'Full Day',
+      reason: leave.reason,
+      notifyUserIds: leave.notifyUserIds || [],
+      approverId: String(leave.approverId || ''),
+      isUrgent: !!leave.isUrgent
+    });
+    setShowModal(true);
+  };
+
+  const handleDeleteTrigger = (leave: LeaveRequest) => {
+    setLeaveToDelete(leave);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleWithdrawal = async () => {
+    if (!leaveToDelete) return;
+    
+    // Notify Manager
+    const manager = employees.find(emp => String(emp.id) === String(leaveToDelete.approverId));
+    if (manager) {
+        await notify(`Leave request from ${currentUser?.name} was withdrawn.`, manager.id);
+        await sendLeaveRequestEmail({
+            to: manager.email,
+            employeeName: currentUser?.name || 'Employee',
+            type: leaveToDelete.type,
+            startDate: leaveToDelete.startDate,
+            endDate: leaveToDelete.endDate,
+            reason: leaveToDelete.reason,
+            isWithdrawal: true
+        });
+    }
+
+    await deleteLeave(leaveToDelete.id);
+    setShowDeleteConfirm(false);
+    showToast("Leave request withdrawn.", "info");
   };
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
@@ -156,18 +203,17 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         endDate: formData.durationType === 'Half Day' ? formData.startDate : formData.endDate
     };
     
-    // UI Local update
-    if (isEditing) await editLeave(isEditing, finalData);
+    if (isEditingId) await editLeave(isEditingId, finalData);
     else await addLeave(finalData);
 
     // Notification Logic
     const manager = employees.find(emp => String(emp.id) === String(formData.approverId));
     const colleagueEmails = employees
-      .filter(emp => formData.notifyUserIds.some(id => String(id) === String(emp.id)))
+      .filter(emp => formData.notifyUserIds.map(String).includes(String(emp.id)))
       .map(emp => emp.email);
 
     if (manager) {
-        showToast("Dispatching notifications...", "info");
+        showToast(isEditingId ? "Updating notifications..." : "Dispatching notifications...", "info");
         
         // SMTP Email
         await sendLeaveRequestEmail({
@@ -177,18 +223,24 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             type: formData.type,
             startDate: finalData.startDate,
             endDate: finalData.endDate,
-            reason: formData.reason
+            reason: formData.reason,
+            isUpdate: !!isEditingId
         });
 
         // In-App
-        await notify(`${currentUser?.name} submitted a ${formData.type} request.`, manager.id);
-        colleagueEmails.forEach(async (_, idx) => {
-            await notify(`${currentUser?.name} is applying for leave.`, formData.notifyUserIds[idx]);
+        const updateMsg = isEditingId ? "updated their" : "submitted a";
+        await notify(`${currentUser?.name} ${updateMsg} ${formData.type} request.`, manager.id);
+        
+        formData.notifyUserIds.forEach(async (id) => {
+            const matchedColleague = employees.find(e => String(e.id) === String(id));
+            if (matchedColleague) {
+              await notify(`${currentUser?.name} is applying for leave (CC).`, matchedColleague.id);
+            }
         });
     }
 
     setShowModal(false);
-    showToast("Leave request submitted successfully.", "success");
+    showToast(isEditingId ? "Leave request updated." : "Leave request submitted.", "success");
   };
 
   const handleStatusUpdate = async (leave: LeaveRequest, newStatus: LeaveStatusEnum, comment: string = '') => {
@@ -311,8 +363,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {leaves.map(leave => {
                       const canApprove = (currentUser?.role === UserRole.MANAGER && String(leave.approverId) === String(currentUser?.id)) || isHR;
+                      const isOwnRequest = String(leave.userId) === String(currentUser?.id);
                       const isPending = leave.status === LeaveStatusEnum.PENDING_MANAGER || leave.status === LeaveStatusEnum.PENDING_HR;
-                      
+                      const canEditDelete = isOwnRequest && leave.status === LeaveStatusEnum.PENDING_MANAGER;
+
                       return (
                         <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
                           <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{leave.userName}</td>
@@ -326,12 +380,20 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                           </td>
                           <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
                           <td className="px-6 py-4 text-right">
-                              {canApprove && isPending && (
-                                  <div className="flex justify-end gap-2">
-                                      <button onClick={() => handleStatusUpdate(leave, LeaveStatusEnum.APPROVED)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition shadow-sm border border-emerald-100" title="Approve"><CheckCircle2 size={16}/></button>
-                                      <button onClick={() => { const reason = window.prompt("Reason for rejection:"); if(reason) handleStatusUpdate(leave, LeaveStatusEnum.REJECTED, reason); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition shadow-sm border border-rose-100" title="Reject"><XCircle size={16}/></button>
-                                  </div>
-                              )}
+                              <div className="flex justify-end gap-2">
+                                  {canApprove && isPending && (
+                                      <>
+                                          <button onClick={() => handleStatusUpdate(leave, LeaveStatusEnum.APPROVED)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition shadow-sm border border-emerald-100" title="Approve"><CheckCircle2 size={16}/></button>
+                                          <button onClick={() => { const reason = window.prompt("Reason for rejection:"); if(reason) handleStatusUpdate(leave, LeaveStatusEnum.REJECTED, reason); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition shadow-sm border border-rose-100" title="Reject"><XCircle size={16}/></button>
+                                      </>
+                                  )}
+                                  {canEditDelete && (
+                                      <>
+                                          <button onClick={() => handleEditClick(leave)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm border border-blue-100" title="Modify"><Edit2 size={16}/></button>
+                                          <button onClick={() => handleDeleteTrigger(leave)} className="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition shadow-sm border border-slate-100" title="Withdraw"><Trash2 size={16}/></button>
+                                      </>
+                                  )}
+                              </div>
                           </td>
                         </tr>
                       );
@@ -454,8 +516,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
           </div>
       )}
 
-      {/* NEW REQUEST MODAL */}
-      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? 'Edit Request' : 'New Leave Request'} width="max-w-xl">
+      {/* NEW/EDIT REQUEST MODAL */}
+      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditingId ? 'Modify Leave Request' : 'New Leave Request'} width="max-w-xl">
         <form onSubmit={handleLeaveSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
@@ -537,9 +599,26 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
             <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
               <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-400 text-xs font-black uppercase">Cancel</button>
-              <button type="submit" className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition-all active:scale-95">Submit Request</button>
+              <button type="submit" className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition-all active:scale-95">{isEditingId ? 'Update Request' : 'Submit Request'}</button>
             </div>
         </form>
+      </DraggableModal>
+
+      {/* WITHDRAW CONFIRM MODAL */}
+      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Withdraw Request" width="max-w-md">
+          <div className="text-center py-4">
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100 dark:border-red-800">
+                  <AlertTriangle className="text-red-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Withdraw Leave Request?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm px-4">
+                  Are you sure you want to withdraw this pending leave request? This action cannot be undone and your manager will be notified.
+              </p>
+          </div>
+          <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Keep Request</button>
+              <button onClick={handleWithdrawal} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-red-700">Withdraw Now</button>
+          </div>
       </DraggableModal>
 
       {/* POLICY MODAL */}

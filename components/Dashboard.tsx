@@ -1,8 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { Users, UserCheck, CalendarOff, TrendingUp } from 'lucide-react';
 import { Employee, EmployeeStatus, LeaveRequest, LeaveStatus, Department } from '../types';
@@ -13,7 +12,6 @@ interface DashboardProps {
   departments: Department[];
 }
 
-// Teal-based palette
 const COLORS = ['#0f766e', '#f59e0b', '#ef4444']; 
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string | number, icon: any, color: string, subtext?: string }) => (
@@ -31,14 +29,11 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string,
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ employees, leaves, departments }) => {
+const Dashboard: React.FC<DashboardProps> = ({ employees, leaves }) => {
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === EmployeeStatus.ACTIVE).length;
   const onLeaveEmployees = employees.filter(e => e.status === EmployeeStatus.ON_LEAVE).length;
   
-  // --- DYNAMIC SUBTEXT CALCULATIONS ---
-  
-  // 1. New Hires this month
   const newHiresThisMonth = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -49,17 +44,14 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves, departments })
     }).length;
   }, [employees]);
 
-  // 2. Active Workforce Percentage
   const activePercentage = useMemo(() => {
     if (totalEmployees === 0) return 0;
     return Math.round((activeEmployees / totalEmployees) * 100);
   }, [activeEmployees, totalEmployees]);
 
-  // 3. Approved Leaves for Today
   const approvedLeavesToday = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     return leaves.filter(leave => {
       if (leave.status !== LeaveStatus.APPROVED) return false;
       const start = new Date(leave.startDate);
@@ -68,21 +60,6 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves, departments })
     }).length;
   }, [leaves]);
 
-  // 4. Department Count for Open Positions (Positions usually tied to departments)
-  const deptCount = departments.length;
-
-  // Data for Department Chart
-  const deptCounts = employees.reduce((acc, curr) => {
-    acc[curr.department] = (acc[curr.department] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const deptData = Object.keys(deptCounts).map(key => ({
-    name: key,
-    employees: deptCounts[key]
-  }));
-
-  // Data for Status Chart
   const statusData = [
     { name: 'Active', value: activeEmployees },
     { name: 'On Leave', value: onLeaveEmployees },
@@ -128,28 +105,13 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves, departments })
           value="8" 
           icon={TrendingUp} 
           color="bg-violet-500"
-          subtext={`Across ${deptCount} departments`}
+          subtext="Active recruitment"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Employees by Department</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={deptData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#fff', color: '#333' }} />
-                <Bar dataKey="employees" fill="#0f766e" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Employee Status</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Workforce Distribution</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
@@ -171,6 +133,11 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves, departments })
               </PieChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-center items-center">
+            <TrendingUp size={48} className="text-teal-600 mb-4 opacity-20" />
+            <p className="text-slate-400 font-medium text-center">Organizational growth metrics and performance indicators will appear here as the period progresses.</p>
         </div>
       </div>
     </div>

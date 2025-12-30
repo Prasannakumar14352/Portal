@@ -230,24 +230,38 @@ apiRouter.post('/notify/project-assignment', async (req, res) => {
 // --- LEAVE NOTIFICATIONS ---
 apiRouter.post('/notify/leave-request', async (req, res) => {
     try {
-        const { to, cc, employeeName, type, startDate, endDate, reason } = req.body;
-        console.log(`📩 [LEAVE REQ] Notifying ${to} (CC: ${cc}) about ${employeeName}'s leave`);
+        const { to, cc, employeeName, type, startDate, endDate, reason, isUpdate, isWithdrawal } = req.body;
+        console.log(`📩 [LEAVE REQ] Notification for ${employeeName} - Update: ${!!isUpdate}, Withdrawal: ${!!isWithdrawal}`);
+
+        let subjectPrefix = "New Leave Request";
+        let statusTitle = "New Leave Request Submitted";
+        let statusColor = "#0d9488";
+
+        if (isWithdrawal) {
+            subjectPrefix = "Leave Request Withdrawn";
+            statusTitle = "Leave Request Withdrawn by Employee";
+            statusColor = "#94a3b8";
+        } else if (isUpdate) {
+            subjectPrefix = "Updated Leave Request";
+            statusTitle = "Leave Request Details Modified";
+            statusColor = "#2563eb";
+        }
 
         const mailOptions = {
             from: `"EmpowerCorp HR" <${SMTP_USER}>`,
             to: to,
             cc: cc,
-            subject: `Leave Request: ${employeeName} - ${type}`,
+            subject: `${subjectPrefix}: ${employeeName} - ${type}`,
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-                    <h2 style="color: #0d9488;">New Leave Request</h2>
+                    <h2 style="color: ${statusColor};">${statusTitle}</h2>
                     <p><strong>Employee:</strong> ${employeeName}</p>
                     <p><strong>Type:</strong> ${type}</p>
                     <p><strong>Period:</strong> ${startDate} to ${endDate}</p>
-                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0d9488; margin: 20px 0;">
+                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid ${statusColor}; margin: 20px 0;">
                         <p style="margin: 0; color: #334155;"><strong>Reason:</strong> ${reason}</p>
                     </div>
-                    <p>Please review this request in the HR Portal.</p>
+                    <p>${isWithdrawal ? 'No further action is required.' : 'Please review this request in the HR Portal.'}</p>
                 </div>`
         };
 
