@@ -147,10 +147,13 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
                       <span>Sync FROM Azure</span>
                   </button>
+                  {/* Invitation functionality hidden as requested */}
+                  {/* 
                   <button onClick={openAddModal} className="flex items-center space-x-2 bg-teal-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold active:scale-95 transition-transform">
                       <Send size={16} />
                       <span>Invite Employee</span>
-                  </button>
+                  </button> 
+                  */}
                 </>
             )}
         </div>
@@ -165,6 +168,9 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             Active Directory ({employees.length})
             {activeTab === 'active' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>}
           </button>
+          
+          {/* Invitation tab hidden as requested */}
+          {/* 
           <button 
             onClick={() => setActiveTab('invitations')}
             className={`px-6 py-3 text-sm font-bold transition-colors relative ${activeTab === 'invitations' ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -172,6 +178,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
             Pending Invitations ({invitations.length})
             {activeTab === 'invitations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>}
           </button>
+          */}
       </div>
 
       {/* Filter Bar */}
@@ -180,7 +187,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder={`Search ${activeTab}...`} 
+                placeholder={`Search members...`} 
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -350,7 +357,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         )}
       </DraggableModal>
 
-      {/* INVITE / EDIT MODAL */}
+      {/* EDIT MODAL (Invite hidden but form reused for editing) */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Send New Invitation'} width="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           {editingEmployee && editingEmployee.password === 'ms-auth-user' && (
@@ -362,20 +369,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                       <p className="text-sm font-bold text-blue-900 dark:text-blue-200 uppercase tracking-tight">Active SSO Directory Link</p>
                       <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
                           This employee is managed via Azure. Changes to <strong>Name, Position, and Department</strong> will be automatically pushed to the Azure Portal upon saving.
-                      </p>
-                  </div>
-              </div>
-          )}
-
-          {!editingEmployee && (
-              <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-xl border border-teal-100 dark:border-teal-800 flex items-start gap-4">
-                  <div className="bg-teal-600 text-white p-2 rounded-lg">
-                      <Mail size={20} />
-                  </div>
-                  <div>
-                      <p className="text-sm font-bold text-teal-900 dark:text-teal-200 uppercase tracking-tight">Onboarding Invitation</p>
-                      <p className="text-xs text-teal-700 dark:text-teal-400 leading-relaxed">
-                          We will generate an invitation. You can copy the link manually if the email notification is restricted in your sandbox environment.
                       </p>
                   </div>
               </div>
