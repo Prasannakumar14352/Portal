@@ -86,7 +86,7 @@ const initDb = async () => {
             { name: 'positions', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='positions' AND xtype='U') CREATE TABLE positions (id NVARCHAR(50) PRIMARY KEY, title NVARCHAR(255), description NVARCHAR(MAX))` },
             { name: 'roles', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U') CREATE TABLE roles (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(255), description NVARCHAR(MAX))` },
             { name: 'projects', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='projects' AND xtype='U') CREATE TABLE projects (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(255), description NVARCHAR(MAX), status NVARCHAR(50), tasks NVARCHAR(MAX), dueDate NVARCHAR(50))` },
-            { name: 'leaves', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U') CREATE TABLE leaves (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(255), type NVARCHAR(100), startDate NVARCHAR(50), endDate NVARCHAR(50), durationType NVARCHAR(50), reason NVARCHAR(MAX), status NVARCHAR(50), approverId NVARCHAR(50), isUrgent BIT, managerComment NVARCHAR(MAX))` },
+            { name: 'leaves', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U') CREATE TABLE leaves (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(255), type NVARCHAR(100), startDate NVARCHAR(50), endDate NVARCHAR(50), durationType NVARCHAR(50), reason NVARCHAR(MAX), status NVARCHAR(50), approverId NVARCHAR(50), isUrgent BIT, managerComment NVARCHAR(MAX), notifyUserIds NVARCHAR(MAX))` },
             { name: 'leave_types', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leave_types' AND xtype='U') CREATE TABLE leave_types (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(100), days INT, description NVARCHAR(MAX), isActive BIT, color NVARCHAR(50))` },
             { name: 'attendance', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='attendance' AND xtype='U') CREATE TABLE attendance (id NVARCHAR(50) PRIMARY KEY, employeeId NVARCHAR(50), employeeName NVARCHAR(255), date NVARCHAR(50), checkIn NVARCHAR(50), checkOut NVARCHAR(50), checkInTime NVARCHAR(100), checkOutTime NVARCHAR(100), status NVARCHAR(50), notes NVARCHAR(MAX), workLocation NVARCHAR(100))` },
             { name: 'time_entries', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='time_entries' AND xtype='U') CREATE TABLE time_entries (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), projectId NVARCHAR(50), task NVARCHAR(255), date NVARCHAR(50), durationMinutes INT, extraMinutes INT, description NVARCHAR(MAX), status NVARCHAR(50), isBillable BIT)` },
@@ -104,7 +104,7 @@ const initDb = async () => {
 
 const apiRouter = express.Router();
 
-// Generic helper for tables
+// Improved setupCrud with POST and PUT support
 const setupCrud = (route, table, parseFields = []) => {
     apiRouter.get(`/${route}`, async (req, res) => {
         try {
@@ -118,18 +118,50 @@ const setupCrud = (route, table, parseFields = []) => {
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
+    apiRouter.post(`/${route}`, async (req, res) => {
+        try {
+            const data = req.body;
+            const request = pool.request();
+            const keys = Object.keys(data);
+            keys.forEach(k => {
+                let val = data[k];
+                if (typeof val === 'object') val = JSON.stringify(val);
+                request.input(k, val);
+            });
+            const cols = keys.join(', ');
+            const params = keys.map(k => `@${k}`).join(', ');
+            await request.query(`INSERT INTO ${table} (${cols}) VALUES (${params})`);
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    apiRouter.put(`/${route}/:id`, async (req, res) => {
+        try {
+            const data = req.body;
+            const request = pool.request();
+            request.input('id', req.params.id);
+            const sets = Object.keys(data).filter(k => k !== 'id').map(k => {
+                let val = data[k];
+                if (typeof val === 'object') val = JSON.stringify(val);
+                request.input(k, val);
+                return `${k}=@${k}`;
+            }).join(', ');
+            await request.query(`UPDATE ${table} SET ${sets} WHERE id=@id`);
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
     apiRouter.delete(`/${route}/:id`, async (req, res) => {
         try {
             const request = pool.request();
             request.input('id', sql.NVarChar, req.params.id);
             await request.query(`DELETE FROM ${table} WHERE id=@id`);
-            console.log(`🗑️ [DELETE SUCCESS] Removed record ${req.params.id} from ${table}`);
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 };
 
-// --- EMPLOYEES ---
+// --- EMPLOYEES (Custom for Project List JSON) ---
 apiRouter.get('/employees', async (req, res) => {
     try {
         const result = await pool.request().query("SELECT * FROM employees");
@@ -163,80 +195,63 @@ apiRouter.post('/employees', async (req, res) => {
         
         await request.query(`INSERT INTO employees (id, employeeId, firstName, lastName, email, password, role, position, department, departmentId, projectIds, joinDate, status, salary, avatar, managerId, phone, workLocation, jobTitle) 
                              VALUES (@id, @employeeId, @firstName, @lastName, @email, @password, @role, @position, @department, @departmentId, @projectIds, @joinDate, @status, @salary, @avatar, @managerId, @phone, @workLocation, @jobTitle)`);
-        console.log(`👤 [EMPLOYEE CREATED] ${e.firstName} ${e.lastName} (ID: ${e.employeeId})`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.put('/employees/:id', async (req, res) => {
+// --- LEAVES (Explicit handling for BIT and JSON) ---
+apiRouter.post('/leaves', async (req, res) => {
     try {
-        const e = req.body;
+        const l = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(l.id));
+        request.input('userId', sql.NVarChar, toStr(l.userId));
+        request.input('userName', sql.NVarChar, toStr(l.userName));
+        request.input('type', sql.NVarChar, toStr(l.type));
+        request.input('startDate', sql.NVarChar, toStr(l.startDate));
+        request.input('endDate', sql.NVarChar, toStr(l.endDate));
+        request.input('durationType', sql.NVarChar, toStr(l.durationType));
+        request.input('reason', sql.NVarChar, toStr(l.reason));
+        request.input('status', sql.NVarChar, toStr(l.status));
+        request.input('approverId', sql.NVarChar, toStr(l.approverId));
+        request.input('isUrgent', sql.Bit, toBit(l.isUrgent));
+        request.input('notifyUserIds', sql.NVarChar, JSON.stringify(l.notifyUserIds || []));
+        request.input('managerComment', sql.NVarChar, toStr(l.managerComment));
+        
+        await request.query(`INSERT INTO leaves (id, userId, userName, type, startDate, endDate, durationType, reason, status, approverId, isUrgent, notifyUserIds, managerComment) 
+                             VALUES (@id, @userId, @userName, @type, @startDate, @endDate, @durationType, @reason, @status, @approverId, @isUrgent, @notifyUserIds, @managerComment)`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.put('/leaves/:id', async (req, res) => {
+    try {
+        const l = req.body;
         const request = pool.request();
         request.input('id', sql.NVarChar, req.params.id);
-        request.input('firstName', sql.NVarChar, toStr(e.firstName));
-        request.input('lastName', sql.NVarChar, toStr(e.lastName));
-        request.input('role', sql.NVarChar, toStr(e.role));
-        request.input('position', sql.NVarChar, toStr(e.position));
-        request.input('department', sql.NVarChar, toStr(e.department));
-        request.input('departmentId', sql.NVarChar, toStr(e.departmentId));
-        request.input('projectIds', sql.NVarChar, JSON.stringify(e.projectIds || []));
-        request.input('status', sql.NVarChar, toStr(e.status));
-        request.input('salary', sql.Float, toFloat(e.salary));
-        request.input('avatar', sql.NVarChar, toStr(e.avatar));
-        request.input('managerId', sql.NVarChar, toStr(e.managerId));
-        request.input('phone', sql.NVarChar, toStr(e.phone));
-        request.input('workLocation', sql.NVarChar, toStr(e.workLocation));
-        request.input('jobTitle', sql.NVarChar, toStr(e.jobTitle));
-
-        await request.query(`UPDATE employees SET firstName=@firstName, lastName=@lastName, role=@role, position=@position, department=@department, departmentId=@departmentId, projectIds=@projectIds, status=@status, salary=@salary, avatar=@avatar, managerId=@managerId, phone=@phone, workLocation=@workLocation, jobTitle=@jobTitle WHERE id=@id`);
-        console.log(`📝 [EMPLOYEE UPDATED] ${e.firstName} ${e.lastName} (Project IDs: ${JSON.stringify(e.projectIds)})`);
+        request.input('type', sql.NVarChar, toStr(l.type));
+        request.input('startDate', sql.NVarChar, toStr(l.startDate));
+        request.input('endDate', sql.NVarChar, toStr(l.endDate));
+        request.input('durationType', sql.NVarChar, toStr(l.durationType));
+        request.input('reason', sql.NVarChar, toStr(l.reason));
+        request.input('status', sql.NVarChar, toStr(l.status));
+        request.input('approverId', sql.NVarChar, toStr(l.approverId));
+        request.input('isUrgent', sql.Bit, toBit(l.isUrgent));
+        request.input('notifyUserIds', sql.NVarChar, JSON.stringify(l.notifyUserIds || []));
+        request.input('managerComment', sql.NVarChar, toStr(l.managerComment));
+        
+        await request.query(`UPDATE leaves SET type=@type, startDate=@startDate, endDate=@endDate, durationType=@durationType, reason=@reason, status=@status, approverId=@approverId, isUrgent=@isUrgent, notifyUserIds=@notifyUserIds, managerComment=@managerComment WHERE id=@id`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NOTIFY PROJECT ASSIGNMENT ---
-apiRouter.post('/notify/project-assignment', async (req, res) => {
-    try {
-        const { email, firstName, projectName, projectDescription } = req.body;
-        console.log(`📩 [EMAIL PROCESS] Attempting to notify ${email} for project "${projectName}"`);
-        
-        const mailOptions = {
-            from: `"EmpowerCorp Projects" <${SMTP_USER}>`,
-            to: email,
-            subject: `New Project Assignment: ${projectName}`,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-                    <h2 style="color: #0f766e;">Project Assignment: ${projectName}</h2>
-                    <p>Hello ${firstName},</p>
-                    <p>You have been assigned to a new project: <strong>${projectName}</strong>.</p>
-                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0f766e; margin: 20px 0;">
-                        <p style="margin: 0; color: #334155;">${projectDescription || 'No description provided.'}</p>
-                    </div>
-                    <div style="text-align: center;">
-                        <a href="${req.headers.origin || 'http://localhost:5173'}/time-logs" style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Project Tasks</a>
-                    </div>
-                </div>`
-        };
-
-        const info = await transporter.sendMail(mailOptions);
-        console.log(`✅ [EMAIL SUCCESS] Successfully sent to ${email} (MessageID: ${info.messageId})`);
-        res.json({ success: true, messageId: info.messageId });
-    } catch (err) { 
-        console.error(`❌ [EMAIL ERROR] Failed to send to ${req.body.email}:`, err.message);
-        res.status(500).json({ error: 'Mail delivery failed: ' + err.message }); 
-    }
-});
-
-// --- LEAVE NOTIFICATIONS ---
+// --- NOTIFY ENDPOINTS ---
 apiRouter.post('/notify/leave-request', async (req, res) => {
     try {
         const { to, cc, employeeName, type, startDate, endDate, reason, isUpdate, isWithdrawal } = req.body;
-        console.log(`📩 [LEAVE REQ] Notification for ${employeeName} - Update: ${!!isUpdate}, Withdrawal: ${!!isWithdrawal}`);
-
         let subjectPrefix = "New Leave Request";
         let statusTitle = "New Leave Request Submitted";
         let statusColor = "#0d9488";
-
         if (isWithdrawal) {
             subjectPrefix = "Leave Request Withdrawn";
             statusTitle = "Leave Request Withdrawn by Employee";
@@ -246,68 +261,58 @@ apiRouter.post('/notify/leave-request', async (req, res) => {
             statusTitle = "Leave Request Details Modified";
             statusColor = "#2563eb";
         }
-
         const mailOptions = {
             from: `"EmpowerCorp HR" <${SMTP_USER}>`,
-            to: to,
-            cc: cc,
-            subject: `${subjectPrefix}: ${employeeName} - ${type}`,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            to: to, cc: cc, subject: `${subjectPrefix}: ${employeeName} - ${type}`,
+            html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                     <h2 style="color: ${statusColor};">${statusTitle}</h2>
-                    <p><strong>Employee:</strong> ${employeeName}</p>
-                    <p><strong>Type:</strong> ${type}</p>
-                    <p><strong>Period:</strong> ${startDate} to ${endDate}</p>
-                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid ${statusColor}; margin: 20px 0;">
-                        <p style="margin: 0; color: #334155;"><strong>Reason:</strong> ${reason}</p>
-                    </div>
-                    <p>${isWithdrawal ? 'No further action is required.' : 'Please review this request in the HR Portal.'}</p>
-                </div>`
+                    <p><strong>Employee:</strong> ${employeeName}</p><p><strong>Type:</strong> ${type}</p><p><strong>Period:</strong> ${startDate} to ${endDate}</p>
+                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid ${statusColor}; margin: 20px 0;"><p style="margin: 0; color: #334155;"><strong>Reason:</strong> ${reason}</p></div>
+                    <p>${isWithdrawal ? 'No further action is required.' : 'Please review this request in the HR Portal.'}</p></div>`
         };
-
-        const info = await transporter.sendMail(mailOptions);
-        res.json({ success: true, messageId: info.messageId });
-    } catch (err) {
-        console.error(`❌ [LEAVE REQ ERROR]:`, err.message);
-        res.status(500).json({ error: err.message });
-    }
+        await transporter.sendMail(mailOptions);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 apiRouter.post('/notify/leave-status', async (req, res) => {
     try {
         const { to, employeeName, status, type, managerComment, hrAction } = req.body;
-        console.log(`📩 [LEAVE STATUS] Notifying ${to} about ${employeeName}'s leave status: ${status}`);
-
         const mailOptions = {
             from: `"EmpowerCorp HR" <${SMTP_USER}>`,
-            to: to,
-            subject: `Leave Request Update: ${employeeName} - ${status}`,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            to: to, subject: `Leave Request Update: ${employeeName} - ${status}`,
+            html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                     <h2 style="color: ${status === 'Approved' ? '#059669' : '#dc2626'};">Leave Request ${status}</h2>
-                    <p>Hello,</p>
-                    <p>The leave request for <strong>${employeeName}</strong> (${type}) has been <strong>${status.toLowerCase()}</strong>${hrAction ? ' by HR' : ' by the manager'}.</p>
+                    <p>Hello,</p><p>The leave request for <strong>${employeeName}</strong> (${type}) has been <strong>${status.toLowerCase()}</strong>${hrAction ? ' by HR' : ' by the manager'}.</p>
                     ${managerComment ? `<div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #94a3b8; margin: 20px 0;"><p style="margin: 0;"><strong>Comment:</strong> ${managerComment}</p></div>` : ''}
-                    <p>Login to the portal for more details.</p>
-                </div>`
+                    <p>Login to the portal for more details.</p></div>`
         };
-
-        const info = await transporter.sendMail(mailOptions);
-        res.json({ success: true, messageId: info.messageId });
-    } catch (err) {
-        console.error(`❌ [LEAVE STATUS ERROR]:`, err.message);
-        res.status(500).json({ error: err.message });
-    }
+        await transporter.sendMail(mailOptions);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- DEPARTMENTS ---
-apiRouter.get('/departments', async (req, res) => { try { const r = await pool.request().query("SELECT * FROM departments"); res.json(r.recordset); } catch (err) { res.status(500).json({ error: err.message }); } });
-apiRouter.post('/departments', async (req, res) => { try { const d = req.body; const r = pool.request(); r.input('id', sql.NVarChar, toStr(d.id)); r.input('name', sql.NVarChar, toStr(d.name)); r.input('description', sql.NVarChar, toStr(d.description)); r.input('managerId', sql.NVarChar, toStr(d.managerId)); await r.query(`INSERT INTO departments (id, name, description, managerId) VALUES (@id, @name, @description, @managerId)`); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
+apiRouter.post('/notify/project-assignment', async (req, res) => {
+    try {
+        const { email, firstName, projectName, projectDescription } = req.body;
+        const mailOptions = {
+            from: `"EmpowerCorp Projects" <${SMTP_USER}>`,
+            to: email, subject: `New Project Assignment: ${projectName}`,
+            html: `<div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                    <h2 style="color: #0f766e;">Project Assignment: ${projectName}</h2><p>Hello ${firstName},</p><p>You have been assigned to a new project: <strong>${projectName}</strong>.</p>
+                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0f766e; margin: 20px 0;"><p style="margin: 0; color: #334155;">${projectDescription || 'No description provided.'}</p></div>
+                    <div style="text-align: center;"><a href="${req.headers.origin || 'http://localhost:5173'}/time-logs" style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Project Tasks</a></div></div>`
+        };
+        await transporter.sendMail(mailOptions);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Setup rest of CRUD
+setupCrud('departments', 'departments');
 setupCrud('positions', 'positions');
 setupCrud('roles', 'roles');
-apiRouter.get('/projects', async (req, res) => { try { const r = await pool.request().query("SELECT * FROM projects"); res.json(r.recordset.map(p => ({ ...p, tasks: parseJSON(p.tasks) || [] }))); } catch (err) { res.status(500).json({ error: err.message }); } });
-apiRouter.post('/projects', async (req, res) => { try { const p = req.body; const r = pool.request(); r.input('id', sql.NVarChar, toStr(p.id)); r.input('name', sql.NVarChar, toStr(p.name)); r.input('description', sql.NVarChar, toStr(p.description)); r.input('status', sql.NVarChar, toStr(p.status)); r.input('tasks', sql.NVarChar, JSON.stringify(p.tasks || [])); r.input('dueDate', sql.NVarChar, toStr(p.dueDate)); await r.query(`INSERT INTO projects (id, name, description, status, tasks, dueDate) VALUES (@id, @name, @description, @status, @tasks, @dueDate)`); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
-setupCrud('leaves', 'leaves');
+setupCrud('projects', 'projects', ['tasks']);
 setupCrud('leave_types', 'leave_types');
 setupCrud('attendance', 'attendance');
 setupCrud('time_entries', 'time_entries');
