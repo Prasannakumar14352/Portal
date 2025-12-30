@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Department, Project, Employee, Role, Position } from '../types';
-import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2, Calendar, MoreVertical, ListChecks } from 'lucide-react';
+import { Briefcase, FolderPlus, Trash2, Building2, Users, Edit2, Layers, CheckCircle, Filter, Plus, Minus, X, ChevronLeft, ChevronRight, Network, MapPin, BadgeCheck, Eye, AlertTriangle, Save, Shield, ListTodo, UserSquare, Search, CheckCircle2, Layout, ZoomIn, ZoomOut, RefreshCw, Maximize2, Calendar, MoreVertical, ListChecks, Move } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 
@@ -73,7 +72,7 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
             <div className="w-px h-3 bg-slate-300 dark:bg-slate-600 mb-0.5"></div>
             <button 
-              onClick={() => setExpanded(!expanded)} 
+              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} 
               className={`flex items-center justify-center w-4 h-4 rounded-full border bg-white dark:bg-slate-700 shadow-sm transition-all hover:scale-110 ${expanded ? 'border-teal-500 text-teal-600' : 'border-slate-300 text-slate-400'}`}
             >
               {expanded ? <Minus size={8} strokeWidth={4} /> : <Plus size={8} strokeWidth={4} />}
@@ -228,6 +227,9 @@ const Organization = () => {
   const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'positions' | 'projects' | 'allocations' | 'chart' | 'locations'>('departments');
   const [chartDeptFilter, setChartDeptFilter] = useState<string>('all');
   const [chartZoom, setChartZoom] = useState<number>(0.85);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
   
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showPosModal, setShowPosModal] = useState(false);
@@ -432,9 +434,33 @@ const Organization = () => {
               const treeWidth = treeEl.scrollWidth;
               const optimalZoom = Math.min(1.2, Math.max(0.3, (containerWidth - 40) / treeWidth));
               setChartZoom(optimalZoom);
+              setPanOffset({ x: 0, y: 0 }); // Center on fit
           }
       }
   };
+
+  // --- Chart Panning & Zooming Logic ---
+  const handleWheel = (e: React.WheelEvent) => {
+    const delta = e.deltaY * -0.001;
+    const newZoom = Math.min(1.5, Math.max(0.3, chartZoom + delta));
+    setChartZoom(newZoom);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    setIsPanning(true);
+    panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setPanOffset({
+      x: e.clientX - panStartRef.current.x,
+      y: e.clientY - panStartRef.current.y
+    });
+  };
+
+  const handleMouseUp = () => setIsPanning(false);
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -668,31 +694,40 @@ const Organization = () => {
        {activeTab === 'chart' && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-                    <button onClick={() => { setChartDeptFilter('all'); setChartZoom(0.85); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === 'all' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>All Company</button>
-                    {departments.map(d => (
-                        <button key={d.id} onClick={() => { setChartDeptFilter(String(d.id)); setTimeout(handleAutoFit, 100); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${chartDeptFilter === String(d.id) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{d.name}</button>
-                    ))}
+                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-bold">
+                    <Move size={14} className="text-teal-600" />
+                    <span>Scroll to Zoom • Drag to Pan</span>
                 </div>
                 <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
                     <button onClick={() => setChartZoom(prev => Math.max(0.3, prev - 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><ZoomOut size={16}/></button>
                     <span className="text-[10px] font-black text-slate-400 w-12 text-center">{Math.round(chartZoom * 100)}%</span>
                     <button onClick={() => setChartZoom(prev => Math.min(1.5, prev + 0.1))} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><ZoomIn size={16}/></button>
                     <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
-                    <button onClick={handleAutoFit} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><Maximize2 size={15}/></button>
-                    <button onClick={() => setChartZoom(1)} className="p-1 text-slate-500 hover:text-teal-600 transition-colors"><RefreshCw size={14}/></button>
+                    <button onClick={handleAutoFit} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Fit to Screen"><Maximize2 size={15}/></button>
+                    <button onClick={() => { setChartZoom(1); setPanOffset({ x: 0, y: 0 }); }} className="p-1 text-slate-500 hover:text-teal-600 transition-colors" title="Reset View"><RefreshCw size={14}/></button>
                 </div>
             </div>
-            <div ref={treeContainerRef} className="bg-white dark:bg-slate-800 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-700 overflow-hidden relative group">
-                <div className="p-4 md:p-8 overflow-auto min-h-[600px] flex justify-center bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] dark:bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:32px_32px] custom-scrollbar">
+            <div 
+              ref={treeContainerRef} 
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              className={`bg-white dark:bg-slate-800 rounded-2xl shadow-inner border border-slate-200 dark:border-slate-700 overflow-hidden relative group h-[650px] ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+            >
+                <div className="absolute inset-0 p-4 md:p-8 flex justify-center bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] dark:bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:32px_32px]">
                     {orgTreeData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-slate-400 pt-20">
                             <Network size={48} className="mb-4 opacity-20" />
                             <p className="font-bold text-xs uppercase tracking-widest">No matching records</p>
                         </div>
                     ) : (
-                        <div className="org-tree transition-all duration-300 ease-out origin-top" style={{ transform: `scale(${chartZoom})` }}>
-                            <ul>{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul>
+                        <div 
+                          className="org-tree transition-transform duration-75 ease-out origin-top inline-block" 
+                          style={{ transform: `translate3d(${panOffset.x}px, ${panOffset.y}px, 0) scale(${chartZoom})` }}
+                        >
+                            <ul className="pointer-events-auto">{orgTreeData.map(node => <OrgChartNode key={node.id} node={node} />)}</ul>
                         </div>
                     )}
                 </div>
