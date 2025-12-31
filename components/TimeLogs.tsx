@@ -50,13 +50,22 @@ const TimeLogs = () => {
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const NO_PROJECT_ID = "NO_PROJECT";
 
-  // Dynamic Subtasks
+  // Dynamic Subtasks - Defensively handled for SQL JSON strings
   const availableTasks = useMemo(() => {
     if (!formData.projectId || formData.projectId === NO_PROJECT_ID) {
       return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training', 'Public Holiday'];
     }
     const project = projects.find(p => String(p.id) === String(formData.projectId));
-    return project?.tasks || [];
+    if (!project) return [];
+    
+    let tasks = project.tasks;
+    if (typeof tasks === 'string') {
+        try {
+            const parsed = JSON.parse(tasks);
+            tasks = Array.isArray(parsed) ? parsed : [];
+        } catch (e) { tasks = []; }
+    }
+    return Array.isArray(tasks) ? tasks : [];
   }, [formData.projectId, projects]);
 
   useEffect(() => {

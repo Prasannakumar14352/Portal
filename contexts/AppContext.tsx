@@ -22,6 +22,18 @@ const formatTime12 = (date: Date) => {
   }).toLowerCase();
 };
 
+const safeParseArray = (val: any) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+        try {
+            const parsed = JSON.parse(val);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) { return []; }
+    }
+    return [];
+};
+
 interface AppContextType {
   employees: Employee[];
   users: Employee[]; 
@@ -132,12 +144,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         db.getLeaves(), db.getLeaveTypes(), db.getAttendance(), db.getTimeEntries(),
         db.getNotifications(), db.getHolidays(), db.getPayslips(), db.getInvitations()
       ]);
-      setEmployees(empData);
+
+      // Sanitize data from API (SQL often returns JSON arrays as strings)
+      const sanitizedEmployees = empData.map((e: any) => ({ ...e, projectIds: safeParseArray(e.projectIds) }));
+      const sanitizedProjects = projData.map((p: any) => ({ ...p, tasks: safeParseArray(p.tasks) }));
+      const sanitizedLeaves = leaveData.map((l: any) => ({ ...l, notifyUserIds: safeParseArray(l.notifyUserIds) }));
+
+      setEmployees(sanitizedEmployees);
       setDepartments(deptData);
       setRoles(roleData);
       setPositions(posData);
-      setProjects(projData);
-      setLeaves(leaveData);
+      setProjects(sanitizedProjects);
+      setLeaves(sanitizedLeaves);
       setLeaveTypes(typeData);
       setAttendance(attendData);
       setTimeEntries(timeData);
@@ -447,7 +465,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await db.addNotification({ 
             id: Math.random().toString(36).substr(2,9), 
             userId: targetId, 
-            title: 'Leave Update', 
+            title: 'Update Notification', 
             message: message, 
             time: 'Just now', 
             read: false,
@@ -465,11 +483,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const yearHolidays = holidays.filter(h => h.date.startsWith(targetYear));
     const todayStr = formatDateISO(new Date());
 
-    showToast(`Syncing holidays for ${targetYear}...`, "info");
+    showToast(`Commencing Holiday Sync for ${targetYear}...`, "info");
     let createdCount = 0;
+    let errors = 0;
 
     for (const h of yearHolidays) {
-        if (h.date > todayStr) continue; // Don't log future holidays yet
+        if (h.date > todayStr) continue; // Past holidays only
 
         for (const emp of activeEmps) {
             const alreadyLogged = timeEntries.some(t => 
@@ -477,28 +496,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             );
 
             if (!alreadyLogged) {
-                await db.addTimeEntry({
-                    id: `hol-${h.id}-${emp.id}`,
-                    userId: emp.id,
-                    projectId: '',
-                    task: 'Public Holiday',
-                    date: h.date,
-                    durationMinutes: 480, // 8 hours
-                    extraMinutes: 0,
-                    description: `System generated log for ${h.name}.`,
-                    status: 'Approved',
-                    isBillable: false
-                });
-                createdCount++;
+                try {
+                    await db.addTimeEntry({
+                        id: `hol-${h.id}-${emp.id}`,
+                        userId: emp.id,
+                        projectId: '',
+                        task: 'Public Holiday',
+                        date: h.date,
+                        durationMinutes: 480, // 8 hours
+                        extraMinutes: 0,
+                        description: `System auto-log for ${h.name}.`,
+                        status: 'Approved',
+                        isBillable: false
+                    });
+                    createdCount++;
+                } catch (e) {
+                    console.error("Failed to log holiday for employee:", emp.id, e);
+                    errors++;
+                }
             }
         }
     }
 
+    await refreshData();
     if (createdCount > 0) {
-        await refreshData();
-        showToast(`Created ${createdCount} holiday time logs.`, "success");
+        showToast(`Sync Complete: ${createdCount} logs created.${errors > 0 ? ` (${errors} failed)` : ''}`, "success");
     } else {
-        showToast("Holiday logs are already up to date.", "info");
+        showToast("Directory already synchronized with company holidays.", "info");
     }
   };
 
@@ -574,8 +598,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTimeEntry: async (e: any) => { await db.addTimeEntry({...e, id: Math.random().toString(36).substr(2,9)}); await refreshData(); },
     updateTimeEntry: async (id: any, d: any) => { const ex = timeEntries.find(e => String(e.id) === String(id)); if(ex) { await db.updateTimeEntry({...ex, ...d}); await refreshData(); } },
     deleteTimeEntry: async (id: any) => { await db.deleteTimeEntry(id.toString()); await refreshData(); },
-    checkIn: async () => { if(!currentUser) return; const now = new Date(); const rec: AttendanceRecord = { id: Math.random().toString(36).substr(2,9), employeeId: currentUser.id, employeeName: currentUser.name, date: formatDateISO(now), checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: 'Present', workLocation: 'Office' }; await db.addAttendance(rec); await refreshData(); },
-    checkOut: async () => { if(!currentUser) return; const today = formatDateISO(new Date()); const rec = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today && !a.checkOut); if(rec) { const now = new Date(); await db.updateAttendance({...rec, checkOut: formatTime12(now), checkOutTime: now.toISOString()}); await refreshData(); } },
+    checkIn: async () => { if(!currentUser) return; try { const now = new Date(); const rec: AttendanceRecord = { id: Math.random().toString(36).substr(2,9), employeeId: currentUser.id, employeeName: currentUser.name, date: formatDateISO(now), checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: 'Present', workLocation: 'Office' }; await db.addAttendance(rec); await refreshData(); showToast("Punch In Successful", "success"); } catch(e) { showToast("Punch In Failed", "error"); } },
+    checkOut: async () => { if(!currentUser) return; const today = formatDateISO(new Date()); const rec = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today && !a.checkOut); if(rec) { try { const now = new Date(); await db.updateAttendance({...rec, checkOut: formatTime12(now), checkOutTime: now.toISOString()}); await refreshData(); showToast("Punch Out Successful", "success"); } catch(e) { showToast("Punch Out Failed", "error"); } } },
     updateAttendanceRecord: async (r: any) => { await db.updateAttendance(r); await refreshData(); },
     deleteAttendanceRecord: async (id: any) => { await db.deleteAttendance(id.toString()); await refreshData(); },
     getTodayAttendance: () => { if(!currentUser) return undefined; const today = formatDateISO(new Date()); return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today); },

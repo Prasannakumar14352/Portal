@@ -91,7 +91,6 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
     let cleanup = false;
     const loadArcGIS = () => {
       return new Promise<void>((resolve, reject) => {
-        // Fix: Use type assertion to avoid property 'require' does not exist on type 'Window'
         if ((window as any).require) { resolve(); return; }
         const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://js.arcgis.com/4.29/esri/themes/light/main.css'; document.head.appendChild(link);
         const script = document.createElement('script'); script.src = 'https://js.arcgis.com/4.29/'; script.async = true; script.onload = () => resolve(); script.onerror = (e) => reject(e); document.body.appendChild(script);
@@ -101,7 +100,6 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
       try {
         await loadArcGIS();
         if (cleanup || !mapDiv.current) return;
-        // Fix: Use type assertion to avoid property 'require' does not exist on type 'Window'
         (window as any).require(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer"], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
           if (cleanup) return;
           const map = new EsriMap({ basemap: "topo-vector" });
@@ -302,8 +300,14 @@ const Organization = () => {
   };
 
   const openProjectEdit = (project: Project) => {
-      const projMembers = employees.filter(e => (e.projectIds || []).some(p => String(p) === String(project.id))).map(e => e.id);
-      setProjectForm({ ...project, employeeIds: projMembers });
+      // Defensive parsing for members list
+      const projMembers = employees.filter(e => {
+          const pIds = Array.isArray(e.projectIds) ? e.projectIds : [];
+          return pIds.some(p => String(p) === String(project.id));
+      }).map(e => e.id);
+      
+      const sanitizedTasks = Array.isArray(project.tasks) ? project.tasks : [];
+      setProjectForm({ ...project, tasks: sanitizedTasks, employeeIds: projMembers });
       setShowProjectModal(true);
   };
 
@@ -342,7 +346,7 @@ const Organization = () => {
                           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><ListTodo size={14} className="text-emerald-600"/> Associated Deliverables</label>
                           <div className="flex gap-2"><input type="text" placeholder="Add task..." className="flex-1 px-4 py-2 border rounded-xl dark:bg-slate-900 bg-white border-slate-200 outline-none focus:ring-1 focus:ring-emerald-500 text-sm" value={newTaskInput} onChange={e => setNewTaskInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTask())}/><button type="button" onClick={addTask} className="px-4 py-2 bg-slate-800 text-white rounded-xl font-bold text-xs">Add</button></div>
                           <div className="flex flex-wrap gap-2 pt-1">
-                              {projectForm.tasks.map((task: string, idx: number) => (
+                              {(projectForm.tasks || []).map((task: string, idx: number) => (
                                   <div key={idx} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-xs font-bold">
                                       <span>{task}</span><button type="button" onClick={() => removeTask(idx)} className="text-emerald-400 hover:text-emerald-600"><X size={14}/></button>
                                   </div>
