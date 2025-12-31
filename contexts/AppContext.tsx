@@ -442,16 +442,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const notify = async (message: string, userId?: string | number) => {
     const targetId = userId || currentUser?.id;
     if(!targetId) return;
-    await db.addNotification({ 
-        id: Math.random().toString(36).substr(2,9), 
-        userId: targetId, 
-        title: 'Leave Update', 
-        message: message, 
-        time: 'Just now', 
-        read: false,
-        type: 'info'
-    }); 
-    await refreshData();
+    try {
+        await db.addNotification({ 
+            id: Math.random().toString(36).substr(2,9), 
+            userId: targetId, 
+            title: 'Leave Update', 
+            message: message, 
+            time: 'Just now', 
+            read: false,
+            type: 'info'
+        }); 
+        await refreshData();
+    } catch (err) {
+        console.error("Failed to save notification to DB:", err);
+    }
   };
 
   const sendProjectAssignmentEmail = async (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => {
@@ -515,9 +519,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addProject: async (p: any) => { const finalId = p.id || Math.random().toString(36).substr(2,9); await db.addProject({...p, id: finalId}); await refreshData(); },
     updateProject: async (id: any, data: any) => { const ex = projects.find(p => String(p.id) === String(id)); if(ex) { await db.updateProject({...ex, ...data}); await refreshData(); } },
     deleteProject: async (id: any) => { await db.deleteProject(id.toString()); await refreshData(); },
-    addLeave: async (l: any) => { await db.addLeave(l); await refreshData(); },
+    addLeave: async (l: any) => { try { await db.addLeave(l); await refreshData(); showToast("Leave request created", "success"); } catch(e) { showToast("Failed to create leave", "error"); throw e; } },
     addLeaves: async (ls: any[]) => { for(const l of ls) await db.addLeave(l); await refreshData(); },
-    updateLeave: async (id: any, d: any) => { const ex = leaves.find(l => String(l.id) === String(id)); if(ex) { await db.updateLeave({...ex, ...d}); await refreshData(); } },
+    updateLeave: async (id: any, d: any) => { try { const ex = leaves.find(l => String(l.id) === String(id)); if(ex) { await db.updateLeave({...ex, ...d}); await refreshData(); showToast("Leave updated", "success"); } } catch(e) { showToast("Failed to update leave", "error"); throw e; } },
     deleteLeave: async (id: any) => { await db.deleteLeave(id.toString()); await refreshData(); },
     updateLeaveStatus: async (id: any, s: any, c: any) => { const ex = leaves.find(l => String(l.id) === String(id)); if(ex) { await db.updateLeave({...ex, status: s, managerComment: c}); await refreshData(); } },
     addLeaveType: async (t: any) => { await db.addLeaveType(t); await refreshData(); },
