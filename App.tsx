@@ -18,6 +18,23 @@ import { User, UserRole, LeaveRequest, LeaveStatus } from './types';
 import { useAppContext } from './contexts/AppContext';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
 
+const viewToPath: Record<string, string> = {
+  'dashboard': 'dashboard',
+  'time-logs': 'timelogs',
+  'organization': 'organization',
+  'attendance': 'attendance',
+  'leaves': 'leaves',
+  'reports': 'reports',
+  'holidays': 'holidays',
+  'payslips': 'payslips',
+  'profile': 'profile',
+  'ai-assistant': 'ai-assistant'
+};
+
+const pathToView: Record<string, string> = Object.fromEntries(
+  Object.entries(viewToPath).map(([k, v]) => [v, k])
+);
+
 const ToastContainer = () => {
   const { toasts, removeToast } = useAppContext();
   
@@ -71,9 +88,32 @@ const App: React.FC = () => {
 
   // --- Routing Logic ---
   
-  // Internal view management without URL manipulation to avoid SecurityErrors in sandboxed environments
-  const handleViewChange = useCallback((view: string) => {
-    setCurrentView(view);
+  // Sync view state based on URL Hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '');
+      if (hash && pathToView[hash]) {
+        setCurrentView(pathToView[hash]);
+      } else if (!hash && currentUser) {
+        // Redirect to dashboard if hash is empty but user is logged in
+        window.location.hash = '/dashboard';
+      }
+    };
+
+    // Initial check
+    handleHashChange();
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [currentUser]);
+
+  // Handle Internal View Change
+  const handleViewChange = useCallback((viewId: string) => {
+    const path = viewToPath[viewId];
+    if (path) {
+      window.location.hash = `/${path}`;
+    }
+    setCurrentView(viewId);
     setIsSidebarOpen(false);
   }, []);
 
@@ -93,6 +133,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     logout();
+    window.location.hash = '';
   };
 
   const handleCreateLeave = async (leaveData: any) => {
