@@ -103,6 +103,7 @@ interface AppContextType {
   sendLeaveStatusEmail: (data: { to: string, employeeName: string, status: string, type: string, managerComment?: string, hrAction?: boolean }) => Promise<void>;
   markNotificationRead: (id: string | number) => Promise<void>;
   markAllRead: (userId: string | number) => Promise<void>;
+  // Fix: Removed duplicate addHoliday definition
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
   addHolidays: (holidays: Omit<Holiday, 'id'>[]) => Promise<void>;
   deleteHoliday: (id: string | number) => Promise<void>;
@@ -145,24 +146,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         db.getNotifications(), db.getHolidays(), db.getPayslips(), db.getInvitations()
       ]);
 
-      // Sanitize data from API (SQL often returns JSON arrays as strings)
-      const sanitizedEmployees = empData.map((e: any) => ({ ...e, projectIds: safeParseArray(e.projectIds) }));
-      const sanitizedProjects = projData.map((p: any) => ({ ...p, tasks: safeParseArray(p.tasks) }));
-      const sanitizedLeaves = leaveData.map((l: any) => ({ ...l, notifyUserIds: safeParseArray(l.notifyUserIds) }));
+      // Robust checks to ensure data is an array before processing
+      const sanitizedEmployees = Array.isArray(empData) ? empData.map((e: any) => ({ ...e, projectIds: safeParseArray(e.projectIds) })) : [];
+      const sanitizedProjects = Array.isArray(projData) ? projData.map((p: any) => ({ ...p, tasks: safeParseArray(p.tasks) })) : [];
+      const sanitizedLeaves = Array.isArray(leaveData) ? leaveData.map((l: any) => ({ ...l, notifyUserIds: safeParseArray(l.notifyUserIds) })) : [];
 
       setEmployees(sanitizedEmployees);
-      setDepartments(deptData);
-      setRoles(roleData);
-      setPositions(posData);
+      setDepartments(Array.isArray(deptData) ? deptData : []);
+      setRoles(Array.isArray(roleData) ? roleData : []);
+      setPositions(Array.isArray(posData) ? posData : []);
       setProjects(sanitizedProjects);
       setLeaves(sanitizedLeaves);
-      setLeaveTypes(typeData);
-      setAttendance(attendData);
-      setTimeEntries(timeData);
-      setNotifications(notifData);
-      setHolidays(holidayData);
-      setPayslips(payslipData);
-      setInvitations(inviteData);
+      setLeaveTypes(Array.isArray(typeData) ? typeData : []);
+      setAttendance(Array.isArray(attendData) ? attendData : []);
+      setTimeEntries(Array.isArray(timeData) ? timeData : []);
+      setNotifications(Array.isArray(notifData) ? notifData : []);
+      setHolidays(Array.isArray(holidayData) ? holidayData : []);
+      setPayslips(Array.isArray(payslipData) ? payslipData : []);
+      setInvitations(Array.isArray(inviteData) ? inviteData : []);
     } catch (error) {
       console.error("Failed to refresh data:", error);
     }
@@ -194,18 +195,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const email = account.username || azureProfile.mail || azureProfile.userPrincipalName;
           const currentEmployees = await db.getEmployees();
           const currentDepts = await db.getDepartments();
-          let targetUser = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase());
+          let targetUser = Array.isArray(currentEmployees) ? currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase()) : null;
           const azureJobTitle = azureProfile.jobTitle || 'Team Member';
           const mappedSystemRole = getSystemRole(azureJobTitle);
           const mappedEmpId = azureProfile.employeeId || 'SSO-NEW';
           const mappedHireDate = azureProfile.employeeHireDate ? azureProfile.employeeHireDate.split('T')[0] : formatDateISO(new Date());
           const azureDeptName = azureProfile.department || 'General';
-          const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
+          const matchedDept = Array.isArray(currentDepts) ? currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase()) : null;
           const mappedDeptId = matchedDept ? matchedDept.id : '';
           const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
 
           if (!targetUser) {
-              const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+              const numericIds = Array.isArray(currentEmployees) ? currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id)) : [];
               const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
               const newEmp: Employee = {
                   id: nextId, employeeId: String(mappedEmpId), firstName: azureProfile.givenName || account.name?.split(' ')[0] || 'User',
@@ -332,9 +333,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const currentDepts = await db.getDepartments();
     const currentEmps = await db.getEmployees();
-    const numericIds = currentEmps.map(e => Number(e.id)).filter(id => !isNaN(id));
+    const numericIds = Array.isArray(currentEmps) ? currentEmps.map(e => Number(e.id)).filter(id => !isNaN(id)) : [];
     const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-    const matchedDept = currentDepts.find(d => d.name === invite.department);
+    const matchedDept = Array.isArray(currentDepts) ? currentDepts.find(d => d.name === invite.department) : null;
     
     const newEmp: Employee = {
       id: nextId, employeeId: `${nextId}`, firstName: invite.firstName, lastName: invite.lastName, email: invite.email,
@@ -382,7 +383,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const azureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
       const currentEmployees = await db.getEmployees();
       const currentDepts = await db.getDepartments();
-      const numericIds = currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id));
+      const numericIds = Array.isArray(currentEmployees) ? currentEmployees.map(e => Number(e.id)).filter(id => !isNaN(id)) : [];
       let nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
 
       for (const au of azureUsers) {
@@ -390,11 +391,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const azureJobTitle = au.jobTitle || 'Team Member';
         const mappedSystemRole = getSystemRole(azureJobTitle);
         const azureDeptName = au.department || 'General';
-        const matchedDept = currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase());
+        const matchedDept = Array.isArray(currentDepts) ? currentDepts.find(d => d.name.toLowerCase() === azureDeptName.toLowerCase()) : null;
         const mappedDeptId = matchedDept ? matchedDept.id : '';
         const mappedDeptName = matchedDept ? matchedDept.name : azureDeptName;
 
-        const existingEmp = currentEmployees.find(e => e.email.toLowerCase() === email);
+        const existingEmp = Array.isArray(currentEmployees) ? currentEmployees.find(e => e.email.toLowerCase() === email) : null;
         if (existingEmp) {
           const updates: Partial<Employee> = {};
           if (existingEmp.position !== azureJobTitle) { updates.position = azureJobTitle; updates.jobTitle = azureJobTitle; updates.role = mappedSystemRole; }
@@ -421,7 +422,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const login = async (email: string, password: string): Promise<boolean> => {
     const currentEmployees = await db.getEmployees();
-    let user = currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password);
+    let user = Array.isArray(currentEmployees) ? currentEmployees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.password === password) : null;
     if (user) {
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,

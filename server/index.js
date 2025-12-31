@@ -92,7 +92,7 @@ const initDb = async () => {
             await request.query(table.query);
         }
 
-        // Schema Migrations: Ensure specific columns exist in case table was created with an older version
+        // Schema Migrations
         const migrations = [
             { table: 'leaves', column: 'notifyUserIds', type: 'NVARCHAR(MAX)' },
             { table: 'leaves', column: 'durationType', type: 'NVARCHAR(50)' },
@@ -100,7 +100,9 @@ const initDb = async () => {
             { table: 'leaves', column: 'managerComment', type: 'NVARCHAR(MAX)' },
             { table: 'time_entries', column: 'extraMinutes', type: 'INT' },
             { table: 'time_entries', column: 'isBillable', type: 'BIT' },
-            { table: 'notifications', column: 'type', type: 'NVARCHAR(50)' }
+            { table: 'notifications', column: 'type', type: 'NVARCHAR(50)' },
+            { table: 'employees', column: 'location', type: 'NVARCHAR(MAX)' },
+            { table: 'employees', column: 'bio', type: 'NVARCHAR(MAX)' }
         ];
 
         for (const m of migrations) {
@@ -115,9 +117,30 @@ const initDb = async () => {
 
 const apiRouter = express.Router();
 
+// Helper to filter request body against actual database columns
+const filterBodyByColumns = async (tableName, data) => {
+    try {
+        const result = await pool.request()
+            .input('table', tableName)
+            .query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @table`);
+        const validColumns = result.recordset.map(r => r.COLUMN_NAME);
+        const filtered = {};
+        Object.keys(data).forEach(key => {
+            if (validColumns.includes(key)) {
+                filtered[key] = data[key];
+            }
+        });
+        return filtered;
+    } catch (err) {
+        console.warn(`[WARN] Column filtering failed for ${tableName}:`, err.message);
+        return data; // Fallback to original if metadata query fails
+    }
+};
+
 const registerStandardRoutes = (endpoint, table) => {
     // GET ALL
     apiRouter.get(`/${endpoint}`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
         try {
             const result = await pool.request().query(`SELECT * FROM ${table}`);
             res.json(result.recordset);
@@ -126,8 +149,9 @@ const registerStandardRoutes = (endpoint, table) => {
 
     // POST NEW
     apiRouter.post(`/${endpoint}`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
         try {
-            const data = req.body;
+            const data = await filterBodyByColumns(table, req.body);
             const request = pool.request();
             const columns = Object.keys(data);
             columns.forEach(col => {
@@ -135,7 +159,6 @@ const registerStandardRoutes = (endpoint, table) => {
                 if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
                 request.input(col, val);
             });
-            // Wrap column names in brackets to handle reserved keywords like 'read'
             const colList = columns.map(c => `[${c}]`).join(', ');
             const paramList = columns.map(c => `@${c}`).join(', ');
             const query = `INSERT INTO ${table} (${colList}) VALUES (${paramList})`;
@@ -146,17 +169,18 @@ const registerStandardRoutes = (endpoint, table) => {
 
     // PUT UPDATE
     apiRouter.put(`/${endpoint}/:id`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
         try {
-            const data = req.body;
+            const data = await filterBodyByColumns(table, req.body);
             const request = pool.request();
             request.input('id', req.params.id);
-            // Wrap column names in brackets to handle reserved keywords like 'read'
             const sets = Object.keys(data).filter(k => k !== 'id').map(k => {
                 let val = data[k];
                 if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
                 request.input(k, val);
                 return `[${k}]=@${k}`;
             }).join(', ');
+            if (!sets) return res.json({ success: true, message: "No fields to update" });
             await request.query(`UPDATE ${table} SET ${sets} WHERE id=@id`);
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
@@ -164,6 +188,7 @@ const registerStandardRoutes = (endpoint, table) => {
 
     // DELETE
     apiRouter.delete(`/${endpoint}/:id`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
         try {
             const request = pool.request();
             request.input('id', req.params.id);

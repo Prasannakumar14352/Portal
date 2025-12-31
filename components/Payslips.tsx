@@ -6,12 +6,12 @@ import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Handle ES Module import structure where GlobalWorkerOptions might be on 'default'
+// Handle ES Module import structure
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
 
-// Configure PDF.js worker - Using a specific stable version
+// Use a reliable, major-version specific worker URL from cdnjs
 if (pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';
 }
 
 const Payslips = () => {

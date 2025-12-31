@@ -18,25 +18,6 @@ import { User, UserRole, LeaveRequest, LeaveStatus } from './types';
 import { useAppContext } from './contexts/AppContext';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
 
-// Map internal view IDs to URL paths
-const viewToPath: Record<string, string> = {
-  'dashboard': '/dashboard',
-  'organization': '/organization',
-  'time-logs': '/timelogs',
-  'reports': '/reports',
-  'profile': '/profile',
-  'attendance': '/attendance',
-  'holidays': '/holidays',
-  'payslips': '/payslips',
-  'leaves': '/leaves',
-  'ai-assistant': '/ai-assistant'
-};
-
-// Reverse map for initialization
-const pathToView: Record<string, string> = Object.fromEntries(
-  Object.entries(viewToPath).map(([view, path]) => [path, view])
-);
-
 const ToastContainer = () => {
   const { toasts, removeToast } = useAppContext();
   
@@ -90,37 +71,17 @@ const App: React.FC = () => {
 
   // --- Routing Logic ---
   
-  // Update URL when view changes
+  // Internal view management without URL manipulation to avoid SecurityErrors in sandboxed environments
   const handleViewChange = useCallback((view: string) => {
-    const path = viewToPath[view] || '/dashboard';
-    if (window.location.pathname !== path) {
-      window.history.pushState({ view }, '', path);
-    }
     setCurrentView(view);
     setIsSidebarOpen(false);
-  }, []);
-
-  // Handle initial load and back/forward buttons
-  useEffect(() => {
-    const handleLocationChange = () => {
-      const path = window.location.pathname;
-      const view = pathToView[path] || 'dashboard';
-      setCurrentView(view);
-    };
-
-    // Initial check
-    handleLocationChange();
-
-    // Listen for back/forward navigation
-    window.addEventListener('popstate', handleLocationChange);
-    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
   const users: User[] = employees.map(emp => ({
     id: emp.id,
     employeeId: emp.employeeId,
     name: `${emp.firstName} ${emp.lastName}`,
-    role: emp.role.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
+    role: emp.role?.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
     avatar: emp.avatar,
     managerId: emp.managerId,
     jobTitle: emp.role
@@ -132,7 +93,6 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    window.history.pushState({}, '', '/');
   };
 
   const handleCreateLeave = async (leaveData: any) => {

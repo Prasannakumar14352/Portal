@@ -12,11 +12,18 @@ interface TreeNode extends Employee {
 
 const buildOrgTree = (employees: Employee[]): TreeNode[] => {
   const empMap: Record<string, TreeNode> = {};
-  employees.forEach(emp => { empMap[emp.id] = { ...emp, children: [] }; });
+  
+  // Defensive: Filter out any invalid employees first
+  const validEmployees = employees.filter(emp => emp && emp.id);
+  
+  validEmployees.forEach(emp => { 
+    empMap[String(emp.id)] = { ...emp, children: [] }; 
+  });
+  
   const roots: TreeNode[] = [];
 
-  employees.forEach(emp => {
-    const node = empMap[emp.id];
+  validEmployees.forEach(emp => {
+    const node = empMap[String(emp.id)];
     const empManagerIdStr = emp.managerId ? String(emp.managerId) : null;
     
     if (empManagerIdStr && empMap[empManagerIdStr]) {
@@ -27,7 +34,7 @@ const buildOrgTree = (employees: Employee[]): TreeNode[] => {
   });
 
   return roots.filter(root => {
-      const isActuallyAChild = employees.some(e => 
+      const isActuallyAChild = validEmployees.some(e => 
           e.managerId && String(e.id) === String(root.id) && empMap[String(e.managerId)]
       );
       return !isActuallyAChild;
@@ -36,7 +43,7 @@ const buildOrgTree = (employees: Employee[]): TreeNode[] => {
 
 const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   const [expanded, setExpanded] = useState(true);
-  const hasChildren = node.children.length > 0;
+  const hasChildren = node.children && node.children.length > 0;
   
   return (
     <li>
@@ -44,7 +51,7 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
         <div className="org-node-card group bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-teal-500/50 transition-all w-36 relative z-10">
            <div className="flex flex-col items-center">
              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-50 dark:border-slate-700 mb-1.5 shadow-sm group-hover:scale-110 transition-transform bg-slate-100">
-                <img src={node.avatar} alt={node.firstName} className="w-full h-full object-cover" />
+                <img src={node.avatar || `https://ui-avatars.com/api/?name=${node.firstName}+${node.lastName}`} alt={node.firstName} className="w-full h-full object-cover" />
              </div>
              <div className="text-center w-full min-w-0">
                 <h4 className="font-bold text-slate-800 dark:text-slate-100 text-[11px] tracking-tight leading-tight truncate px-1" title={`${node.firstName} ${node.lastName}`}>
@@ -100,6 +107,8 @@ const GraphicsLayerMap: React.FC<{ users: Employee[] }> = ({ users }) => {
       try {
         await loadArcGIS();
         if (cleanup || !mapDiv.current) return;
+        if (!(window as any).require) return;
+
         (window as any).require(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer"], (EsriMap: any, MapView: any, Graphic: any, GraphicsLayer: any) => {
           if (cleanup) return;
           const map = new EsriMap({ basemap: "topo-vector" });
@@ -158,9 +167,11 @@ const EmployeePicker: React.FC<{
 }> = ({ selectedIds, onToggle, allEmployees }) => {
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => allEmployees.filter(e => 
-      `${e.firstName} ${e.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-      (e.position || '').toLowerCase().includes(query.toLowerCase()) ||
-      String(e.employeeId).toLowerCase().includes(query.toLowerCase())
+      e && (
+        `${e.firstName} ${e.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
+        (e.position || '').toLowerCase().includes(query.toLowerCase()) ||
+        String(e.employeeId).toLowerCase().includes(query.toLowerCase())
+      )
   ), [allEmployees, query]);
 
   return (
@@ -193,7 +204,7 @@ const EmployeePicker: React.FC<{
 };
 
 const Organization = () => {
-  const { currentUser, projects, notify, bulkUpdateEmployees, positions, addPosition, updatePosition, deletePosition, employees, addEmployee, updateEmployee, deleteEmployee, addProject, updateProject, deleteProject, sendProjectAssignmentEmail, showToast } = useAppContext();
+  const { currentUser, projects, notify, bulkUpdateEmployees, positions, addPosition, updatePosition, deletePosition, employees, addEmployee, updateEmployee, deleteEmployee, addProject, updateProject, deleteProject, sendProjectAssignmentEmail, showToast, refreshData } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<'employees' | 'positions' | 'projects' | 'chart' | 'locations'>('projects');
   const [chartZoom, setChartZoom] = useState<number>(0.85);
@@ -213,7 +224,13 @@ const Organization = () => {
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const treeContainerRef = useRef<HTMLDivElement>(null);
 
-  const orgTreeData = useMemo(() => buildOrgTree(employees), [employees]);
+  const orgTreeData = useMemo(() => buildOrgTree(employees || []), [employees]);
+
+  useEffect(() => {
+    if (activeTab === 'employees') {
+        refreshData();
+    }
+  }, [activeTab]);
 
   const handlePosSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,7 +317,6 @@ const Organization = () => {
   };
 
   const openProjectEdit = (project: Project) => {
-      // Defensive parsing for members list
       const projMembers = employees.filter(e => {
           const pIds = Array.isArray(e.projectIds) ? e.projectIds : [];
           return pIds.some(p => String(p) === String(project.id));
@@ -405,7 +421,7 @@ const Organization = () => {
        {activeTab === 'positions' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserSquare className="text-emerald-600" /> Designations</h3>{isPowerUser && <button onClick={() => { setPosForm({ id: '', title: '', description: '' }); setShowPosModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 font-bold shadow-sm"><Plus size={16} /> Add Position</button>}</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">{isPowerUser && (<div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setPosForm(p); setShowPosModal(true); }} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Edit2 size={14}/></button><button onClick={() => { if(window.confirm('Delete this position?')) deletePosition(p.id); }} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button></div>)}<h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{p.description}</p></div>))}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{positions.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition relative group">{isPowerUser && (<div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => { setPosForm(p); setShowPosModal(true); }} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm transition-all"><Edit2 size={14}/></button><button onClick={() => { if(window.confirm('Delete this position?')) deletePosition(p.id); }} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded shadow-sm"><Trash2 size={14}/></button></div>)}<h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{p.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{p.description}</p></div>))}</div>
           </div>
        )}
     </div>

@@ -1,9 +1,6 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
-// Initialize the Google GenAI client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 /**
  * Interface for the context data we pass to Gemini
  */
@@ -17,6 +14,9 @@ export interface HRContext {
 }
 
 export const getHRChatResponse = async (message: string, context: HRContext): Promise<string> => {
+  // Initialize the Google GenAI client inside the function as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
   // Construct a concise summary of the organization state for the AI
   const contextSummary = `
 CURRENT USER: ${context.currentUser.name} (Role: ${context.currentUser.role}, Dept ID: ${context.currentUser.departmentId || 'N/A'})

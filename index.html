@@ -5,6 +5,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EmpowerCorp HR Portal</title>
+    <script>
+      // Early polyfill for process.env to prevent ReferenceErrors during module loading
+      window.process = { env: { NODE_ENV: 'development' } };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -13,7 +17,7 @@
           extend: {
             colors: {
               slate: {
-                850: '#1e293b', // Custom dark shade if needed
+                850: '#1e293b', 
               }
             }
           }
@@ -25,7 +29,6 @@
       body {
         font-family: 'Inter', sans-serif;
       }
-      /* Custom scrollbar for chat and modals */
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
       }
@@ -34,7 +37,6 @@
           scrollbar-width: none;
       }
       
-      /* Global Custom Scrollbar */
       .custom-scrollbar::-webkit-scrollbar {
         width: 6px;
       }
@@ -64,7 +66,7 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "recharts": "https://esm.sh/recharts@^3.6.0",
     "jszip": "https://esm.sh/jszip@^3.10.1",
-    "pdfjs-dist": "https://esm.sh/pdfjs-dist@^5.4.449",
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@^4.0.379",
     "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
     "jspdf": "https://esm.sh/jspdf@^3.0.4",
     "vite": "https://esm.sh/vite@^7.3.0",

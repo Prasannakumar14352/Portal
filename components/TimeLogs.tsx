@@ -212,6 +212,7 @@ const TimeLogs = () => {
     const normalMinutes = (parseInt(normalInput.hours) || 0) * 60 + (parseInt(normalInput.minutes) || 0);
     const extraMinutes = includeExtra ? (parseInt(extraInput.hours) || 0) * 60 + (parseInt(extraInput.minutes) || 0) : 0;
     
+    // Fix: Explicitly cast status to ensure it matches 'Pending' | 'Approved' | 'Rejected'
     const entryData = {
         userId: currentUser.id, 
         projectId: formData.isHoliday ? '' : (String(formData.projectId) === NO_PROJECT_ID ? '' : formData.projectId),
@@ -220,12 +221,12 @@ const TimeLogs = () => {
         durationMinutes: normalMinutes,
         extraMinutes: extraMinutes,
         description: formData.description,
-        status: formData.isHoliday ? 'Approved' : ('Pending' as const),
+        status: (formData.isHoliday ? 'Approved' : 'Pending') as 'Approved' | 'Pending',
         isBillable: formData.isHoliday ? false : formData.isBillable
     };
     
-    if (editingId) updateTimeEntry(editingId, entryData);
-    else addTimeEntry(entryData);
+    if (editingId) updateTimeEntry(editingId, entryData as Partial<TimeEntry>);
+    else addTimeEntry(entryData as Omit<TimeEntry, 'id'>);
     setShowModal(false);
     resetForm();
   };

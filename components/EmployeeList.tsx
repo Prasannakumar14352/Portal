@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Employee, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -8,7 +8,7 @@ import DraggableModal from './DraggableModal';
 interface EmployeeListProps {
   employees: Employee[];
   onAddEmployee: (emp: Employee, syncToAzure?: boolean) => void;
-  onUpdateEmployee: (emp: Employee) => void;
+  onUpdateEmployee: (emp: Employee) => Promise<void> | void;
   onDeleteEmployee: (id: string | number) => void;
 }
 
@@ -24,6 +24,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
   const [activeTab, setActiveTab] = useState<'active' | 'invitations'>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -75,16 +76,25 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingEmployee) {
-      onUpdateEmployee({ ...editingEmployee, ...formData } as Employee);
-      setShowModal(false);
-    } else {
-      await inviteEmployee({
-          ...formData,
-          provisionInAzure: provisionInAzure
-      });
-      setShowModal(false);
-      setActiveTab('invitations');
+    setIsSaving(true);
+    try {
+        if (editingEmployee) {
+          const finalEmp = { ...editingEmployee, ...formData } as Employee;
+          await onUpdateEmployee(finalEmp);
+          setShowModal(false);
+        } else {
+          await inviteEmployee({
+              ...formData,
+              provisionInAzure: provisionInAzure
+          });
+          setShowModal(false);
+          setActiveTab('invitations');
+        }
+    } catch (err) {
+        console.error("Submission error:", err);
+        showToast("Operation failed. Please try again.", "error");
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -287,35 +297,36 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Send New Invitation'} width="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required disabled={isSaving} type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required disabled={isSaving} type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
           </div>
 
-          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div></div>
+          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required disabled={isSaving} type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div></div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Position</label>
-              <select required value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all dark:text-white">
+              <select required disabled={isSaving} value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all dark:text-white">
                  <option value="" disabled>Select Position...</option>
                  {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">System Role</label>
-              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white">
+              <select required disabled={isSaving} value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white">
                  {SYSTEM_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input disabled={isSaving} type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
             <div>
              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Reporting Manager</label>
              <div className="relative">
                 <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <select 
+                  disabled={isSaving}
                   value={formData.managerId} 
                   onChange={(e) => setFormData({...formData, managerId: e.target.value})} 
                   className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500 appearance-none"
@@ -332,7 +343,9 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
 
           <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
-            <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest">{editingEmployee ? 'Update Records' : 'Generate Invitation'}</button>
+            <button type="submit" disabled={isSaving} className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest min-w-[160px] flex items-center justify-center gap-2">
+                {isSaving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : (editingEmployee ? 'Update Records' : 'Generate Invitation')}
+            </button>
           </div>
         </form>
       </DraggableModal>

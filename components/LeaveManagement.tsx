@@ -1,26 +1,29 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle
+  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Loader2, Mail
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
+/**
+ * Interface definition for LeaveManagement props to resolve TypeScript compilation error.
+ */
 interface LeaveManagementProps {
   currentUser: User | null;
   users: User[];
   leaves: LeaveRequest[];
   leaveTypes: LeaveTypeConfig[];
-  addLeave: (leave: any) => void;
-  editLeave: (id: string | number, data: any) => void;
-  addLeaves: (leaves: any[]) => void;
-  updateLeaveStatus: (id: string | number, status: LeaveStatusEnum, comment?: string) => void;
-  addLeaveType: (type: any) => void;
-  updateLeaveType: (id: string | number, data: any) => void;
-  deleteLeaveType: (id: string | number) => void;
+  addLeave: (leave: any) => Promise<void>;
+  editLeave: (id: string | number, data: any) => Promise<void>;
+  addLeaves: (leaves: any[]) => Promise<void>;
+  updateLeaveStatus: (id: string | number, status: LeaveStatus, comment?: string) => Promise<void>;
+  addLeaveType: (type: any) => Promise<void>;
+  updateLeaveType: (id: string | number, data: any) => Promise<void>;
+  deleteLeaveType: (id: string | number) => Promise<void>;
 }
 
+// Fix: Updated prop types to accept (string | number)[] to handle both types of IDs consistently
 const MultiSelectUser = ({ 
   options, 
   selectedIds, 
@@ -28,8 +31,8 @@ const MultiSelectUser = ({
   label 
 }: { 
   options: User[], 
-  selectedIds: string[], 
-  onChange: (ids: string[]) => void, 
+  selectedIds: (string | number)[], 
+  onChange: (ids: (string | number)[]) => void, 
   label: string 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +48,8 @@ const MultiSelectUser = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (id: string) => {
+  // Fix: Updated signature to accept both string and number
+  const handleSelect = (id: string | number) => {
     const idStr = String(id);
     if (selectedIds.map(String).includes(idStr)) {
       onChange(selectedIds.filter(sid => String(sid) !== idStr));
@@ -77,7 +81,7 @@ const MultiSelectUser = ({
       {isOpen && (
         <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 p-2">
             {options.map(user => (
-              <div key={user.id} onClick={() => handleSelect(String(user.id))} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
+              <div key={user.id} onClick={() => handleSelect(user.id)} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
                 <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-200'}`}>
                   {selectedIds.map(String).includes(String(user.id)) && <CheckCircle size={10} className="text-white" />}
                 </div>
@@ -101,6 +105,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [leaveToDelete, setLeaveToDelete] = useState<LeaveRequest | null>(null);
   
+  const [isProcessing, setIsProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'calendar'>('requests');
   const [currentCalDate, setCurrentCalDate] = useState(new Date());
   const [isEditingId, setIsEditingId] = useState<string | number | null>(null);
@@ -175,107 +180,127 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   const handleWithdrawal = async () => {
     if (!leaveToDelete) return;
+    setIsProcessing(true);
     
-    // Notify Manager
-    const manager = employees.find(emp => String(emp.id) === String(leaveToDelete.approverId));
-    if (manager) {
-        await notify(`Leave request from ${currentUser?.name} was withdrawn.`, manager.id);
-        await sendLeaveRequestEmail({
-            to: manager.email,
-            employeeName: currentUser?.name || 'Employee',
-            type: leaveToDelete.type,
-            startDate: leaveToDelete.startDate,
-            endDate: leaveToDelete.endDate,
-            reason: leaveToDelete.reason,
-            isWithdrawal: true
-        });
-    }
+    try {
+      // Notify Manager
+      const manager = employees.find(emp => String(emp.id) === String(leaveToDelete.approverId));
+      if (manager) {
+          await notify(`Leave request from ${currentUser?.name} was withdrawn.`, manager.id);
+          await sendLeaveRequestEmail({
+              to: manager.email,
+              employeeName: currentUser?.name || 'Employee',
+              type: leaveToDelete.type,
+              startDate: leaveToDelete.startDate,
+              endDate: leaveToDelete.endDate,
+              reason: leaveToDelete.reason,
+              isWithdrawal: true
+          });
+      }
 
-    await deleteLeave(leaveToDelete.id);
-    setShowDeleteConfirm(false);
-    showToast("Leave request withdrawn.", "info");
+      await deleteLeave(leaveToDelete.id);
+      showToast("Leave request withdrawn.", "info");
+    } catch (err) {
+      showToast("Error withdrawing request", "error");
+    } finally {
+      setIsProcessing(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalData = {
-        ...formData,
-        endDate: formData.durationType === 'Half Day' ? formData.startDate : formData.endDate
-    };
+    setIsProcessing(true);
     
-    if (isEditingId) await editLeave(isEditingId, finalData);
-    else await addLeave(finalData);
-
-    // Notification Logic
-    const manager = employees.find(emp => String(emp.id) === String(formData.approverId));
-    const colleagueEmails = employees
-      .filter(emp => formData.notifyUserIds.map(String).includes(String(emp.id)))
-      .map(emp => emp.email);
-
-    if (manager) {
-        showToast(isEditingId ? "Updating notifications..." : "Dispatching notifications...", "info");
-        
-        // SMTP Email
-        await sendLeaveRequestEmail({
-            to: manager.email,
-            cc: colleagueEmails,
-            employeeName: currentUser?.name || 'Employee',
-            type: formData.type,
-            startDate: finalData.startDate,
-            endDate: finalData.endDate,
-            reason: formData.reason,
-            isUpdate: !!isEditingId
-        });
-
-        // In-App
-        const updateMsg = isEditingId ? "updated their" : "submitted a";
-        await notify(`${currentUser?.name} ${updateMsg} ${formData.type} request.`, manager.id);
-        
-        formData.notifyUserIds.forEach(async (id) => {
-            const matchedColleague = employees.find(e => String(e.id) === String(id));
-            if (matchedColleague) {
-              await notify(`${currentUser?.name} is applying for leave (CC).`, matchedColleague.id);
-            }
-        });
-    }
-
-    setShowModal(false);
-    showToast(isEditingId ? "Leave request updated." : "Leave request submitted.", "success");
-  };
-
-  const handleStatusUpdate = async (leave: LeaveRequest, newStatus: LeaveStatusEnum, comment: string = '') => {
-      await updateLeaveStatus(leave.id, newStatus, comment);
+    try {
+      const finalData = {
+          ...formData,
+          endDate: formData.durationType === 'Half Day' ? formData.startDate : formData.endDate
+      };
       
-      const employee = employees.find(emp => String(emp.id) === String(leave.userId));
-      const hrUsers = employees.filter(emp => emp.role === UserRole.HR || emp.role === UserRole.ADMIN);
+      if (isEditingId) await editLeave(isEditingId, finalData);
+      else await addLeave(finalData);
 
-      if (employee) {
-          // Notify Employee
-          await notify(`Your leave request status is now: ${newStatus}`, employee.id);
-          await sendLeaveStatusEmail({
-              to: employee.email,
-              employeeName: employee.firstName,
-              status: newStatus,
-              type: leave.type,
-              managerComment: comment,
-              hrAction: isHR
+      // Notification Logic
+      const manager = employees.find(emp => String(emp.id) === String(formData.approverId));
+      const colleagueEmails = employees
+        .filter(emp => formData.notifyUserIds.map(String).includes(String(emp.id)))
+        .map(emp => emp.email);
+
+      if (manager) {
+          // SMTP Email
+          await sendLeaveRequestEmail({
+              to: manager.email,
+              cc: colleagueEmails,
+              employeeName: currentUser?.name || 'Employee',
+              type: formData.type,
+              startDate: finalData.startDate,
+              endDate: finalData.endDate,
+              reason: formData.reason,
+              isUpdate: !!isEditingId
           });
 
-          // If Manager approves -> Notify HR
-          if (newStatus === LeaveStatusEnum.PENDING_HR || (newStatus === LeaveStatusEnum.APPROVED && !isHR)) {
-              for (const hr of hrUsers) {
-                  await notify(`${leave.userName}'s leave request needs HR approval.`, hr.id);
-                  await sendLeaveStatusEmail({
-                      to: hr.email,
-                      employeeName: leave.userName,
-                      status: 'Awaiting HR Approval',
-                      type: leave.type,
-                      managerComment: comment
-                  });
+          // In-App
+          const updateMsg = isEditingId ? "updated their" : "submitted a";
+          await notify(`${currentUser?.name} ${updateMsg} ${formData.type} request.`, manager.id);
+          
+          for (const id of formData.notifyUserIds) {
+              const matchedColleague = employees.find(e => String(e.id) === String(id));
+              if (matchedColleague) {
+                await notify(`${currentUser?.name} is applying for leave (CC).`, matchedColleague.id);
               }
           }
       }
-      showToast(`Status updated to ${newStatus}`, "success");
+
+      setShowModal(false);
+      showToast(isEditingId ? "Leave request updated." : "Leave request submitted.", "success");
+    } catch (err) {
+      showToast("Error processing request", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleStatusUpdate = async (leave: LeaveRequest, newStatus: LeaveStatusEnum, comment: string = '') => {
+      setIsProcessing(true);
+      try {
+        await updateLeaveStatus(leave.id, newStatus, comment);
+        
+        const employee = employees.find(emp => String(emp.id) === String(leave.userId));
+        const hrUsers = employees.filter(emp => emp.role === UserRole.HR || emp.role === UserRole.ADMIN);
+
+        if (employee) {
+            // Notify Employee
+            await notify(`Your leave request status is now: ${newStatus}`, employee.id);
+            await sendLeaveStatusEmail({
+                to: employee.email,
+                employeeName: employee.firstName,
+                status: newStatus,
+                type: leave.type,
+                managerComment: comment,
+                hrAction: isHR
+            });
+
+            // If Manager approves -> Notify HR
+            if (newStatus === LeaveStatusEnum.PENDING_HR || (newStatus === LeaveStatusEnum.APPROVED && !isHR)) {
+                for (const hr of hrUsers) {
+                    await notify(`${leave.userName}'s leave request needs HR approval.`, hr.id);
+                    await sendLeaveStatusEmail({
+                        to: hr.email,
+                        employeeName: leave.userName,
+                        status: 'Awaiting HR Approval',
+                        type: leave.type,
+                        managerComment: comment
+                    });
+                }
+            }
+        }
+        showToast(`Status updated to ${newStatus}`, "success");
+      } catch (err) {
+        showToast("Failed to update status", "error");
+      } finally {
+        setIsProcessing(false);
+      }
   };
 
   const handleTypeSubmit = (e: React.FormEvent) => {
@@ -323,7 +348,32 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* PROCESSING LOADER OVERLAY */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-6 max-w-sm text-center border border-slate-200 dark:border-slate-700">
+              <div className="relative">
+                 <div className="w-16 h-16 border-4 border-teal-600/20 border-t-teal-600 rounded-full animate-spin"></div>
+                 <Mail size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-teal-600 animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Dispatching Notifications</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Please wait while we notify your manager and designated colleagues about this request.</p>
+              </div>
+              <div className="w-full bg-slate-100 dark:bg-slate-700 h-1 rounded-full overflow-hidden">
+                 <div className="bg-teal-600 h-full w-1/2 animate-[progress_1.5s_infinite_linear]"></div>
+              </div>
+           </div>
+           <style>{`
+              @keyframes progress {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(200%); }
+              }
+           `}</style>
+        </div>
+      )}
+
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Leave Management</h2>
@@ -600,11 +650,13 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                <label htmlFor="urgent-check" className="text-xs font-black uppercase text-red-700 flex items-center gap-1.5 cursor-pointer">Mark as Urgent <Flame size={14} /></label>
             </div>
 
-            <MultiSelectUser label="Notify Colleagues (CC)" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={ids => setFormData({...formData, notifyUserIds: ids as any})} />
+            <MultiSelectUser label="Notify Colleagues (CC)" options={users.filter(u => String(u.id) !== String(currentUser?.id))} selectedIds={formData.notifyUserIds} onChange={ids => setFormData({...formData, notifyUserIds: ids})} />
 
             <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
               <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-400 text-xs font-black uppercase">Cancel</button>
-              <button type="submit" className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition-all active:scale-95">{isEditingId ? 'Update Request' : 'Submit Request'}</button>
+              <button type="submit" disabled={isProcessing} className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition-all active:scale-95 disabled:opacity-50">
+                  {isEditingId ? 'Update Request' : 'Submit Request'}
+              </button>
             </div>
         </form>
       </DraggableModal>
@@ -622,7 +674,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
           </div>
           <div className="flex gap-3 mt-6 pt-6 border-t dark:border-slate-700">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200">Keep Request</button>
-              <button onClick={handleWithdrawal} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-red-700">Withdraw Now</button>
+              <button onClick={handleWithdrawal} disabled={isProcessing} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-red-700 disabled:opacity-50">Withdraw Now</button>
           </div>
       </DraggableModal>
 
