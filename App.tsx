@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './components/Login';
@@ -12,11 +12,30 @@ import Organization from './components/Organization';
 import TimeLogs from './components/TimeLogs';
 import Reports from './components/Reports';
 import Profile from './components/Profile';
-import Holidays from './components/Holidays'; // New
-import Payslips from './components/Payslips'; // New
+import Holidays from './components/Holidays';
+import Payslips from './components/Payslips';
 import { User, UserRole, LeaveRequest, LeaveStatus } from './types';
 import { useAppContext } from './contexts/AppContext';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
+
+// Map internal view IDs to URL paths
+const viewToPath: Record<string, string> = {
+  'dashboard': '/dashboard',
+  'organization': '/organization',
+  'time-logs': '/timelogs',
+  'reports': '/reports',
+  'profile': '/profile',
+  'attendance': '/attendance',
+  'holidays': '/holidays',
+  'payslips': '/payslips',
+  'leaves': '/leaves',
+  'ai-assistant': '/ai-assistant'
+};
+
+// Reverse map for initialization
+const pathToView: Record<string, string> = Object.fromEntries(
+  Object.entries(viewToPath).map(([view, path]) => [path, view])
+);
 
 const ToastContainer = () => {
   const { toasts, removeToast } = useAppContext();
@@ -51,20 +70,15 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Use the Global API Context
   const { 
     currentUser,
-    login,
-    logout,
     employees, 
     departments,
     leaves, 
     leaveTypes, 
     attendance, 
     isLoading,
-    addEmployee,
-    updateEmployee,
-    deleteEmployee,
+    logout,
     addLeave,
     addLeaves,
     updateLeave,
@@ -74,10 +88,36 @@ const App: React.FC = () => {
     deleteLeaveType
   } = useAppContext();
 
-  // Convert Employees to Users for the Leave Component props
+  // --- Routing Logic ---
+  
+  // Update URL when view changes
+  const handleViewChange = useCallback((view: string) => {
+    const path = viewToPath[view] || '/dashboard';
+    if (window.location.pathname !== path) {
+      window.history.pushState({ view }, '', path);
+    }
+    setCurrentView(view);
+    setIsSidebarOpen(false);
+  }, []);
+
+  // Handle initial load and back/forward buttons
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname;
+      const view = pathToView[path] || 'dashboard';
+      setCurrentView(view);
+    };
+
+    // Initial check
+    handleLocationChange();
+
+    // Listen for back/forward navigation
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
+
   const users: User[] = employees.map(emp => ({
     id: emp.id,
-    /* Added missing employeeId */
     employeeId: emp.employeeId,
     name: `${emp.firstName} ${emp.lastName}`,
     role: emp.role.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
@@ -87,20 +127,14 @@ const App: React.FC = () => {
   }));
 
   const handleLogin = (user: User) => {
-    // Auth logic is handled within the Login component via Context
-    setCurrentView('dashboard');
+    handleViewChange('dashboard');
   };
 
   const handleLogout = () => {
     logout();
+    window.history.pushState({}, '', '/');
   };
 
-  const handleViewChange = (view: string) => {
-    setCurrentView(view);
-    setIsSidebarOpen(false); // Close sidebar on mobile when navigating
-  };
-
-  // Wrapper for Leave creation to inject current user details automatically
   const handleCreateLeave = async (leaveData: any) => {
     const newLeave: LeaveRequest = {
       id: Math.random().toString(36).substr(2, 9),
@@ -178,7 +212,6 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden transition-colors duration-200">
       <ToastContainer />
       
-      {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-20 md:hidden"
