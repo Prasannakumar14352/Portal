@@ -97,6 +97,7 @@ interface AppContextType {
   generatePayslips: (month: string) => Promise<void>;
   manualAddPayslip: (payslip: Payslip) => Promise<void>;
   syncAzureUsers: () => Promise<void>;
+  syncHolidayLogs: (year?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -458,6 +459,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const syncHolidayLogs = async (year?: string) => {
+    const targetYear = year || new Date().getFullYear().toString();
+    const activeEmps = employees.filter(e => e.status === EmployeeStatus.ACTIVE);
+    const yearHolidays = holidays.filter(h => h.date.startsWith(targetYear));
+    const todayStr = formatDateISO(new Date());
+
+    showToast(`Syncing holidays for ${targetYear}...`, "info");
+    let createdCount = 0;
+
+    for (const h of yearHolidays) {
+        if (h.date > todayStr) continue; // Don't log future holidays yet
+
+        for (const emp of activeEmps) {
+            const alreadyLogged = timeEntries.some(t => 
+                String(t.userId) === String(emp.id) && t.date === h.date
+            );
+
+            if (!alreadyLogged) {
+                await db.addTimeEntry({
+                    id: `hol-${h.id}-${emp.id}`,
+                    userId: emp.id,
+                    projectId: '',
+                    task: 'Public Holiday',
+                    date: h.date,
+                    durationMinutes: 480, // 8 hours
+                    extraMinutes: 0,
+                    description: `System generated log for ${h.name}.`,
+                    status: 'Approved',
+                    isBillable: false
+                });
+                createdCount++;
+            }
+        }
+    }
+
+    if (createdCount > 0) {
+        await refreshData();
+        showToast(`Created ${createdCount} holiday time logs.`, "success");
+    } else {
+        showToast("Holiday logs are already up to date.", "info");
+    }
+  };
+
   const sendProjectAssignmentEmail = async (data: { email: string, firstName: string, projectName: string, projectDescription?: string }) => {
     try {
         const res = await fetch(`${API_BASE}/notify/project-assignment`, {
@@ -536,6 +580,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     deleteAttendanceRecord: async (id: any) => { await db.deleteAttendance(id.toString()); await refreshData(); },
     getTodayAttendance: () => { if(!currentUser) return undefined; const today = formatDateISO(new Date()); return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today); },
     notify,
+    syncHolidayLogs,
     sendProjectAssignmentEmail,
     sendLeaveRequestEmail,
     sendLeaveStatusEmail,

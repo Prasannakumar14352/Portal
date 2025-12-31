@@ -5,14 +5,14 @@ import { TimeEntry, Project, UserRole } from '../types';
 import { 
   Clock, Plus, FileText, ChevronDown, ChevronRight, ChevronLeft, Edit2, Trash2,
   DollarSign, FileSpreadsheet, AlertTriangle, CheckCircle2, MoreHorizontal, SlidersHorizontal, Zap, 
-  Calendar as CalendarIcon, Search, Filter, Download, MoreVertical
+  Calendar as CalendarIcon, Search, Filter, Download, MoreVertical, Coffee, RefreshCcw
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import DraggableModal from './DraggableModal';
 
 const TimeLogs = () => {
-  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, users, showToast } = useAppContext();
+  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, users, showToast, syncHolidayLogs, holidays } = useAppContext();
   
   // UI State
   const [showModal, setShowModal] = useState(false);
@@ -47,13 +47,13 @@ const TimeLogs = () => {
   const [normalInput, setNormalInput] = useState({ hours: '8', minutes: '00' });
   const [extraInput, setExtraInput] = useState({ hours: '0', minutes: '00' });
 
-  const isHR = currentUser?.role === UserRole.HR;
+  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const NO_PROJECT_ID = "NO_PROJECT";
 
   // Dynamic Subtasks
   const availableTasks = useMemo(() => {
     if (!formData.projectId || formData.projectId === NO_PROJECT_ID) {
-      return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training'];
+      return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training', 'Public Holiday'];
     }
     const project = projects.find(p => String(p.id) === String(formData.projectId));
     return project?.tasks || [];
@@ -244,6 +244,11 @@ const TimeLogs = () => {
       setShowDeleteConfirm(true);
   };
 
+  const handleSyncHolidays = async () => {
+      const year = viewDate.getFullYear().toString();
+      await syncHolidayLogs(year);
+  };
+
   const exportCSV = () => {
     const headers = ["Date", "Project", "Task", "User", "Duration", "Status", "Billable"];
     const csvRows = visibleEntries.map(e => [
@@ -306,6 +311,15 @@ const TimeLogs = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+              {isHR && (
+                  <button 
+                    onClick={handleSyncHolidays}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-slate-50"
+                  >
+                      <RefreshCcw size={18} className="text-emerald-500" />
+                      <span>Sync Holiday Logs</span>
+                  </button>
+              )}
               <button 
                 onClick={() => { resetForm(); setShowModal(true); }}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-teal-500/20 transition-all active:scale-95"
@@ -425,18 +439,22 @@ const TimeLogs = () => {
                       {expandedProjects[pid] && entries.map(e => {
                         const { day, monthYear } = getDayNameAndDate(e.date);
                         const user = users.find(u => String(u.id) === String(e.userId));
+                        const isHolidayLog = e.task === 'Public Holiday';
                         return (
-                          <tr key={e.id} className="bg-white dark:bg-slate-800 hover:bg-slate-50/50 transition-colors group">
+                          <tr key={e.id} className={`hover:bg-slate-50/50 transition-colors group ${isHolidayLog ? 'bg-emerald-50/20 dark:bg-emerald-900/5' : 'bg-white dark:bg-slate-800'}`}>
                             <td className="px-6 py-5 leading-tight">
                                <div className="font-bold text-slate-800 dark:text-white text-sm">{monthYear.split(' ')[0]} {day},</div>
                                <div className="text-slate-400 text-[10px] uppercase font-bold">{monthYear.split(' ')[1]}</div>
                             </td>
                             <td className="px-6 py-5 whitespace-nowrap">
-                                <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded text-[10px] uppercase">
-                                    {getProjectName(e.projectId)}
+                                <span className={`${isHolidayLog ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'} font-bold px-2 py-1 rounded text-[10px] uppercase`}>
+                                    {isHolidayLog ? 'Company Holiday' : getProjectName(e.projectId)}
                                 </span>
                             </td>
-                            <td className="px-6 py-5 font-bold text-slate-700 dark:text-slate-200">{e.task}</td>
+                            <td className="px-6 py-5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                {e.task}
+                                {isHolidayLog && <Coffee size={12} className="text-emerald-500" />}
+                            </td>
                             <td className="px-6 py-5 text-slate-500 max-w-xs line-clamp-2">{e.description}</td>
                             <td className="px-6 py-5 text-slate-600 dark:text-slate-300 font-medium">{user ? `${user.firstName} ${user.lastName}` : 'Unknown'}</td>
                             <td className="px-6 py-5 font-mono font-bold text-slate-800 dark:text-white bg-slate-50/50 dark:bg-slate-900/10">{formatDuration(e.durationMinutes + (e.extraMinutes || 0))}</td>
@@ -522,7 +540,7 @@ const TimeLogs = () => {
                            <div className="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 group-hover:text-teal-600 transition-colors">
                                {expandedSummary[pid] ? <ChevronDown size={12}/> : <ChevronRight size={12}/>}
                            </div>
-                           <span className="text-slate-700 dark:text-slate-200">No Client - {getProjectName(pid)} ({Object.keys(data.tasks).length} task)</span>
+                           <span className="text-slate-700 dark:text-slate-200">{pid === NO_PROJECT_ID ? 'General / System' : `Project - ${getProjectName(pid)}`} ({Object.keys(data.tasks).length} task)</span>
                         </td>
                         {data.days.map((m: number, i: number) => (
                             <td key={i} className={`px-4 py-4 text-center border-r border-slate-200 dark:border-slate-700 font-bold ${m > 0 ? 'text-teal-600 dark:text-teal-400' : 'text-slate-300'}`}>

@@ -79,7 +79,9 @@ const initDb = async () => {
             { name: 'projects', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='projects' AND xtype='U') CREATE TABLE projects (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(255), description NVARCHAR(MAX), status NVARCHAR(50), tasks NVARCHAR(MAX), dueDate NVARCHAR(50))` },
             { name: 'leaves', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='leaves' AND xtype='U') CREATE TABLE leaves (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(255), type NVARCHAR(100), startDate NVARCHAR(50), endDate NVARCHAR(50), durationType NVARCHAR(50), reason NVARCHAR(MAX), status NVARCHAR(50), approverId NVARCHAR(50), isUrgent BIT, managerComment NVARCHAR(MAX), notifyUserIds NVARCHAR(MAX))` },
             { name: 'attendance', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='attendance' AND xtype='U') CREATE TABLE attendance (id NVARCHAR(50) PRIMARY KEY, employeeId NVARCHAR(50), employeeName NVARCHAR(255), date NVARCHAR(50), checkIn NVARCHAR(50), checkOut NVARCHAR(50), checkInTime NVARCHAR(100), checkOutTime NVARCHAR(100), status NVARCHAR(50), notes NVARCHAR(MAX), workLocation NVARCHAR(100))` },
+            { name: 'time_entries', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='time_entries' AND xtype='U') CREATE TABLE time_entries (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), projectId NVARCHAR(50), task NVARCHAR(255), date NVARCHAR(50), durationMinutes INT, extraMinutes INT, description NVARCHAR(MAX), status NVARCHAR(50), isBillable BIT)` },
             { name: 'notifications', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U') CREATE TABLE notifications (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), title NVARCHAR(255), message NVARCHAR(MAX), time NVARCHAR(100), [read] BIT, type NVARCHAR(50))` },
+            { name: 'holidays', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='holidays' AND xtype='U') CREATE TABLE holidays (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(255), date NVARCHAR(50), type NVARCHAR(50))` },
             { name: 'invitations', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='invitations' AND xtype='U') CREATE TABLE invitations (id NVARCHAR(50) PRIMARY KEY, email NVARCHAR(255), firstName NVARCHAR(100), lastName NVARCHAR(100), role NVARCHAR(100), position NVARCHAR(100), department NVARCHAR(100), salary FLOAT, invitedDate NVARCHAR(50), token NVARCHAR(100), provisionInAzure BIT)` }
         ];
         for (const table of tables) {
@@ -91,6 +93,63 @@ const initDb = async () => {
 };
 
 const apiRouter = express.Router();
+
+// --- TIME ENTRIES ROUTES ---
+apiRouter.get('/time_entries', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM time_entries");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.post('/time_entries', async (req, res) => {
+    try {
+        const e = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(e.id));
+        request.input('userId', sql.NVarChar, toStr(e.userId));
+        request.input('projectId', sql.NVarChar, toStr(e.projectId));
+        request.input('task', sql.NVarChar, toStr(e.task));
+        request.input('date', sql.NVarChar, toStr(e.date));
+        request.input('durationMinutes', sql.Int, parseInt(e.durationMinutes) || 0);
+        request.input('extraMinutes', sql.Int, parseInt(e.extraMinutes) || 0);
+        request.input('description', sql.NVarChar, toStr(e.description));
+        request.input('status', sql.NVarChar, toStr(e.status));
+        request.input('isBillable', sql.Bit, toBit(e.isBillable));
+        
+        await request.query(`INSERT INTO time_entries (id, userId, projectId, task, date, durationMinutes, extraMinutes, description, status, isBillable) 
+                             VALUES (@id, @userId, @projectId, @task, @date, @durationMinutes, @extraMinutes, @description, @status, @isBillable)`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.put('/time_entries/:id', async (req, res) => {
+    try {
+        const e = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, req.params.id);
+        request.input('projectId', sql.NVarChar, toStr(e.projectId));
+        request.input('task', sql.NVarChar, toStr(e.task));
+        request.input('date', sql.NVarChar, toStr(e.date));
+        request.input('durationMinutes', sql.Int, parseInt(e.durationMinutes) || 0);
+        request.input('extraMinutes', sql.Int, parseInt(e.extraMinutes) || 0);
+        request.input('description', sql.NVarChar, toStr(e.description));
+        request.input('status', sql.NVarChar, toStr(e.status));
+        request.input('isBillable', sql.Bit, toBit(e.isBillable));
+        
+        await request.query(`UPDATE time_entries SET projectId=@projectId, task=@task, date=@date, durationMinutes=@durationMinutes, extraMinutes=@extraMinutes, description=@description, status=@status, isBillable=@isBillable WHERE id=@id`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.delete('/time_entries/:id', async (req, res) => {
+    try {
+        const request = pool.request();
+        request.input('id', sql.NVarChar, req.params.id);
+        await request.query(`DELETE FROM time_entries WHERE id=@id`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // --- ATTENDANCE ROUTES ---
 apiRouter.get('/attendance', async (req, res) => {
@@ -133,15 +192,6 @@ apiRouter.put('/attendance/:id', async (req, res) => {
         request.input('notes', sql.NVarChar, toStr(a.notes));
         
         await request.query(`UPDATE attendance SET checkOut=@checkOut, checkOutTime=@checkOutTime, status=@status, notes=@notes WHERE id=@id`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.delete('/attendance/:id', async (req, res) => {
-    try {
-        const request = pool.request();
-        request.input('id', sql.NVarChar, req.params.id);
-        await request.query(`DELETE FROM attendance WHERE id=@id`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -190,15 +240,6 @@ apiRouter.put('/leaves/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.delete('/leaves/:id', async (req, res) => {
-    try {
-        const request = pool.request();
-        request.input('id', sql.NVarChar, req.params.id);
-        await request.query(`DELETE FROM leaves WHERE id=@id`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // --- NOTIFICATION ROUTES ---
 apiRouter.get('/notifications', async (req, res) => {
     try {
@@ -233,37 +274,32 @@ apiRouter.put('/notifications/:id/read', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-apiRouter.put('/notifications/read-all/:userId', async (req, res) => {
+// --- HOLIDAY ROUTES ---
+apiRouter.get('/holidays', async (req, res) => {
+    try {
+        const result = await pool.request().query("SELECT * FROM holidays");
+        res.json(result.recordset);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.post('/holidays', async (req, res) => {
+    try {
+        const h = req.body;
+        const request = pool.request();
+        request.input('id', sql.NVarChar, toStr(h.id));
+        request.input('name', sql.NVarChar, toStr(h.name));
+        request.input('date', sql.NVarChar, toStr(h.date));
+        request.input('type', sql.NVarChar, toStr(h.type));
+        await request.query(`INSERT INTO holidays (id, name, date, type) VALUES (@id, @name, @date, @type)`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+apiRouter.delete('/holidays/:id', async (req, res) => {
     try {
         const request = pool.request();
-        request.input('userId', sql.NVarChar, req.params.userId);
-        await request.query(`UPDATE notifications SET [read]=1 WHERE userId=@userId`);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// --- NOTIFY (EMAIL) ENDPOINTS ---
-apiRouter.post('/notify/leave-request', async (req, res) => {
-    try {
-        const { to, cc, employeeName, type, startDate, endDate, reason, isUpdate, isWithdrawal } = req.body;
-        const subject = `${isWithdrawal ? 'Withdrawn' : isUpdate ? 'Updated' : 'New'} Leave: ${employeeName}`;
-        await transporter.sendMail({
-            from: `"EmpowerCorp HR" <${SMTP_USER}>`,
-            to, cc, subject,
-            html: `<p><strong>${employeeName}</strong> has ${isWithdrawal ? 'withdrawn' : 'submitted/updated'} a <strong>${type}</strong> request.</p><p>Dates: ${startDate} to ${endDate}</p><p>Reason: ${reason}</p>`
-        });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-apiRouter.post('/notify/leave-status', async (req, res) => {
-    try {
-        const { to, employeeName, status, type, managerComment } = req.body;
-        await transporter.sendMail({
-            from: `"EmpowerCorp HR" <${SMTP_USER}>`,
-            to, subject: `Leave Status: ${status}`,
-            html: `<p>The request for <strong>${employeeName}</strong> (${type}) is <strong>${status}</strong>.</p>${managerComment ? `<p>Comment: ${managerComment}</p>` : ''}`
-        });
+        request.input('id', sql.NVarChar, req.params.id);
+        await request.query(`DELETE FROM holidays WHERE id=@id`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
