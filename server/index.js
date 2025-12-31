@@ -66,12 +66,11 @@ const connectDb = async () => {
     }
 };
 
-const toStr = (val) => val === null || val === undefined ? '' : String(val);
-const toBit = (val) => val ? 1 : 0;
-
 const initDb = async () => {
     try {
         const request = pool.request();
+        
+        // Define standard table structures
         const tables = [
             { name: 'employees', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U') CREATE TABLE employees (id NVARCHAR(50) PRIMARY KEY, employeeId NVARCHAR(50), firstName NVARCHAR(100), lastName NVARCHAR(100), email NVARCHAR(255), password NVARCHAR(255), role NVARCHAR(100), position NVARCHAR(100), department NVARCHAR(100), departmentId NVARCHAR(50), projectIds NVARCHAR(MAX), joinDate NVARCHAR(50), status NVARCHAR(50), salary FLOAT, avatar NVARCHAR(MAX), managerId NVARCHAR(50), phone NVARCHAR(50), workLocation NVARCHAR(100), jobTitle NVARCHAR(100))` },
             { name: 'departments', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U') CREATE TABLE departments (id NVARCHAR(50) PRIMARY KEY, name NVARCHAR(255), description NVARCHAR(MAX), managerId NVARCHAR(50))` },
@@ -87,12 +86,31 @@ const initDb = async () => {
             { name: 'payslips', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='payslips' AND xtype='U') CREATE TABLE payslips (id NVARCHAR(50) PRIMARY KEY, userId NVARCHAR(50), userName NVARCHAR(255), month NVARCHAR(50), amount FLOAT, currency NVARCHAR(10), status NVARCHAR(50), generatedDate NVARCHAR(50), fileData NVARCHAR(MAX), fileName NVARCHAR(255))` },
             { name: 'invitations', query: `IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='invitations' AND xtype='U') CREATE TABLE invitations (id NVARCHAR(50) PRIMARY KEY, email NVARCHAR(255), firstName NVARCHAR(100), lastName NVARCHAR(100), role NVARCHAR(100), position NVARCHAR(100), department NVARCHAR(100), salary FLOAT, invitedDate NVARCHAR(50), token NVARCHAR(100), provisionInAzure BIT)` }
         ];
+
+        // Ensure tables exist
         for (const table of tables) {
             await request.query(table.query);
         }
-        await request.query(`IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('leaves') AND name = 'notifyUserIds') ALTER TABLE leaves ADD notifyUserIds NVARCHAR(MAX)`);
-        console.log("✅ [DB INIT] All tables verified");
-    } catch (err) { console.error("❌ [DB INIT ERROR]:", err.message); }
+
+        // Schema Migrations: Ensure specific columns exist in case table was created with an older version
+        const migrations = [
+            { table: 'leaves', column: 'notifyUserIds', type: 'NVARCHAR(MAX)' },
+            { table: 'leaves', column: 'durationType', type: 'NVARCHAR(50)' },
+            { table: 'leaves', column: 'isUrgent', type: 'BIT' },
+            { table: 'leaves', column: 'managerComment', type: 'NVARCHAR(MAX)' },
+            { table: 'time_entries', column: 'extraMinutes', type: 'INT' },
+            { table: 'time_entries', column: 'isBillable', type: 'BIT' },
+            { table: 'notifications', column: 'type', type: 'NVARCHAR(50)' }
+        ];
+
+        for (const m of migrations) {
+            await request.query(`IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('${m.table}') AND name = '${m.column}') ALTER TABLE ${m.table} ADD ${m.column} ${m.type}`);
+        }
+
+        console.log("✅ [DB INIT] All tables and columns verified");
+    } catch (err) { 
+        console.error("❌ [DB INIT ERROR]:", err.message); 
+    }
 };
 
 const apiRouter = express.Router();
