@@ -117,7 +117,8 @@ const registerStandardRoutes = (endpoint, table) => {
                 if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
                 request.input(col, val);
             });
-            const colList = columns.join(', ');
+            // Wrap column names in brackets to handle reserved keywords like 'read'
+            const colList = columns.map(c => `[${c}]`).join(', ');
             const paramList = columns.map(c => `@${c}`).join(', ');
             const query = `INSERT INTO ${table} (${colList}) VALUES (${paramList})`;
             await request.query(query);
@@ -131,11 +132,12 @@ const registerStandardRoutes = (endpoint, table) => {
             const data = req.body;
             const request = pool.request();
             request.input('id', req.params.id);
+            // Wrap column names in brackets to handle reserved keywords like 'read'
             const sets = Object.keys(data).filter(k => k !== 'id').map(k => {
                 let val = data[k];
                 if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
                 request.input(k, val);
-                return `${k}=@${k}`;
+                return `[${k}]=@${k}`;
             }).join(', ');
             await request.query(`UPDATE ${table} SET ${sets} WHERE id=@id`);
             res.json({ success: true });
