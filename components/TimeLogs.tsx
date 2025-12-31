@@ -5,7 +5,7 @@ import { TimeEntry, Project, UserRole } from '../types';
 import { 
   Clock, Plus, FileText, ChevronDown, ChevronRight, ChevronLeft, Edit2, Trash2,
   DollarSign, FileSpreadsheet, AlertTriangle, CheckCircle2, MoreHorizontal, SlidersHorizontal, Zap, 
-  Calendar as CalendarIcon, Search, Filter, Download, MoreVertical, Coffee, RefreshCcw
+  Calendar as CalendarIcon, Search, Filter, Download, MoreVertical, Coffee, RefreshCcw, PartyPopper
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -41,7 +41,8 @@ const TimeLogs = () => {
     task: '',
     date: new Date().toISOString().split('T')[0],
     description: '',
-    isBillable: true
+    isBillable: true,
+    isHoliday: false
   });
 
   const [normalInput, setNormalInput] = useState({ hours: '8', minutes: '00' });
@@ -52,6 +53,7 @@ const TimeLogs = () => {
 
   // Dynamic Subtasks - Defensively handled for SQL JSON strings
   const availableTasks = useMemo(() => {
+    if (formData.isHoliday) return ['Public Holiday'];
     if (!formData.projectId || formData.projectId === NO_PROJECT_ID) {
       return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training', 'Public Holiday'];
     }
@@ -66,7 +68,7 @@ const TimeLogs = () => {
         } catch (e) { tasks = []; }
     }
     return Array.isArray(tasks) ? tasks : [];
-  }, [formData.projectId, projects]);
+  }, [formData.projectId, formData.isHoliday, projects]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -210,17 +212,19 @@ const TimeLogs = () => {
     if (!currentUser) return;
     const normalMinutes = (parseInt(normalInput.hours) || 0) * 60 + (parseInt(normalInput.minutes) || 0);
     const extraMinutes = includeExtra ? (parseInt(extraInput.hours) || 0) * 60 + (parseInt(extraInput.minutes) || 0) : 0;
+    
     const entryData = {
         userId: currentUser.id, 
-        projectId: String(formData.projectId) === NO_PROJECT_ID ? '' : formData.projectId,
-        task: formData.task,
+        projectId: formData.isHoliday ? '' : (String(formData.projectId) === NO_PROJECT_ID ? '' : formData.projectId),
+        task: formData.isHoliday ? 'Public Holiday' : formData.task,
         date: formData.date,
         durationMinutes: normalMinutes,
         extraMinutes: extraMinutes,
         description: formData.description,
-        status: 'Pending' as const,
-        isBillable: formData.isBillable
+        status: formData.isHoliday ? 'Approved' : ('Pending' as const),
+        isBillable: formData.isHoliday ? false : formData.isBillable
     };
+    
     if (editingId) updateTimeEntry(editingId, entryData);
     else addTimeEntry(entryData);
     setShowModal(false);
@@ -230,14 +234,22 @@ const TimeLogs = () => {
   const resetForm = () => {
       setEditingId(null);
       setIncludeExtra(false);
-      setFormData({ projectId: '', task: '', date: new Date().toISOString().split('T')[0], description: '', isBillable: true });
+      setFormData({ projectId: '', task: '', date: new Date().toISOString().split('T')[0], description: '', isBillable: true, isHoliday: false });
       setNormalInput({ hours: '8', minutes: '00' });
       setExtraInput({ hours: '0', minutes: '00' });
   };
 
   const handleEdit = (entry: TimeEntry) => {
+      const isHol = entry.task === 'Public Holiday';
       setEditingId(String(entry.id));
-      setFormData({ projectId: String(entry.projectId || NO_PROJECT_ID), task: entry.task, date: entry.date, description: entry.description || '', isBillable: entry.isBillable });
+      setFormData({ 
+        projectId: String(entry.projectId || NO_PROJECT_ID), 
+        task: entry.task, 
+        date: entry.date, 
+        description: entry.description || '', 
+        isBillable: entry.isBillable,
+        isHoliday: isHol
+      });
       const nh = Math.floor(entry.durationMinutes / 60);
       const nm = entry.durationMinutes % 60;
       setNormalInput({ hours: nh.toString(), minutes: nm.toString().padStart(2, '0') });
@@ -413,18 +425,18 @@ const TimeLogs = () => {
       <section className="space-y-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-400 font-bold uppercase tracking-wider border-b">
-                    <th className="px-6 py-4 w-36">Date</th>
-                    <th className="px-6 py-4">Project</th>
-                    <th className="px-6 py-4">Task</th>
-                    <th className="px-6 py-4">Task Description</th>
-                    <th className="px-6 py-4">User</th>
-                    <th className="px-6 py-4">Duration</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Billable</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4 w-[120px]">Date</th>
+                    <th className="px-6 py-4 w-[140px]">Project</th>
+                    <th className="px-6 py-4 w-[160px]">Task</th>
+                    <th className="px-6 py-4 min-w-[200px]">Task Description</th>
+                    <th className="px-6 py-4 w-[180px]">User</th>
+                    <th className="px-6 py-4 w-[100px]">Duration</th>
+                    <th className="px-6 py-4 w-[120px]">Status</th>
+                    <th className="px-6 py-4 w-[100px]">Billable</th>
+                    <th className="px-6 py-4 w-[100px] text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -452,7 +464,7 @@ const TimeLogs = () => {
                         return (
                           <tr key={e.id} className={`hover:bg-slate-50/50 transition-colors group ${isHolidayLog ? 'bg-emerald-50/20 dark:bg-emerald-900/5' : 'bg-white dark:bg-slate-800'}`}>
                             <td className="px-6 py-5 leading-tight">
-                               <div className="font-bold text-slate-800 dark:text-white text-sm">{monthYear.split(' ')[0]} {day},</div>
+                               <div className="font-bold text-slate-800 dark:text-white text-sm whitespace-nowrap">{monthYear.split(' ')[0]} {day},</div>
                                <div className="text-slate-400 text-[10px] uppercase font-bold">{monthYear.split(' ')[1]}</div>
                             </td>
                             <td className="px-6 py-5 whitespace-nowrap">
@@ -460,20 +472,32 @@ const TimeLogs = () => {
                                     {isHolidayLog ? 'Company Holiday' : getProjectName(e.projectId)}
                                 </span>
                             </td>
-                            <td className="px-6 py-5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                {e.task}
-                                {isHolidayLog && <Coffee size={12} className="text-emerald-500" />}
-                            </td>
-                            <td className="px-6 py-5 text-slate-500 max-w-xs line-clamp-2">{e.description}</td>
-                            <td className="px-6 py-5 text-slate-600 dark:text-slate-300 font-medium">{user ? `${user.firstName} ${user.lastName}` : 'Unknown'}</td>
-                            <td className="px-6 py-5 font-mono font-bold text-slate-800 dark:text-white bg-slate-50/50 dark:bg-slate-900/10">{formatDuration(e.durationMinutes + (e.extraMinutes || 0))}</td>
                             <td className="px-6 py-5">
-                               <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${e.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : e.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                                <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                    {e.task}
+                                    {isHolidayLog && <Coffee size={12} className="text-emerald-500" />}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5">
+                                <div className="text-slate-500 max-w-xs line-clamp-2 leading-relaxed">
+                                    {e.description}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5">
+                                <div className="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                                    {user ? `${user.firstName} ${user.lastName}` : 'Unknown'}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5 font-mono font-bold text-slate-800 dark:text-white bg-slate-50/50 dark:bg-slate-900/10">
+                                {formatDuration(e.durationMinutes + (e.extraMinutes || 0))}
+                            </td>
+                            <td className="px-6 py-5">
+                               <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border inline-block whitespace-nowrap ${e.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : e.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                                   {e.status}
                                </span>
                             </td>
                             <td className="px-6 py-5">
-                               {e.isBillable && <span className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">Billable</span>}
+                               {e.isBillable && <span className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">Billable</span>}
                             </td>
                             <td className="px-6 py-5 text-right">
                                <div className="flex items-center justify-end gap-2">
@@ -597,6 +621,30 @@ const TimeLogs = () => {
       {/* Shared Edit Modal */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? "Edit Time Log" : "Log New Session"} width="max-w-xl">
            <form onSubmit={handleSubmit} className="space-y-6">
+               <div className="flex items-center gap-2 mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl cursor-pointer transition-all">
+                  <input 
+                    type="checkbox" 
+                    id="isHoliday" 
+                    checked={formData.isHoliday} 
+                    onChange={e => {
+                        const checked = e.target.checked;
+                        setFormData({
+                            ...formData, 
+                            isHoliday: checked,
+                            projectId: checked ? NO_PROJECT_ID : '',
+                            task: checked ? 'Public Holiday' : '',
+                            isBillable: checked ? false : true,
+                            description: checked ? 'Public / National Holiday observed.' : formData.description
+                        });
+                        if (checked) setNormalInput({ hours: '8', minutes: '00' });
+                    }} 
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                  />
+                  <label htmlFor="isHoliday" className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest cursor-pointer flex items-center gap-2">
+                    <PartyPopper size={14} /> Mark as Public / National Holiday
+                  </label>
+               </div>
+
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div>
                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Date</label>
@@ -604,7 +652,12 @@ const TimeLogs = () => {
                    </div>
                    <div>
                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Project</label>
-                       <select required className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500" value={formData.projectId} onChange={e => {
+                       <select 
+                        required 
+                        disabled={formData.isHoliday}
+                        className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:bg-slate-50" 
+                        value={formData.projectId} 
+                        onChange={e => {
                          const pid = e.target.value;
                          setFormData({...formData, projectId: pid, task: ''}); // Reset task when project changes
                        }}>
@@ -618,12 +671,12 @@ const TimeLogs = () => {
                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Task / Subtask</label>
                    <select 
                       required 
-                      disabled={!formData.projectId}
-                      className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800 transition-all shadow-sm" 
+                      disabled={!formData.projectId || formData.isHoliday}
+                      className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:bg-slate-50 transition-all shadow-sm" 
                       value={formData.task} 
                       onChange={e => setFormData({...formData, task: e.target.value})}
                    >
-                    <option value="" disabled>{formData.projectId ? "Select subtask..." : "Select project first"}</option>
+                    <option value="" disabled>{formData.isHoliday ? 'Public Holiday' : (formData.projectId ? "Select subtask..." : "Select project first")}</option>
                     {availableTasks.map(t => <option key={t} value={t}>{t}</option>)}
                    </select>
                </div>
@@ -644,23 +697,27 @@ const TimeLogs = () => {
                         </div>
                    </div>
                    <div className="flex flex-col justify-end">
-                      <label className="flex items-center gap-2 cursor-pointer pb-2">
-                         <input type="checkbox" checked={includeExtra} onChange={(e) => setIncludeExtra(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
-                         <span className="text-[10px] font-bold text-slate-500 uppercase">Include Overtime?</span>
-                      </label>
-                      {includeExtra && (
-                          <div className="flex gap-2 animate-in fade-in slide-in-from-top-2">
-                            <input type="number" placeholder="H" className="w-full px-2 py-1.5 border border-purple-200 rounded-lg dark:bg-slate-800 outline-none focus:ring-1 focus:ring-purple-500 text-center" value={extraInput.hours} onChange={e => setExtraInput({...extraInput, hours: e.target.value})} />
-                            <input 
-                              type="number" 
-                              min="0" 
-                              max="59" 
-                              placeholder="M" 
-                              className="w-full px-2 py-1.5 border border-purple-200 rounded-lg dark:bg-slate-800 outline-none focus:ring-1 focus:ring-purple-500 text-center" 
-                              value={extraInput.minutes} 
-                              onChange={e => setExtraInput({...extraInput, minutes: e.target.value.padStart(2, '0').slice(-2)})} 
-                            />
-                          </div>
+                      {!formData.isHoliday && (
+                        <>
+                          <label className="flex items-center gap-2 cursor-pointer pb-2">
+                            <input type="checkbox" checked={includeExtra} onChange={(e) => setIncludeExtra(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Include Overtime?</span>
+                          </label>
+                          {includeExtra && (
+                              <div className="flex gap-2 animate-in fade-in slide-in-from-top-2">
+                                <input type="number" placeholder="H" className="w-full px-2 py-1.5 border border-purple-200 rounded-lg dark:bg-slate-800 outline-none focus:ring-1 focus:ring-purple-500 text-center" value={extraInput.hours} onChange={e => setExtraInput({...extraInput, hours: e.target.value})} />
+                                <input 
+                                  type="number" 
+                                  min="0" 
+                                  max="59" 
+                                  placeholder="M" 
+                                  className="w-full px-2 py-1.5 border border-purple-200 rounded-lg dark:bg-slate-800 outline-none focus:ring-1 focus:ring-purple-500 text-center" 
+                                  value={extraInput.minutes} 
+                                  onChange={e => setExtraInput({...extraInput, minutes: e.target.value.padStart(2, '0').slice(-2)})} 
+                                />
+                              </div>
+                          )}
+                        </>
                       )}
                    </div>
                </div>
