@@ -269,9 +269,9 @@ const TimeLogs = () => {
       await syncHolidayLogs(year);
   };
 
-  const formatDateLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // --- Specialized Exports Matching User Requirement ---
 
-  // --- Specialized Exports ---
+  const formatDateLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const exportCSV = () => {
     // Filename format: timesheet_YYYY_MM.csv
@@ -284,7 +284,7 @@ const TimeLogs = () => {
         const user = users.find(u => String(u.id) === String(e.userId));
         const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
         const totalHours = ((e.durationMinutes + (e.extraMinutes || 0)) / 60).toFixed(2);
-        const category = user?.department || 'Product Development'; // Default as shown in image
+        const category = user?.department || 'Product Development';
         
         return [
             e.date,
@@ -319,7 +319,7 @@ const TimeLogs = () => {
                   now.getSeconds().toString().padStart(2, '0');
     const filename = `TimeLog_${stamp}_month.xlsx`;
 
-    // Sheet 1: Time Entries
+    // 1. Time Entries Sheet
     const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
     const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
     const rangeStr = `${formatDateLabel(startOfMonth)} - ${formatDateLabel(endOfMonth)}`;
@@ -356,8 +356,14 @@ const TimeLogs = () => {
     ws1Data.push(["GRAND TOTAL", "", "", "", "", (grandTotalMinutes / 60).toFixed(2)]);
 
     const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+    
+    // Set column widths for better auto-formatting appearance
+    ws1['!cols'] = [
+        { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, 
+        { wch: 15 }, { wch: 10 }, { wch: 40 }, { wch: 12 }, { wch: 10 }
+    ];
 
-    // Sheet 2: Project Summary
+    // 2. Project Summary Sheet
     const ws2Data = [
         ["Approved & Locked Project Hours Summary"],
         [],
@@ -383,6 +389,7 @@ const TimeLogs = () => {
     });
 
     const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws1, "Time Entries");
@@ -404,18 +411,18 @@ const TimeLogs = () => {
     const rangeStr = `${formatDateLabel(startOfMonth)} - ${formatDateLabel(endOfMonth)}`;
 
     // Top Right generated on
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     doc.text(`Generated on ${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`, 280, 10, { align: 'right' });
 
-    // Main Title
+    // Main Title - Centered
     doc.setFontSize(22);
     doc.setTextColor(33, 33, 33);
     doc.text(`Time Entries Report`, 148, 20, { align: 'center' });
     
-    // Date Range
-    doc.setFontSize(12);
-    doc.text(rangeStr, 148, 30, { align: 'center' });
+    // Date Range - Centered
+    doc.setFontSize(11);
+    doc.text(rangeStr, 148, 28, { align: 'center' });
 
     const tableData = visibleEntries.map(e => {
         const user = users.find(u => String(u.id) === String(e.userId));
@@ -425,7 +432,7 @@ const TimeLogs = () => {
             resourceName,
             getProjectName(e.projectId),
             e.task,
-            `${((e.durationMinutes + (e.extraMinutes || 0)) / 60).toFixed(0)}h`,
+            `${((e.durationMinutes + (e.extraMinutes || 0)) / 60).toFixed(1)}h`,
             e.status.toLowerCase(),
             e.isBillable ? 'Yes' : 'No'
         ];
@@ -434,10 +441,10 @@ const TimeLogs = () => {
     autoTable(doc, {
       head: [["Date", "Resource", "Project", "Task", "Time", "Status", "Billable"]],
       body: tableData,
-      startY: 45,
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [64, 64, 64], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
+      startY: 40,
+      styles: { fontSize: 8.5, cellPadding: 3.5 },
+      headStyles: { fillColor: [51, 51, 51], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 }
     });
 
@@ -485,12 +492,12 @@ const TimeLogs = () => {
                     <ChevronDown size={14} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
                 </button>
                 {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                     <button onClick={exportPDF} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors border-b dark:border-slate-700">
                         <FileText size={16} className="text-red-500" /> PDF Report
                     </button>
                     <button onClick={exportExcel} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors border-b dark:border-slate-700">
-                        <FileSpreadsheet size={16} className="text-emerald-500" /> Excel (.xlsx)
+                        <FileSpreadsheet size={16} className="text-emerald-600" /> Excel (.xlsx)
                     </button>
                     <button onClick={exportCSV} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors">
                         <FileSpreadsheet size={16} className="text-slate-400" /> CSV Details
