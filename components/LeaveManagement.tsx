@@ -440,7 +440,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         </div>
       )}
 
-      {/* TYPES (POLICIES) VIEW */}
+      {/* TYPES (POLICIES) VIEW - MATCHING BALANCES STYLE */}
       {viewMode === 'types' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -449,28 +449,33 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               <button onClick={() => { setEditingType(null); setTypeData({ name: '', days: 10, description: '', isActive: true, color: 'text-teal-600' }); setShowTypeModal(true); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 flex items-center gap-2 shadow-sm transition-all"><Plus size={16} /> Add Leave Type</button>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {leaveTypes.map(type => (
               <div key={type.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm relative group hover:shadow-md transition-all">
                   <div className="flex justify-between items-start mb-4">
                     <div className={`p-3 rounded-xl bg-teal-50 dark:bg-teal-900/20 text-teal-600`}>
                       <CalendarDays size={24} />
                     </div>
+                    <div className="text-right">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Allowance</span>
+                        <p className="text-2xl font-black text-slate-800 dark:text-white leading-none">{type.days}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <h4 className="font-bold text-slate-800 dark:text-white mb-1">{type.name}</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 h-8 leading-relaxed">{type.description}</p>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-slate-50 dark:border-slate-700/50">
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${type.isActive ? 'bg-teal-50 text-teal-600 border border-teal-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>{type.isActive ? 'Active' : 'Inactive'}</span>
+                    
                     {isHR && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Edit2 size={16}/></button>
-                        <button onClick={() => { if(window.confirm('Delete this policy permanently?')) deleteLeaveType(type.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                      <div className="flex gap-1">
+                        <button onClick={() => { setEditingType(String(type.id)); setTypeData(type as any); setShowTypeModal(true); }} className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Edit2 size={14}/></button>
+                        <button onClick={() => { if(window.confirm('Delete this policy permanently?')) deleteLeaveType(type.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={14}/></button>
                       </div>
                     )}
-                  </div>
-                  <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{type.name}</h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2 h-10 leading-relaxed">{type.description}</p>
-                  <div className="flex justify-between items-end pt-4 border-t border-slate-50 dark:border-slate-700/50">
-                    <div>
-                      <span className="block text-2xl font-black text-slate-800 dark:text-white">{type.days}</span>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Days / Year</span>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${type.isActive ? 'bg-teal-50 text-teal-600 border border-teal-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>{type.isActive ? 'Active' : 'Inactive'}</span>
                   </div>
               </div>
             ))}
