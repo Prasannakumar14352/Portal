@@ -425,18 +425,18 @@ const TimeLogs = () => {
       <section className="space-y-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs table-fixed border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-400 font-bold uppercase tracking-wider border-b">
-                    <th className="px-6 py-4 w-[120px]">Date</th>
+                    <th className="px-6 py-4 w-[110px]">Date</th>
                     <th className="px-6 py-4 w-[140px]">Project</th>
-                    <th className="px-6 py-4 w-[160px]">Task</th>
-                    <th className="px-6 py-4 min-w-[200px]">Task Description</th>
+                    <th className="px-6 py-4 w-[150px]">Task</th>
+                    <th className="px-6 py-4 w-auto min-w-[200px]">Task Description</th>
                     <th className="px-6 py-4 w-[180px]">User</th>
-                    <th className="px-6 py-4 w-[100px]">Duration</th>
-                    <th className="px-6 py-4 w-[120px]">Status</th>
-                    <th className="px-6 py-4 w-[100px]">Billable</th>
-                    <th className="px-6 py-4 w-[100px] text-right">Actions</th>
+                    <th className="px-6 py-4 w-[90px]">Duration</th>
+                    <th className="px-6 py-4 w-[110px]">Status</th>
+                    <th className="px-6 py-4 w-[90px]">Billable</th>
+                    <th className="px-6 py-4 w-[90px] text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -463,49 +463,55 @@ const TimeLogs = () => {
                         const isHolidayLog = e.task === 'Public Holiday';
                         return (
                           <tr key={e.id} className={`hover:bg-slate-50/50 transition-colors group ${isHolidayLog ? 'bg-emerald-50/20 dark:bg-emerald-900/5' : 'bg-white dark:bg-slate-800'}`}>
-                            <td className="px-6 py-5 leading-tight">
-                               <div className="font-bold text-slate-800 dark:text-white text-sm whitespace-nowrap">{monthYear.split(' ')[0]} {day},</div>
-                               <div className="text-slate-400 text-[10px] uppercase font-bold">{monthYear.split(' ')[1]}</div>
+                            <td className="px-6 py-5 align-top">
+                               <div className="leading-tight">
+                                   <div className="font-bold text-slate-800 dark:text-white text-sm whitespace-nowrap">{monthYear.split(' ')[0]} {day},</div>
+                                   <div className="text-slate-400 text-[10px] uppercase font-bold">{monthYear.split(' ')[1]}</div>
+                               </div>
                             </td>
-                            <td className="px-6 py-5 whitespace-nowrap">
-                                <span className={`${isHolidayLog ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'} font-bold px-2 py-1 rounded text-[10px] uppercase`}>
-                                    {isHolidayLog ? 'Company Holiday' : getProjectName(e.projectId)}
-                                </span>
-                            </td>
-                            <td className="px-6 py-5">
-                                <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                    {e.task}
-                                    {isHolidayLog && <Coffee size={12} className="text-emerald-500" />}
+                            <td className="px-6 py-5 align-top">
+                                <div className="whitespace-normal">
+                                    <span className={`${isHolidayLog ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'} font-bold px-2 py-1 rounded text-[10px] uppercase inline-block`}>
+                                        {isHolidayLog ? 'Company Holiday' : getProjectName(e.projectId)}
+                                    </span>
                                 </div>
                             </td>
-                            <td className="px-6 py-5">
-                                <div className="text-slate-500 max-w-xs line-clamp-2 leading-relaxed">
+                            <td className="px-6 py-5 align-top">
+                                <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 whitespace-normal break-words">
+                                    {e.task}
+                                    {isHolidayLog && <Coffee size={12} className="text-emerald-500 shrink-0" />}
+                                </div>
+                            </td>
+                            <td className="px-6 py-5 align-top">
+                                <div className="text-slate-500 leading-relaxed break-words whitespace-normal line-clamp-3">
                                     {e.description}
                                 </div>
                             </td>
-                            <td className="px-6 py-5">
-                                <div className="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                            <td className="px-6 py-5 align-top">
+                                <div className="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                                     {user ? `${user.firstName} ${user.lastName}` : 'Unknown'}
                                 </div>
                             </td>
-                            <td className="px-6 py-5 font-mono font-bold text-slate-800 dark:text-white bg-slate-50/50 dark:bg-slate-900/10">
-                                {formatDuration(e.durationMinutes + (e.extraMinutes || 0))}
+                            <td className="px-6 py-5 align-top text-center bg-slate-50/30 dark:bg-slate-900/10">
+                                <div className="font-mono font-bold text-slate-800 dark:text-white">
+                                    {formatDuration(e.durationMinutes + (e.extraMinutes || 0))}
+                                </div>
                             </td>
-                            <td className="px-6 py-5">
-                               <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border inline-block whitespace-nowrap ${e.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : e.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                            <td className="px-6 py-5 align-top text-center">
+                               <span className={`px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wide border inline-block whitespace-nowrap ${e.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : e.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                                   {e.status}
                                </span>
                             </td>
-                            <td className="px-6 py-5">
+                            <td className="px-6 py-5 align-top text-center">
                                {e.isBillable && <span className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">Billable</span>}
                             </td>
-                            <td className="px-6 py-5 text-right">
-                               <div className="flex items-center justify-end gap-2">
+                            <td className="px-6 py-5 align-top text-right">
+                               <div className="flex items-center justify-end gap-1">
                                   <button onClick={() => handleEdit(e)} className="text-slate-300 hover:text-teal-600 transition-colors p-2 rounded-lg hover:bg-teal-50" title="Edit Log">
-                                     <Edit2 size={16} />
+                                     <Edit2 size={15} />
                                   </button>
                                   <button onClick={() => handleDeleteTrigger(e.id)} className="text-slate-300 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50" title="Delete Log">
-                                     <Trash2 size={16} />
+                                     <Trash2 size={15} />
                                   </button>
                                </div>
                             </td>
