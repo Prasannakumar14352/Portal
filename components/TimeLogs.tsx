@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import DraggableModal from './DraggableModal';
 
 const TimeLogs = () => {
@@ -32,7 +33,6 @@ const TimeLogs = () => {
   const [filterProject, setFilterProject] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   
-  const menuRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
 
   // Form State
@@ -51,7 +51,7 @@ const TimeLogs = () => {
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const NO_PROJECT_ID = "NO_PROJECT";
 
-  // Dynamic Subtasks - Defensively handled for SQL JSON strings
+  // Dynamic Subtasks
   const availableTasks = useMemo(() => {
     if (formData.isHoliday) return ['Public Holiday'];
     if (!formData.projectId || formData.projectId === NO_PROJECT_ID) {
@@ -137,7 +137,6 @@ const TimeLogs = () => {
        entries = entries.filter(e => String(e.userId) === String(currentUser?.id));
     }
     
-    // Date Filtering (Current Month for main table)
     const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
     const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
     endOfMonth.setHours(23, 59, 59);
@@ -270,53 +269,179 @@ const TimeLogs = () => {
       await syncHolidayLogs(year);
   };
 
-  const exportCSV = () => {
-    const headers = ["Date", "Project", "Task", "User", "Duration", "Status", "Billable"];
-    const csvRows = visibleEntries.map(e => [
-      e.date,
-      getProjectName(e.projectId),
-      e.task,
-      users.find(u => String(u.id) === String(e.userId))?.firstName || 'Unknown',
-      `${Math.floor((e.durationMinutes + (e.extraMinutes || 0))/60)}h ${(e.durationMinutes + (e.extraMinutes || 0))%60}m`,
-      e.status,
-      e.isBillable ? 'Yes' : 'No'
-    ].map(v => `"${v}"`).join(','));
+  const formatDateLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    const csvContent = [headers.join(','), ...csvRows].join('\n');
+  // --- Specialized Exports ---
+
+  const exportCSV = () => {
+    // Filename format: timesheet_YYYY_MM.csv
+    const year = viewDate.getFullYear();
+    const month = String(viewDate.getMonth() + 1).padStart(2, '0');
+    const filename = `timesheet_${year}_${month}.csv`;
+
+    const headers = ["Date", "Resource", "Category", "Project", "Task", "Time", "Description", "Status", "Billable"];
+    const rows = visibleEntries.map(e => {
+        const user = users.find(u => String(u.id) === String(e.userId));
+        const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
+        const totalHours = ((e.durationMinutes + (e.extraMinutes || 0)) / 60).toFixed(2);
+        const category = user?.department || 'Product Development'; // Default as shown in image
+        
+        return [
+            e.date,
+            resourceName,
+            category,
+            getProjectName(e.projectId),
+            e.task,
+            totalHours,
+            e.description,
+            e.status.toLowerCase(),
+            e.isBillable ? 'Yes' : 'No'
+        ];
+    });
+
+    const csvContent = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `timesheet_${viewDate.getFullYear()}_${viewDate.getMonth() + 1}.csv`;
+    link.setAttribute("download", filename);
     link.click();
     setShowExportMenu(false);
     showToast("CSV Exported", "success");
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4');
-    doc.setFontSize(16);
-    doc.text(`Timesheet Report - ${viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}`, 14, 15);
-    
-    const tableData = visibleEntries.map(e => [
-      e.date,
-      getProjectName(e.projectId),
-      e.task,
-      users.find(u => String(u.id) === String(e.userId))?.firstName || 'Unknown',
-      `${Math.floor((e.durationMinutes + (e.extraMinutes || 0))/60)}h ${(e.durationMinutes + (e.extraMinutes || 0))%60}m`,
-      e.status,
-      e.isBillable ? 'Yes' : 'No'
-    ]);
+  const exportExcel = () => {
+    // Filename format: TimeLog_YYYY-MM-DD HH_mm_ss_month.xlsx
+    const now = new Date();
+    const stamp = now.toISOString().split('T')[0] + ' ' + 
+                  now.getHours().toString().padStart(2, '0') + '_' + 
+                  now.getMinutes().toString().padStart(2, '0') + '_' + 
+                  now.getSeconds().toString().padStart(2, '0');
+    const filename = `TimeLog_${stamp}_month.xlsx`;
 
-    autoTable(doc, {
-      head: [["Date", "Project", "Task", "User", "Duration", "Status", "Billable"]],
-      body: tableData,
-      startY: 25,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [13, 148, 136] }
+    // Sheet 1: Time Entries
+    const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+    const rangeStr = `${formatDateLabel(startOfMonth)} - ${formatDateLabel(endOfMonth)}`;
+    const generatedStr = `Generated on ${now.toISOString().split('T')[0]} ${now.getHours()}:${now.getMinutes()}`;
+
+    const ws1Data = [
+        ["Time Entries"],
+        [rangeStr],
+        ["", "", "", "", "", "", generatedStr],
+        ["Date", "Resource", "Category", "Project", "Task", "Time", "Description", "Status", "Billable"]
+    ];
+
+    let grandTotalMinutes = 0;
+    visibleEntries.forEach(e => {
+        const user = users.find(u => String(u.id) === String(e.userId));
+        const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
+        const totalMins = e.durationMinutes + (e.extraMinutes || 0);
+        grandTotalMinutes += totalMins;
+        const hours = (totalMins / 60).toFixed(2);
+        
+        ws1Data.push([
+            e.date,
+            resourceName,
+            user?.department || 'Product Development',
+            getProjectName(e.projectId),
+            e.task,
+            hours,
+            e.description,
+            e.status.toLowerCase(),
+            e.isBillable ? 'Yes' : 'No'
+        ]);
     });
 
-    doc.save(`timesheet_${Date.now()}.pdf`);
+    ws1Data.push(["GRAND TOTAL", "", "", "", "", (grandTotalMinutes / 60).toFixed(2)]);
+
+    const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+
+    // Sheet 2: Project Summary
+    const ws2Data = [
+        ["Approved & Locked Project Hours Summary"],
+        [],
+        ["Project", "Total Hours", "Approved Hours", "Locked Hours"]
+    ];
+
+    const projSummary: Record<string, { total: number, approved: number }> = {};
+    visibleEntries.forEach(e => {
+        const name = getProjectName(e.projectId);
+        if(!projSummary[name]) projSummary[name] = { total: 0, approved: 0 };
+        const mins = e.durationMinutes + (e.extraMinutes || 0);
+        projSummary[name].total += mins;
+        if(e.status === 'Approved') projSummary[name].approved += mins;
+    });
+
+    Object.entries(projSummary).forEach(([name, vals]) => {
+        ws2Data.push([
+            name, 
+            (vals.total / 60).toFixed(2), 
+            (vals.approved / 60).toFixed(2), 
+            "0.00" // Locked placeholder
+        ]);
+    });
+
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, "Time Entries");
+    XLSX.utils.book_append_sheet(wb, ws2, "Project Summary");
+
+    XLSX.writeFile(wb, filename);
+    setShowExportMenu(false);
+    showToast("Excel Exported", "success");
+  };
+
+  const exportPDF = () => {
+    // Filename format: TimeLog_YYYY-MM-DD_month.pdf
+    const now = new Date();
+    const filename = `TimeLog_${now.toISOString().split('T')[0]}_month.pdf`;
+
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+    const rangeStr = `${formatDateLabel(startOfMonth)} - ${formatDateLabel(endOfMonth)}`;
+
+    // Top Right generated on
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Generated on ${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`, 280, 10, { align: 'right' });
+
+    // Main Title
+    doc.setFontSize(22);
+    doc.setTextColor(33, 33, 33);
+    doc.text(`Time Entries Report`, 148, 20, { align: 'center' });
+    
+    // Date Range
+    doc.setFontSize(12);
+    doc.text(rangeStr, 148, 30, { align: 'center' });
+
+    const tableData = visibleEntries.map(e => {
+        const user = users.find(u => String(u.id) === String(e.userId));
+        const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
+        return [
+            e.date,
+            resourceName,
+            getProjectName(e.projectId),
+            e.task,
+            `${((e.durationMinutes + (e.extraMinutes || 0)) / 60).toFixed(0)}h`,
+            e.status.toLowerCase(),
+            e.isBillable ? 'Yes' : 'No'
+        ];
+    });
+
+    autoTable(doc, {
+      head: [["Date", "Resource", "Project", "Task", "Time", "Status", "Billable"]],
+      body: tableData,
+      startY: 45,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [64, 64, 64], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 }
+    });
+
+    doc.save(filename);
     setShowExportMenu(false);
     showToast("PDF Exported", "success");
   };
@@ -364,8 +489,11 @@ const TimeLogs = () => {
                     <button onClick={exportPDF} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors border-b dark:border-slate-700">
                         <FileText size={16} className="text-red-500" /> PDF Report
                     </button>
+                    <button onClick={exportExcel} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors border-b dark:border-slate-700">
+                        <FileSpreadsheet size={16} className="text-emerald-500" /> Excel (.xlsx)
+                    </button>
                     <button onClick={exportCSV} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors">
-                        <FileSpreadsheet size={16} className="text-emerald-500" /> Excel/CSV
+                        <FileSpreadsheet size={16} className="text-slate-400" /> CSV Details
                     </button>
                   </div>
                 )}
