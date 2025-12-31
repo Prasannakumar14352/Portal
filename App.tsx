@@ -122,9 +122,10 @@ const App: React.FC = () => {
     employeeId: emp.employeeId,
     name: `${emp.firstName} ${emp.lastName}`,
     role: emp.role?.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
+    position: emp.position, // Critical: Ensuring position field is passed for filtering
     avatar: emp.avatar,
     managerId: emp.managerId,
-    jobTitle: emp.role
+    jobTitle: emp.jobTitle || emp.position || emp.role
   }));
 
   const handleLogin = (user: User) => {

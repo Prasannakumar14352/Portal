@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
@@ -120,15 +121,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
   /**
-   * Filter available managers based on the 'position' or 'role' fields in the database
+   * Filter available managers based strictly on the 'position' field
+   * Targets positions like "Manager" and "HR Manager" as seen in user's DB screenshot.
    */
   const availableManagers = useMemo(() => {
     return users.filter(u => {
-      // Check if position contains 'Manager', 'Head', 'Lead', etc. as requested
-      const position = (u.position || u.jobTitle || '').toLowerCase();
-      const isManagerByPosition = position.includes('manager') || position.includes('head') || position.includes('lead') || position.includes('director') || position.includes('vp');
+      const position = (u.position || '').toLowerCase();
+      // Check if the position string specifically contains the word manager
+      const isManagerByPosition = position.includes('manager');
       
-      // Also fallback to system roles if positions are not consistently filled
+      // Secondary check for system roles if position metadata is missing for some records
       const isManagerByRole = u.role === UserRole.MANAGER || u.role === UserRole.HR || u.role === UserRole.ADMIN;
       
       return (isManagerByPosition || isManagerByRole) && String(u.id) !== String(currentUser?.id);
