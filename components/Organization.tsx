@@ -1,7 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { UserRole, Project, Employee, Position } from '../types';
-import { Briefcase, Trash2, Edit2, Users, Plus, X, Network, MapPin, ListTodo, UserSquare, Globe, Navigation, Layers, Map as MapIcon, ChevronDown, CheckCircle2, AlertCircle, Calendar, Minus, Layout } from 'lucide-react';
+import { UserRole, Project, Employee, Position, EmployeeStatus } from '../types';
+import { 
+  Briefcase, Trash2, Edit2, Users, Plus, X, Network, MapPin, 
+  Globe, Navigation, Map as MapIcon, ChevronDown, ChevronRight, 
+  Calendar, Minus, Layout, Search, Locate, Target, UserPlus, 
+  RefreshCw, MapPinned, Info, Building2
+} from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
 import { loadModules } from 'esri-loader';
@@ -60,41 +65,46 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
 };
 
 const Organization = () => {
-  const { currentUser, projects, positions, employees, addProject, updateProject, deleteProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'employees' | 'positions' | 'projects' | 'chart' | 'map'>('projects');
+  const { currentUser, projects, positions, employees, addProject, updateProject, deleteProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast, syncAzureUsers } = useAppContext();
+  const [activeTab, setActiveTab] = useState<'projects' | 'directory' | 'positions' | 'chart'>('directory');
   
   const [mapType, setMapType] = useState<'streets-vector' | 'satellite' | 'topo-vector' | 'dark-gray-vector'>('streets-vector');
+  const [directorySearch, setDirectorySearch] = useState('');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
+  const graphicsLayerRef = useRef<any>(null);
 
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [projectForm, setProjectForm] = useState({
-      name: '',
-      description: '',
-      status: 'Active' as const,
-      dueDate: '',
-      tasks: [] as string[]
+      name: '', description: '', status: 'Active' as const, dueDate: '', tasks: [] as string[]
   });
 
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const tree = useMemo(() => buildOrgTree(employees), [employees]);
 
+  const filteredDirectoryEmployees = useMemo(() => {
+      const term = directorySearch.toLowerCase();
+      return employees.filter(e => 
+          `${e.firstName} ${e.lastName}`.toLowerCase().includes(term) ||
+          (e.position || '').toLowerCase().includes(term) ||
+          (e.department || '').toLowerCase().includes(term) ||
+          (e.email || '').toLowerCase().includes(term)
+      );
+  }, [employees, directorySearch]);
+
+  // Combined Map Initialization & Lifecycle
   useEffect(() => {
-    if (activeTab !== 'map' || !mapContainerRef.current) return;
+    if (activeTab !== 'directory' || !mapContainerRef.current) return;
 
     loadModules([
-      "esri/Map",
-      "esri/views/MapView",
-      "esri/Graphic",
-      "esri/layers/GraphicsLayer",
-      "esri/geometry/Point",
-      "esri/geometry/SpatialReference",
-      "esri/symbols/SimpleMarkerSymbol",
-      "esri/widgets/Home"
+      "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", 
+      "esri/geometry/Point", "esri/geometry/SpatialReference", "esri/symbols/SimpleMarkerSymbol", "esri/widgets/Home"
     ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Point, SpatialReference, SimpleMarkerSymbol, Home]) => {
         if (!mapContainerRef.current) return;
 
@@ -103,7 +113,7 @@ const Organization = () => {
           container: mapContainerRef.current,
           map: map,
           zoom: 4,
-          center: [78.9629, 20.5937], // Centered on India
+          center: [78.9629, 20.5937], // India Center
           ui: { components: ["zoom"] },
           popup: {
             dockEnabled: false,
@@ -115,100 +125,111 @@ const Organization = () => {
         const homeWidget = new Home({ view: view });
         view.ui.add(homeWidget, "top-left");
 
-        const graphicsLayer = new GraphicsLayer();
+        const graphicsLayer = new GraphicsLayer({ id: "employeePoints" });
         map.add(graphicsLayer);
+        
         viewInstanceRef.current = view;
+        graphicsLayerRef.current = graphicsLayer;
 
+        // Ensure points are drawn once the view is ready
         view.when(() => {
-            const graphics: any[] = [];
-            const wgs84 = new SpatialReference({ wkid: 4326 });
-
-            employees.forEach(emp => {
-                const lat = parseFloat(String(emp.location?.latitude));
-                const lon = parseFloat(String(emp.location?.longitude));
-
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    const point = new Point({
-                        longitude: lon,
-                        latitude: lat,
-                        spatialReference: wgs84
-                    });
-
-                    const symbol = new SimpleMarkerSymbol({
-                        style: "circle",
-                        color: [13, 148, 136], // Teal-600
-                        size: 14,
-                        outline: {
-                            color: [255, 255, 255],
-                            width: 2
-                        }
-                    });
-
-                    const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
-                        ? emp.avatar 
-                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}&background=0D9488&color=fff`;
-
-                    const popupTemplate = {
-                        title: `${emp.firstName} ${emp.lastName}`,
-                        content: `
-                            <div style="font-family: 'Inter', sans-serif; min-width: 260px;">
-                                <div style="background:#0d9488; height: 60px; position:relative; border-radius: 12px 12px 0 0;">
-                                    <img src="${avatarUrl}" style="width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; position: absolute; bottom: -20px; left: 20px; object-fit: cover; background: #f1f5f9;" />
-                                </div>
-                                <div style="padding: 28px 20px 20px 20px; background: white;">
-                                    <h4 style="margin: 0; font-weight: 800; font-size: 16px; color: #1e293b;">${emp.firstName} ${emp.lastName}</h4>
-                                    <p style="margin: 2px 0; color: #0d9488; font-weight: 700; font-size: 10px; text-transform: uppercase;">${emp.position || 'Empower Team'}</p>
-                                    <div style="margin-top: 15px; border-top: 1px solid #f1f5f9; padding-top: 10px; font-size: 12px; color: #64748b;">
-                                        <p style="margin: 4px 0;">📍 ${emp.workLocation || 'Office Location'}</p>
-                                        <p style="margin: 4px 0;">📧 ${emp.email}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        `
-                    };
-
-                    const graphic = new Graphic({
-                        geometry: point,
-                        symbol: symbol,
-                        popupTemplate: popupTemplate
-                    });
-
-                    graphics.push(graphic);
-                }
-            });
-
-            if (graphics.length > 0) {
-                graphicsLayer.addMany(graphics);
-            }
+            refreshMapMarkers(filteredDirectoryEmployees);
         });
-    }).catch(err => {
-      console.error("ArcGIS module load failed:", err);
-    });
+    }).catch(err => console.error("ArcGIS load failed:", err));
 
     return () => {
         if (viewInstanceRef.current) {
             viewInstanceRef.current.destroy();
             viewInstanceRef.current = null;
+            graphicsLayerRef.current = null;
         }
     };
-  }, [activeTab, employees, mapType]);
+  }, [activeTab, mapType]);
+
+  // Sync Markers when search filters change
+  useEffect(() => {
+    if (activeTab === 'directory' && graphicsLayerRef.current) {
+        refreshMapMarkers(filteredDirectoryEmployees);
+    }
+  }, [filteredDirectoryEmployees, activeTab]);
+
+  const refreshMapMarkers = async (list: Employee[]) => {
+      if (!graphicsLayerRef.current) return;
+      
+      const [Graphic, Point, SimpleMarkerSymbol] = await loadModules(["esri/Graphic", "esri/geometry/Point", "esri/symbols/SimpleMarkerSymbol"]);
+      
+      graphicsLayerRef.current.removeAll();
+      const wgs84 = { wkid: 4326 };
+
+      list.forEach(emp => {
+          const lat = parseFloat(String(emp.location?.latitude));
+          const lon = parseFloat(String(emp.location?.longitude));
+          
+          if (!isNaN(lat) && !isNaN(lon)) {
+              const symbol = new SimpleMarkerSymbol({
+                  style: "circle",
+                  color: [13, 148, 136, 0.9], // Teal-600
+                  size: 14,
+                  outline: { color: [255, 255, 255, 1], width: 2 }
+              });
+
+              const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
+                        ? emp.avatar 
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}&background=0D9488&color=fff`;
+
+              const graphic = new Graphic({
+                  geometry: new Point({ longitude: lon, latitude: lat, spatialReference: wgs84 }),
+                  symbol: symbol,
+                  attributes: { id: emp.id, name: `${emp.firstName} ${emp.lastName}` },
+                  popupTemplate: {
+                      title: `${emp.firstName} ${emp.lastName}`,
+                      content: `
+                        <div style="font-family: 'Inter', sans-serif; min-width: 240px;">
+                            <div style="background:#0d9488; height: 50px; position:relative; border-radius: 8px 8px 0 0;">
+                                <img src="${avatarUrl}" style="width: 44px; height: 44px; border-radius: 50%; border: 3px solid white; position: absolute; bottom: -15px; left: 15px; object-fit: cover; background: #f1f5f9;" />
+                            </div>
+                            <div style="padding: 20px 15px 15px 15px; background: white;">
+                                <h4 style="margin: 0; font-weight: 800; font-size: 14px; color: #1e293b;">${emp.firstName} ${emp.lastName}</h4>
+                                <p style="margin: 1px 0; color: #0d9488; font-weight: 700; font-size: 9px; text-transform: uppercase;">${emp.position || 'Consultant'}</p>
+                                <div style="margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 8px; font-size: 11px; color: #64748b;">
+                                    <p style="margin: 3px 0;">📍 ${emp.workLocation || 'Office Location'}</p>
+                                    <p style="margin: 3px 0;">📧 ${emp.email}</p>
+                                </div>
+                            </div>
+                        </div>
+                      `
+                  }
+              });
+              graphicsLayerRef.current.add(graphic);
+          }
+      });
+  };
+
+  const focusEmployeeOnMap = (emp: Employee) => {
+      if (!viewInstanceRef.current || !emp.location) {
+          showToast(`No coordinates set for ${emp.firstName}.`, "warning");
+          return;
+      }
+      
+      viewInstanceRef.current.goTo({
+          target: [emp.location.longitude, emp.location.latitude],
+          zoom: 12
+      }, { duration: 1500, easing: "ease-in-out" }).then(() => {
+          const matchingGraphic = graphicsLayerRef.current?.graphics?.find((g: any) => String(g.attributes.id) === String(emp.id));
+          if (matchingGraphic) {
+              viewInstanceRef.current.popup.open({ features: [matchingGraphic], location: matchingGraphic.geometry });
+          }
+      });
+  };
 
   const handleCreateProject = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsProcessing(true);
-      try {
-          await addProject({
-              ...projectForm,
-              id: Math.random().toString(36).substr(2, 9)
-          });
-          setShowProjectModal(false);
-          setProjectForm({ name: '', description: '', status: 'Active', dueDate: '', tasks: [] });
-          showToast("New project created successfully.", "success");
-      } catch (err) {
-          showToast("Failed to create project.", "error");
-      } finally {
-          setIsProcessing(false);
-      }
+      await addProject({ ...projectForm, id: Math.random().toString(36).substr(2, 9) });
+      setShowProjectModal(false);
+      setProjectForm({ name: '', description: '', status: 'Active', dueDate: '', tasks: [] });
+      showToast("New project created.", "success");
+      setIsProcessing(false);
   };
 
   const handleUpdateProject = async (e: React.FormEvent) => {
@@ -218,13 +239,7 @@ const Organization = () => {
       await updateProject(editingProject.id, editingProject);
       setIsProcessing(false);
       setEditingProject(null);
-      showToast("Project updated successfully.", "success");
-  };
-
-  const handleDeleteProject = async (id: string | number) => {
-      if (!window.confirm("Are you sure you want to delete this project?")) return;
-      await deleteProject(id);
-      showToast("Project removed.", "info");
+      showToast("Project updated.", "success");
   };
 
   const handleUpdatePosition = async (e: React.FormEvent) => {
@@ -234,21 +249,27 @@ const Organization = () => {
       await updatePosition(editingPosition.id, editingPosition);
       setIsProcessing(false);
       setEditingPosition(null);
-      showToast("Position updated successfully.", "success");
+      showToast("Position updated.", "success");
+  };
+
+  const handleSync = async () => {
+      setIsSyncing(true);
+      await syncAzureUsers();
+      setIsSyncing(false);
   };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
+       {/* Page Title & Navigation */}
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-          <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage structure, assets, and global presence.</p></div>
+          <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage workforce directory and global business operations.</p></div>
           <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
                {[
                  { id: 'projects', label: 'Projects', icon: Layout },
-                 { id: 'employees', label: 'Employees', icon: Users },
+                 { id: 'directory', label: 'Team Directory', icon: Users },
                  { id: 'positions', label: 'Positions', icon: Briefcase },
-                 { id: 'chart', label: 'Org Chart', icon: Network },
-                 { id: 'map', label: 'Employees Location', icon: MapPin }
+                 { id: 'chart', label: 'Org Chart', icon: Network }
                ].map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-4 py-2 rounded-md text-sm transition capitalize flex items-center gap-2 ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 shadow text-teal-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>
                     <tab.icon size={14} />
@@ -257,16 +278,99 @@ const Organization = () => {
                ))}
             </div>
             {activeTab === 'projects' && isPowerUser && (
-                <button onClick={() => setShowProjectModal(true)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-bold shadow-lg shadow-teal-500/20">
-                    <Plus size={18} />
-                    <span>New Project</span>
-                </button>
+                <button onClick={() => setShowProjectModal(true)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-bold shadow-lg shadow-teal-500/20"><Plus size={18} /><span>New Project</span></button>
+            )}
+            {activeTab === 'directory' && isPowerUser && (
+                <div className="flex gap-2">
+                    <button onClick={handleSync} disabled={isSyncing} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 transition flex items-center space-x-2 text-sm font-bold shadow-sm">
+                        <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+                        <span>Sync</span>
+                    </button>
+                    <button onClick={() => setShowManageModal(true)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-bold shadow-lg shadow-teal-500/20"><UserPlus size={18} /><span>Add Team</span></button>
+                </div>
             )}
           </div>
        </div>
 
-       {activeTab === 'employees' && <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />}
-       
+       {activeTab === 'directory' && (
+           <div className="space-y-4">
+               {/* Unified Directory UI */}
+               <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                   <div className="relative flex-1">
+                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                       <input 
+                            type="text" 
+                            placeholder="Find colleague by name, department or role..." 
+                            className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white"
+                            value={directorySearch}
+                            onChange={e => setDirectorySearch(e.target.value)}
+                       />
+                   </div>
+                   <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-teal-50 dark:bg-teal-900/30 rounded-xl border border-teal-100 dark:border-teal-800 text-teal-700 dark:text-teal-400">
+                       <MapPinned size={16}/>
+                       <span className="text-xs font-black uppercase tracking-widest">{filteredDirectoryEmployees.length} Global Points</span>
+                   </div>
+               </div>
+
+               <div className="flex flex-col lg:flex-row gap-6 h-[720px]">
+                   {/* Left: Scrollable List View */}
+                   <div className="w-full lg:w-96 flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                       <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                           <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Building2 size={14}/> Corporate Directory</h3>
+                       </div>
+                       <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                           {filteredDirectoryEmployees.map(emp => (
+                               <button 
+                                    key={emp.id} 
+                                    onClick={() => focusEmployeeOnMap(emp)}
+                                    className="w-full text-left p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700/50 group border border-transparent hover:border-slate-100 dark:hover:border-slate-700 transition-all"
+                               >
+                                   <div className="flex items-start gap-4">
+                                       <img src={emp.avatar} className="w-12 h-12 rounded-2xl object-cover shadow-sm border border-white dark:border-slate-800" alt="" />
+                                       <div className="min-w-0 flex-1">
+                                           <p className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm">{emp.firstName} {emp.lastName}</p>
+                                           <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-tight mt-0.5">{emp.position || 'Team Member'}</p>
+                                           <div className="flex items-center gap-1.5 mt-2 text-slate-400">
+                                               <MapPin size={10} />
+                                               <span className="text-[10px] font-bold truncate">{emp.workLocation || 'Location Not Set'}</span>
+                                           </div>
+                                       </div>
+                                       <ChevronRight size={16} className="text-slate-300 group-hover:text-teal-500 mt-1 transition-colors" />
+                                   </div>
+                               </button>
+                           ))}
+                           {filteredDirectoryEmployees.length === 0 && (
+                               <div className="py-20 text-center flex flex-col items-center gap-3">
+                                   <Search size={32} className="text-slate-200" />
+                                   <p className="text-sm text-slate-400 font-medium italic">No colleagues match your search.</p>
+                               </div>
+                           )}
+                       </div>
+                   </div>
+
+                   {/* Right: Map Surface */}
+                   <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl">
+                       <div className="absolute top-6 right-6 z-[1000] w-32">
+                           <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-2">
+                               <h4 className="text-[9px] font-black uppercase text-slate-400 mb-1 ml-1 tracking-widest">Base Map</h4>
+                               {[
+                                   { id: 'streets-vector', icon: Navigation, label: 'Street' },
+                                   { id: 'satellite', icon: Globe, label: 'Sat' },
+                                   { id: 'dark-gray-vector', icon: MapIcon, label: 'Dark' }
+                               ].map(type => (
+                                   <button key={type.id} onClick={() => setMapType(type.id as any)} className={`p-2.5 rounded-xl flex flex-col items-center gap-1 transition-all ${mapType === type.id ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                       <type.icon size={18} />
+                                       <span className="text-[8px] font-black uppercase tracking-tighter">{type.label}</span>
+                                   </button>
+                               ))}
+                           </div>
+                       </div>
+                       <div ref={mapContainerRef} className="w-full h-full z-0"></div>
+                   </div>
+               </div>
+           </div>
+       )}
+
        {activeTab === 'projects' && (
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {projects.map(project => (
@@ -277,14 +381,11 @@ const Organization = () => {
                         </div>
                         <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-1">{project.name}</h4>
                         <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">{project.description}</p>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-4">
-                          <Calendar size={14} />
-                          <span>Due: {project.dueDate || 'No date'}</span>
-                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-4"><Calendar size={14} /><span>Due: {project.dueDate || 'No date'}</span></div>
                         {isPowerUser && (
                             <div className="flex gap-2 mt-4 pt-4 border-t dark:border-slate-700">
                                 <button onClick={() => setEditingProject(project)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"><Edit2 size={16}/></button>
-                                <button onClick={() => handleDeleteProject(project.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                <button onClick={() => deleteProject(project.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
                             </div>
                         )}
                     </div>
@@ -292,36 +393,11 @@ const Organization = () => {
            </div>
        )}
 
-       {activeTab === 'map' && (
-           <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[700px] relative shadow-2xl">
-               <div className="absolute top-6 right-6 z-[1000] w-32">
-                   <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-2 ring-1 ring-black/5">
-                       <h4 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 mb-1 ml-1 tracking-widest">Map Design</h4>
-                       {[
-                           { id: 'streets-vector', icon: Navigation, label: 'Street' },
-                           { id: 'satellite', icon: Globe, label: 'Satellite' },
-                           { id: 'dark-gray-vector', icon: MapIcon, label: 'Dark' }
-                       ].map(type => (
-                           <button key={type.id} onClick={() => setMapType(type.id as any)} className={`p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all ${mapType === type.id ? 'bg-teal-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                             <type.icon size={20} />
-                             <span className="text-[9px] font-black uppercase tracking-tight">{type.label}</span>
-                           </button>
-                       ))}
-                   </div>
-               </div>
-               <div ref={mapContainerRef} className="w-full h-full z-0"></div>
-           </div>
-       )}
-
        {activeTab === 'positions' && (
            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-900/50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                        <tr>
-                            <th className="px-6 py-4">Title</th>
-                            <th className="px-6 py-4">Description</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                        </tr>
+                        <tr><th className="px-6 py-4">Title</th><th className="px-6 py-4">Description</th><th className="px-6 py-4 text-right">Actions</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                         {positions.map(pos => (
@@ -343,21 +419,22 @@ const Organization = () => {
 
        {activeTab === 'chart' && (
           <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-x-auto min-h-[500px]">
-            <div className="org-chart">
-              <ul className="flex justify-center">
-                {tree.map(root => <OrgChartNode key={root.id} node={root} />)}
-              </ul>
-            </div>
+            <div className="org-chart"><ul className="flex justify-center">{tree.map(root => <OrgChartNode key={root.id} node={root} />)}</ul></div>
           </div>
        )}
 
+       {/* Modals */}
+       <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Manage Workforce" width="max-w-7xl">
+           <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />
+       </DraggableModal>
+
        <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title="New Project Creation" width="max-w-md">
            <form onSubmit={handleCreateProject} className="space-y-4">
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Project Name</label><input required type="text" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} placeholder="e.g. Apollo Phase II" className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea rows={3} value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} placeholder="Strategic goals and overview..." className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Project Name</label><input required type="text" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} placeholder="e.g. Apollo Phase II" className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Description</label><textarea rows={3} value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} placeholder="Strategic goals..." className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Status</label><select value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Due Date</label><input type="date" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                    <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Status</label><select value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                    <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Due Date</label><input type="date" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
                 </div>
                 <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" disabled={isProcessing} className="px-8 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg">{isProcessing ? 'Creating...' : 'Create Project'}</button></div>
            </form>
@@ -365,11 +442,11 @@ const Organization = () => {
 
        <DraggableModal isOpen={!!editingProject} onClose={() => setEditingProject(null)} title="Update Project Effort" width="max-w-md">
            <form onSubmit={handleUpdateProject} className="space-y-4">
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Project Name</label><input required type="text" value={editingProject?.name || ''} onChange={e => setEditingProject(p => p ? {...p, name: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea rows={3} value={editingProject?.description || ''} onChange={e => setEditingProject(p => p ? {...p, description: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Project Name</label><input required type="text" value={editingProject?.name || ''} onChange={e => setEditingProject(p => p ? {...p, name: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Description</label><textarea rows={3} value={editingProject?.description || ''} onChange={e => setEditingProject(p => p ? {...p, description: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none" /></div>
                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Status</label><select value={editingProject?.status || 'Active'} onChange={e => setEditingProject(p => p ? {...p, status: e.target.value as any} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Due Date</label><input type="date" value={editingProject?.dueDate || ''} onChange={e => setEditingProject(p => p ? {...p, dueDate: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                    <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Status</label><select value={editingProject?.status || 'Active'} onChange={e => setEditingProject(p => p ? {...p, status: e.target.value as any} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                    <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Due Date</label><input type="date" value={editingProject?.dueDate || ''} onChange={e => setEditingProject(p => p ? {...p, dueDate: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none" /></div>
                 </div>
                 <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setEditingProject(null)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" className="px-8 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg">Save Changes</button></div>
            </form>
@@ -377,8 +454,8 @@ const Organization = () => {
 
        <DraggableModal isOpen={!!editingPosition} onClose={() => setEditingPosition(null)} title="Modify Role Title" width="max-w-md">
            <form onSubmit={handleUpdatePosition} className="space-y-4">
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Position Title</label><input required type="text" value={editingPosition?.title || ''} onChange={e => setEditingPosition(p => p ? {...p, title: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Role Description</label><textarea rows={3} value={editingPosition?.description || ''} onChange={e => setEditingPosition(p => p ? {...p, description: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Position Title</label><input required type="text" value={editingPosition?.title || ''} onChange={e => setEditingPosition(p => p ? {...p, title: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 uppercase mb-1.5">Role Description</label><textarea rows={3} value={editingPosition?.description || ''} onChange={e => setEditingPosition(p => p ? {...p, description: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white outline-none" /></div>
                 <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setEditingPosition(null)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg">Update Role</button></div>
            </form>
        </DraggableModal>
