@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole } from '../types';
-import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -25,11 +24,14 @@ interface AttendanceProps {
 }
 
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
-  const { checkIn, checkOut, timeEntries, addTimeEntry, currentUser, updateAttendanceRecord, deleteAttendanceRecord, showToast } = useAppContext();
+  const { checkIn, checkOut, timeEntries, currentUser, updateAttendanceRecord, deleteAttendanceRecord, showToast } = useAppContext();
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Search State
+  const [employeeSearch, setEmployeeSearch] = useState('');
   
   // Date Filtering State
   const today = new Date();
@@ -40,17 +42,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [showEarlyReasonModal, setShowEarlyReasonModal] = useState(false);
   const [showTimeLogModal, setShowTimeLogModal] = useState(false);
   const [pendingCheckoutAction, setPendingCheckoutAction] = useState<'normal' | 'early' | null>(null);
-  
-  const [logForm, setLogForm] = useState({ 
-    projectId: '', 
-    task: '', 
-    hours: '8', 
-    minutes: '00', 
-    description: '',
-    includeExtra: false,
-    extraHours: '0',
-    extraMinutes: '00'
-  });
   
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
@@ -119,7 +110,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     const actionType = (todayRecord?.checkInTime && (currentTime.getTime() - new Date(todayRecord.checkInTime).getTime()) / 3600000 < 9) ? 'early' : 'normal';
     if (!hasLog) {
         setPendingCheckoutAction(actionType);
-        setLogForm({ projectId: '', task: '', hours: '8', minutes: '00', description: '', includeExtra: false, extraHours: '0', extraMinutes: '00' });
         setShowTimeLogModal(true);
         return;
     }
@@ -163,6 +153,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
     }
 
+    // Name search filtering
+    if (employeeSearch) {
+        filtered = filtered.filter(r => 
+            r.employeeName.toLowerCase().includes(employeeSearch.toLowerCase())
+        );
+    }
+
     // Date range filtering
     if (filterStartDate) {
       filtered = filtered.filter(r => r.date >= filterStartDate);
@@ -172,7 +169,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     }
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [records, isHR, currentUser, filterStartDate, filterEndDate]);
+  }, [records, isHR, currentUser, filterStartDate, filterEndDate, employeeSearch]);
 
   const paginatedRecords = useMemo(() => {
     return filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -181,6 +178,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const resetFilters = () => {
     setFilterStartDate(formatDateISO(firstDayOfMonth));
     setFilterEndDate(formatDateISO(today));
+    setEmployeeSearch('');
     setCurrentPage(1);
   };
 
@@ -225,38 +223,55 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
          </div>
       </div>
 
-      {/* Date Range Filter Bar */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-end">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full">
-              <div className="space-y-1.5">
+      {/* Unified Search & Filter Bar */}
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="space-y-1.5 flex-1 w-full">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                    <Calendar size={12} /> From Date
+                    <Search size={12} /> Search Employee
                   </label>
-                  <input 
-                    type="date" 
-                    value={filterStartDate} 
-                    onChange={e => { setFilterStartDate(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
-                  />
+                  <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Search by name..." 
+                        value={employeeSearch} 
+                        onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }}
+                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                      />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  </div>
               </div>
-              <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                    <Calendar size={12} /> To Date
-                  </label>
-                  <input 
-                    type="date" 
-                    value={filterEndDate} 
-                    onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-[2] w-full">
+                  <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                        <Calendar size={12} /> From Date
+                      </label>
+                      <input 
+                        type="date" 
+                        value={filterStartDate} 
+                        onChange={e => { setFilterStartDate(e.target.value); setCurrentPage(1); }}
+                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                      />
+                  </div>
+                  <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                        <Calendar size={12} /> To Date
+                      </label>
+                      <input 
+                        type="date" 
+                        value={filterEndDate} 
+                        onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }}
+                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                      />
+                  </div>
               </div>
+              <button 
+                onClick={resetFilters}
+                className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg shrink-0 h-[42px]"
+              >
+                  <RotateCcw size={14} /> Reset
+              </button>
           </div>
-          <button 
-            onClick={resetFilters}
-            className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg"
-          >
-              <RotateCcw size={14} /> Reset
-          </button>
       </div>
 
       {/* Records Table */}
@@ -274,7 +289,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {paginatedRecords.map((record) => {
-                // Precise Permission Logic - Unified for Today and Extensions
                 const recordDate = new Date(record.date);
                 const today = new Date();
                 today.setHours(0,0,0,0);
@@ -283,18 +297,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                 
                 const isOwn = String(record.employeeId) === String(currentUser?.id);
-                
-                // Rules:
-                // 1. diffDays 0 (Today) -> Allow
-                // 2. diffDays 1 (Yesterday) -> Allow
-                // 3. Friday Case: if record was Friday (5), allow Sat(1), Sun(2), Mon(3)
                 const isFriday = recordDate.getDay() === 5;
                 const canManage = isHR || (isOwn && (diffDays <= 1 || (isFriday && diffDays <= 3)));
                 
                 let lockReason = "";
                 if (!canManage) {
-                    if (diffDays > 1) lockReason = "Window Closed - Request HR";
-                    else lockReason = "Read Only";
+                    if (diffDays > 1) lockReason = "Window Closed - Contact HR";
+                    else lockReason = "Read Only Access";
                 }
 
                 return (
@@ -339,17 +348,16 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 );
               })}
               {paginatedRecords.length === 0 && (
-                <tr><td colSpan={5} className="px-8 py-24 text-center text-slate-300 dark:text-slate-600 italic font-medium">No activity logs discovered for this period.</td></tr>
+                <tr><td colSpan={5} className="px-8 py-24 text-center text-slate-300 dark:text-slate-600 italic font-medium">No records matching your search.</td></tr>
               )}
             </tbody>
           </table>
         </div>
         
-        {/* Pagination Logic Integrated */}
         {filteredRecords.length > itemsPerPage && (
           <div className="px-8 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Showing {(currentPage-1)*itemsPerPage + 1} to {Math.min(currentPage*itemsPerPage, filteredRecords.length)} of {filteredRecords.length} logs
+                  Showing {(currentPage-1)*itemsPerPage + 1} to {Math.min(currentPage*itemsPerPage, filteredRecords.length)} of {filteredRecords.length} records
               </p>
               <div className="flex gap-2">
                   <button 
@@ -371,7 +379,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         )}
       </div>
 
-      {/* Manual Edit Modal */}
       <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Correct Session Data" width="max-w-md">
           <form onSubmit={handleEditSubmit} className="space-y-6">
               <div className="grid grid-cols-1 gap-5">
@@ -388,7 +395,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                         </div>
                     </div>
                   </div>
-                  <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-700">
                     <label className="block text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-4 border-b border-rose-100 pb-2">Shift Conclusion</label>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -405,7 +412,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               <div className="flex items-start gap-4 bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/50">
                   <div className="p-2 bg-amber-100 dark:bg-amber-800/40 rounded-lg text-amber-600"><Info size={18} /></div>
                   <p className="text-[10px] text-amber-800 dark:text-amber-200 font-bold uppercase tracking-tight leading-relaxed">
-                      Session modification is permitted for Today, Yesterday, and the most recent Weekend window. All manual adjustments are flagged for auditing.
+                      Session modification is permitted for Today, Yesterday, and the most recent Weekend window.
                   </p>
               </div>
               <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black hover:bg-teal-700 transition shadow-xl shadow-teal-500/20 text-xs uppercase tracking-[0.2em] active:scale-[0.98]">Commit Record Update</button>
@@ -416,7 +423,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           <div className="text-center py-6">
               <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-5 border-4 border-red-100 dark:border-red-800"><Trash2 className="text-red-600" size={36} /></div>
               <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">Delete this entry?</h3>
-              <p className="text-slate-500 dark:text-slate-400 text-xs px-6 leading-relaxed">This action cannot be undone. Standard users can only remove logs within their allowed editing window.</p>
+              <p className="text-slate-500 dark:text-slate-400 text-xs px-6 leading-relaxed">This action cannot be undone. Logs can only be removed within the allowed editing window.</p>
           </div>
           <div className="flex gap-3 mt-4 pt-6 border-t border-slate-100 dark:border-slate-700">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-4 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-colors">Abort</button>
