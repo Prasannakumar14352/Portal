@@ -24,6 +24,8 @@
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- ArcGIS CSS -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
     
     <style>
       body {
@@ -113,6 +115,12 @@
       }
       .esri-popup__pointer-direction-up {
         background-color: #0d9488 !important;
+      }
+      
+      /* Fix for Basemap Gallery width inside Expand */
+      .esri-basemap-gallery {
+        min-width: 280px !important;
+        max-height: 400px !important;
       }
     </style>
   <script type="importmap">

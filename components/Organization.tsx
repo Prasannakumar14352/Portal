@@ -68,7 +68,6 @@ const Organization = () => {
   const { currentUser, projects, positions, employees, addProject, updateProject, deleteProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast, syncAzureUsers } = useAppContext();
   const [activeTab, setActiveTab] = useState<'projects' | 'directory' | 'positions' | 'chart'>('directory');
   
-  const [mapType, setMapType] = useState<'streets-vector' | 'satellite' | 'topo-vector' | 'dark-gray-vector'>('streets-vector');
   const [directorySearch, setDirectorySearch] = useState('');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
@@ -105,17 +104,17 @@ const Organization = () => {
       );
   }, [employees, directorySearch]);
 
-  // Map Initialization for combined view
+  // Main Map Hook
   useEffect(() => {
     if (activeTab !== 'directory' || !mapContainerRef.current) return;
 
     loadModules([
       "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", 
-      "esri/geometry/Point", "esri/geometry/SpatialReference", "esri/symbols/SimpleMarkerSymbol", "esri/widgets/Home"
-    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Point, SpatialReference, SimpleMarkerSymbol, Home]) => {
+      "esri/widgets/Home", "esri/widgets/BasemapGallery", "esri/widgets/Expand"
+    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Home, BasemapGallery, Expand]) => {
         if (!mapContainerRef.current) return;
 
-        const map = new EsriMap({ basemap: mapType });
+        const map = new EsriMap({ basemap: "streets-vector" });
         const view = new MapView({
           container: mapContainerRef.current,
           map: map,
@@ -124,13 +123,23 @@ const Organization = () => {
           ui: { components: ["zoom"] },
           popup: {
             dockEnabled: false,
-            dockOptions: { buttonEnabled: false, breakpoint: false },
             visibleElements: { closeButton: true }
           }
         });
 
-        const homeWidget = new Home({ view: view });
-        view.ui.add(homeWidget, "top-left");
+        // Add Standard Widgets to top-left
+        view.ui.add(new Home({ view: view }), "top-left");
+        
+        // Fix: Use simple initialization so Expand handles the widget container properly
+        const basemapGallery = new BasemapGallery({ view: view });
+        const bgExpand = new Expand({ 
+          view: view, 
+          content: basemapGallery, 
+          expanded: false, 
+          group: "top-left", 
+          tooltip: "Select Basemap"
+        });
+        view.ui.add(bgExpand, "top-left");
 
         const graphicsLayer = new GraphicsLayer({ id: "employeePoints" });
         map.add(graphicsLayer);
@@ -140,7 +149,7 @@ const Organization = () => {
 
         view.when(() => {
             refreshMapMarkers(filteredDirectoryEmployees);
-        });
+        }).catch((err: any) => console.error("Map initialization failed", err));
     }).catch(err => console.error("ArcGIS load failed:", err));
 
     return () => {
@@ -150,29 +159,43 @@ const Organization = () => {
             graphicsLayerRef.current = null;
         }
     };
-  }, [activeTab, mapType]);
+  }, [activeTab]);
 
-  // Sync Markers
+  // Sync Markers effect
   useEffect(() => {
     if (activeTab === 'directory' && graphicsLayerRef.current) {
         refreshMapMarkers(filteredDirectoryEmployees);
     }
   }, [filteredDirectoryEmployees, activeTab]);
 
-  // Edit Modal Map logic
+  // Edit Modal Map Hook
   useEffect(() => {
     if (!editingEmployee || !editMapRef.current) return;
 
-    loadModules(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer"], { css: true })
-      .then(([EsriMap, MapView, Graphic, GraphicsLayer]) => {
+    loadModules([
+      "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer",
+      "esri/widgets/BasemapGallery", "esri/widgets/Expand", "esri/widgets/Home"
+    ], { css: true })
+      .then(([EsriMap, MapView, Graphic, GraphicsLayer, BasemapGallery, Expand, Home]) => {
         const map = new EsriMap({ basemap: "streets-vector" });
         const view = new MapView({
           container: editMapRef.current!,
           map: map,
           zoom: 5,
-          center: [employeeFormData?.location?.longitude || 78, employeeFormData?.location?.latitude || 20],
+          center: [employeeFormData?.location?.longitude || 78.9, employeeFormData?.location?.latitude || 20.5],
           ui: { components: ["zoom"] }
         });
+
+        // Add Standard Widgets
+        view.ui.add(new Home({ view: view }), "top-left");
+        const bgExpand = new Expand({ 
+          view: view, 
+          content: new BasemapGallery({ view: view }), 
+          expanded: false,
+          group: "top-left",
+          tooltip: "Change Basemap"
+        });
+        view.ui.add(bgExpand, "top-left");
 
         const layer = new GraphicsLayer();
         map.add(layer);
@@ -180,8 +203,16 @@ const Organization = () => {
 
         const updateMarker = (lon: number, lat: number) => {
             layer.removeAll();
-            const symbol = { type: "simple-marker", color: [13, 148, 136], size: "14px", outline: { color: [255, 255, 255], width: 2 } };
-            layer.add(new Graphic({ geometry: { type: "point", longitude: lon, latitude: lat }, symbol }));
+            layer.add(new Graphic({ 
+              geometry: { type: "point", longitude: lon, latitude: lat, spatialReference: { wkid: 4326 } }, 
+              symbol: { 
+                  type: "simple-marker", 
+                  style: "circle",
+                  color: [13, 148, 136, 0.9], 
+                  size: "14px", 
+                  outline: { color: [255, 255, 255], width: 2 } 
+              }
+            }));
         };
 
         if (employeeFormData?.location?.latitude) {
@@ -200,21 +231,52 @@ const Organization = () => {
 
   const refreshMapMarkers = async (list: Employee[]) => {
       if (!graphicsLayerRef.current) return;
-      const [Graphic, Point, SimpleMarkerSymbol] = await loadModules(["esri/Graphic", "esri/geometry/Point", "esri/symbols/SimpleMarkerSymbol"]);
+      const [Graphic] = await loadModules(["esri/Graphic"]);
       graphicsLayerRef.current.removeAll();
-      const wgs84 = { wkid: 4326 };
-
+      
       list.forEach(emp => {
           const lat = parseFloat(String(emp.location?.latitude));
           const lon = parseFloat(String(emp.location?.longitude));
+          
           if (!isNaN(lat) && !isNaN(lon)) {
+              const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
+                        ? emp.avatar 
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}&background=0D9488&color=fff`;
+
               const graphic = new Graphic({
-                  geometry: new Point({ longitude: lon, latitude: lat, spatialReference: wgs84 }),
-                  symbol: new SimpleMarkerSymbol({ style: "circle", color: [13, 148, 136, 0.9], size: 14, outline: { color: [255, 255, 255, 1], width: 2 } }),
-                  attributes: { id: emp.id },
+                  geometry: { type: "point", longitude: lon, latitude: lat, spatialReference: { wkid: 4326 } },
+                  symbol: { 
+                      type: "simple-marker", 
+                      style: "circle", 
+                      color: [13, 148, 136, 0.9], 
+                      size: 14, 
+                      outline: { color: [255, 255, 255], width: 2 } 
+                  },
+                  attributes: { 
+                      id: emp.id, 
+                      name: `${emp.firstName} ${emp.lastName}`,
+                      position: emp.position || 'Team Member',
+                      email: emp.email || 'N/A',
+                      workLocation: emp.workLocation || 'Office',
+                      avatar: avatarUrl
+                  },
                   popupTemplate: {
-                      title: `${emp.firstName} ${emp.lastName}`,
-                      content: `<div style="padding:10px"><b>${emp.position}</b><br/>${emp.email}</div>`
+                      title: "{name}",
+                      content: `
+                        <div style="font-family: 'Inter', sans-serif; min-width: 240px; border-radius: 12px; overflow: hidden; background: white;">
+                            <div style="background:#0d9488; height: 50px; position:relative;">
+                                <img src="{avatar}" style="width: 44px; height: 44px; border-radius: 50%; border: 3px solid white; position: absolute; bottom: -15px; left: 15px; object-fit: cover; background: #f1f5f9;" />
+                            </div>
+                            <div style="padding: 20px 15px 15px 15px;">
+                                <h4 style="margin: 0; font-weight: 800; font-size: 14px; color: #1e293b;">{name}</h4>
+                                <p style="margin: 1px 0; color: #0d9488; font-weight: 700; font-size: 9px; text-transform: uppercase;">{position}</p>
+                                <div style="margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 8px; font-size: 11px; color: #64748b;">
+                                    <p style="margin: 3px 0;">📍 {workLocation}</p>
+                                    <p style="margin: 3px 0;">📧 {email}</p>
+                                </div>
+                            </div>
+                        </div>
+                      `
                   }
               });
               graphicsLayerRef.current.add(graphic);
@@ -371,27 +433,12 @@ const Organization = () => {
                    </div>
 
                    <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl">
-                       <div className="absolute top-6 right-6 z-[1000] w-32">
-                           <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-2">
-                               <h4 className="text-[9px] font-black uppercase text-slate-400 mb-1 ml-1 tracking-widest">Base Map</h4>
-                               {[
-                                   { id: 'streets-vector', icon: Navigation, label: 'Street' },
-                                   { id: 'satellite', icon: Globe, label: 'Sat' },
-                                   { id: 'dark-gray-vector', icon: MapIcon, label: 'Dark' }
-                               ].map(type => (
-                                   <button key={type.id} onClick={() => setMapType(type.id as any)} className={`p-2.5 rounded-xl flex flex-col items-center gap-1 transition-all ${mapType === type.id ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                       <type.icon size={18} /><span className="text-[8px] font-black uppercase tracking-tighter">{type.label}</span>
-                                   </button>
-                               ))}
-                           </div>
-                       </div>
                        <div ref={mapContainerRef} className="w-full h-full z-0"></div>
                    </div>
                </div>
            </div>
        )}
 
-       {/* Project/Position tabs logic preserved from combined view */}
        {activeTab === 'projects' && (
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {projects.map(project => (
