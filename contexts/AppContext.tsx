@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -32,6 +31,18 @@ const safeParseArray = (val: any) => {
         } catch (e) { return []; }
     }
     return [];
+};
+
+const safeParseObject = (val: any) => {
+    if (!val) return undefined;
+    if (typeof val === 'object' && !Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+        try {
+            const parsed = JSON.parse(val);
+            return (typeof parsed === 'object' && parsed !== null) ? parsed : undefined;
+        } catch (e) { return undefined; }
+    }
+    return undefined;
 };
 
 interface AppContextType {
@@ -103,7 +114,6 @@ interface AppContextType {
   sendLeaveStatusEmail: (data: { to: string, employeeName: string, status: string, type: string, managerComment?: string, hrAction?: boolean }) => Promise<void>;
   markNotificationRead: (id: string | number) => Promise<void>;
   markAllRead: (userId: string | number) => Promise<void>;
-  // Fix: Removed duplicate addHoliday definition
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
   addHolidays: (holidays: Omit<Holiday, 'id'>[]) => Promise<void>;
   deleteHoliday: (id: string | number) => Promise<void>;
@@ -146,8 +156,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         db.getNotifications(), db.getHolidays(), db.getPayslips(), db.getInvitations()
       ]);
 
-      // Robust checks to ensure data is an array before processing
-      const sanitizedEmployees = Array.isArray(empData) ? empData.map((e: any) => ({ ...e, projectIds: safeParseArray(e.projectIds) })) : [];
+      const sanitizedEmployees = Array.isArray(empData) ? empData.map((e: any) => ({ 
+        ...e, 
+        projectIds: safeParseArray(e.projectIds),
+        location: safeParseObject(e.location),
+        bio: e.bio || ''
+      })) : [];
+
       const sanitizedProjects = Array.isArray(projData) ? projData.map((p: any) => ({ ...p, tasks: safeParseArray(p.tasks) })) : [];
       const sanitizedLeaves = Array.isArray(leaveData) ? leaveData.map((l: any) => ({ ...l, notifyUserIds: safeParseArray(l.notifyUserIds) })) : [];
 
@@ -242,7 +257,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               setCurrentUser({ 
                   id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
                   role: targetUser.role as UserRole, position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
-                  departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: targetUser.location, workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
+                  departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: safeParseObject(targetUser.location), workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
               });
               return true;
           }
@@ -427,7 +442,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
             role: user.role as UserRole, position: user.position, avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
-            departmentId: user.departmentId, projectIds: user.projectIds, location: user.location, workLocation: user.workLocation, hireDate: user.joinDate
+            departmentId: user.departmentId, projectIds: user.projectIds, location: safeParseObject(user.location), workLocation: user.workLocation, hireDate: user.joinDate
         });
         showToast(`Welcome back!`, 'success');
         return true;

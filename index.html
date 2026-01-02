@@ -30,6 +30,7 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -59,20 +60,27 @@
         background: #475569;
       }
 
-      /* ArcGIS UI Overrides */
+      /* Modern ArcGIS UI Overrides */
       .esri-ui-corner .esri-component {
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
-        border-radius: 8px !important;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+        border-radius: 12px !important;
         overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.05) !important;
       }
+      
+      .dark .esri-ui-corner .esri-component {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: white !important;
+      }
+
       .esri-popup__main-container {
-        border-radius: 16px !important;
+        border-radius: 20px !important;
         overflow: hidden !important;
         box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25) !important;
         border: none !important;
       }
       
-      /* Popup Header & Close Button Styling */
       .esri-popup__header {
         position: absolute !important;
         top: 0 !important;
@@ -82,45 +90,82 @@
         width: auto !important;
         padding: 12px !important;
       }
+      
       .esri-popup__header-container {
         display: none !important;
       }
+      
       .esri-popup__button {
         color: white !important;
-        background: rgba(0, 0, 0, 0.2) !important;
+        background: rgba(0, 0, 0, 0.3) !important;
         border-radius: 50% !important;
-        width: 32px !important;
-        height: 32px !important;
+        width: 30px !important;
+        height: 30px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        backdrop-filter: blur(4px);
+        transition: all 0.2s ease !important;
       }
+      
       .esri-popup__button:hover {
-        background: rgba(225, 29, 72, 0.8) !important; /* Rose-600 for clear exit signal */
-        color: white !important;
+        background: #e11d48 !important;
         transform: scale(1.1);
-        border-color: transparent !important;
       }
+      
       .esri-popup__content {
         margin: 0 !important;
         padding: 0 !important;
       }
+
       .esri-view-surface:focus::after {
         outline: none !important;
       }
-      .dark .esri-view-surface {
-        background-color: #0f172a !important;
-      }
-      .esri-popup__pointer-direction-up {
-        background-color: #0d9488 !important;
+
+      /* Basemap Gallery Modernization */
+      .esri-basemap-gallery {
+        min-width: 300px !important;
+        max-width: 320px !important;
+        max-height: 500px !important;
+        background-color: white !important;
+        padding: 8px !important;
       }
       
-      /* Fix for Basemap Gallery width inside Expand */
-      .esri-basemap-gallery {
-        min-width: 280px !important;
-        max-height: 400px !important;
+      .dark .esri-basemap-gallery {
+        background-color: #1e293b !important;
+        color: #f1f5f9 !important;
+      }
+      
+      .esri-basemap-gallery__item {
+        border-radius: 8px !important;
+        margin: 4px 0 !important;
+        transition: background 0.2s ease !important;
+        border: 1px solid transparent !important;
+      }
+      
+      .esri-basemap-gallery__item--selected {
+        background-color: #f0fdfa !important;
+        border-color: #5eead4 !important;
+      }
+      
+      .dark .esri-basemap-gallery__item--selected {
+        background-color: #134e4a !important;
+        border-color: #0d9488 !important;
+      }
+      
+      .esri-basemap-gallery__item-title {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+      }
+      
+      .esri-basemap-gallery__item-thumbnail {
+        border-radius: 6px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+      }
+
+      .esri-expand__content--expanded {
+        border-radius: 12px !important;
+        overflow: hidden !important;
       }
     </style>
   <script type="importmap">
