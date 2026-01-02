@@ -67,9 +67,39 @@
         border-radius: 16px !important;
         overflow: hidden !important;
         box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25) !important;
+        border: none !important;
       }
+      
+      /* Popup Header & Close Button Styling */
       .esri-popup__header {
+        position: absolute !important;
+        top: 0 !important;
+        right: 0 !important;
+        z-index: 50 !important;
+        background: transparent !important;
+        width: auto !important;
+        padding: 12px !important;
+      }
+      .esri-popup__header-container {
         display: none !important;
+      }
+      .esri-popup__button {
+        color: white !important;
+        background: rgba(0, 0, 0, 0.2) !important;
+        border-radius: 50% !important;
+        width: 32px !important;
+        height: 32px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      }
+      .esri-popup__button:hover {
+        background: rgba(225, 29, 72, 0.8) !important; /* Rose-600 for clear exit signal */
+        color: white !important;
+        transform: scale(1.1);
+        border-color: transparent !important;
       }
       .esri-popup__content {
         margin: 0 !important;

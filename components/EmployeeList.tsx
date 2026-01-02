@@ -21,7 +21,6 @@ const SYSTEM_ROLES = [
 
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee }) => {
   const { currentUser, showToast, positions, syncAzureUsers, invitations, inviteEmployee, acceptInvitation, revokeInvitation } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'active' | 'invitations'>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -121,22 +120,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
     });
   }, [employees, searchTerm]);
 
-  const filteredInvitations = useMemo(() => {
-    return invitations.filter(inv => {
-      const term = searchTerm.toLowerCase();
-      return inv.firstName.toLowerCase().includes(term) ||
-             inv.lastName.toLowerCase().includes(term) ||
-             inv.email.toLowerCase().includes(term) ||
-             (inv.position || '').toLowerCase().includes(term) ||
-             (inv.role || '').toLowerCase().includes(term);
-    });
-  }, [invitations, searchTerm]);
-
-  const paginatedItems = activeTab === 'active' 
-    ? filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-    : filteredInvitations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const totalPages = Math.ceil((activeTab === 'active' ? filteredEmployees.length : filteredInvitations.length) / itemsPerPage);
+  const paginatedItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +133,6 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         } else {
           await inviteEmployee({ ...formData, provisionInAzure: provisionInAzure });
           setShowModal(false);
-          setActiveTab('invitations');
         }
     } catch (err) {
         showToast("Operation failed.", "error");
@@ -183,37 +167,25 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         </div>
         <div className="flex flex-wrap gap-2">
             {isPowerUser && (
-                <>
-                  <button onClick={() => { setEditingEmployee(null); setFormData({ firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE, salary: 0, position: '', provisionInAzure: false, managerId: '', location: { latitude: 20.5937, longitude: 78.9629, address: '' } }); setShowModal(true); }} className="flex items-center space-x-2 bg-teal-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-teal-700 transition">
-                      <Plus size={16} />
-                      <span>Invite Member</span>
-                  </button>
-                  <button onClick={async () => { setIsSyncing(true); await syncAzureUsers(); setIsSyncing(false); }} disabled={isSyncing} className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50">
-                      <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-                      <span>Sync FROM Azure</span>
-                  </button>
-                </>
+                <button onClick={async () => { setIsSyncing(true); await syncAzureUsers(); setIsSyncing(false); }} disabled={isSyncing} className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50">
+                    <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+                    <span>Sync FROM Azure</span>
+                </button>
             )}
         </div>
       </div>
 
       <div className="flex border-b border-slate-200 dark:border-slate-700">
-          <button onClick={() => { setActiveTab('active'); setCurrentPage(1); }} className={`px-6 py-3 text-sm font-bold transition-colors relative ${activeTab === 'active' ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>
+          <div className="px-6 py-3 text-sm font-black uppercase tracking-widest text-teal-600 relative">
             Active Directory ({employees.length})
-            {activeTab === 'active' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>}
-          </button>
-          {isPowerUser && (
-              <button onClick={() => { setActiveTab('invitations'); setCurrentPage(1); }} className={`px-6 py-3 text-sm font-bold transition-colors relative ${activeTab === 'invitations' ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                Invitations ({invitations.length})
-                {activeTab === 'invitations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>}
-              </button>
-          )}
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>
+          </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
           <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder={`Search ${activeTab === 'active' ? 'members' : 'invitations'}...`} className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <input type="text" placeholder="Search team members..." className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
       </div>
 
@@ -222,8 +194,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
-                <th className="px-6 py-4">{activeTab === 'active' ? 'Employee' : 'Invitee'}</th>
-                <th className="px-6 py-4">{activeTab === 'active' ? 'ID' : 'Invited Date'}</th>
+                <th className="px-6 py-4">Employee</th>
+                <th className="px-6 py-4">ID</th>
                 <th className="px-6 py-4">Position</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Status</th>
@@ -242,29 +214,20 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-xs font-black text-slate-500">{activeTab === 'active' ? emp.employeeId : emp.invitedDate}</td>
+                  <td className="px-6 py-4 text-xs font-black text-slate-500">{emp.employeeId}</td>
                   <td className="px-6 py-4 text-xs text-slate-900 dark:text-slate-200 font-bold">{emp.position || 'Consultant'}</td>
                   <td className="px-6 py-4">
                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400">
                         <Shield size={12} className="text-blue-500" /> {emp.role}
                      </div>
                   </td>
-                  <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${activeTab === 'active' ? (emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100') : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{activeTab === 'active' ? emp.status : 'Invited'}</span></td>
+                  <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>{emp.status}</span></td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end space-x-1">
-                      {activeTab === 'active' ? (
-                        <>
                           <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-2" title="View Profile"><Eye size={16} /></button>
                           {isPowerUser && (
                             <button onClick={() => { setEditingEmployee(emp); setFormData({ ...emp, managerId: emp.managerId || '' }); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2" title="Edit Employee"><Edit2 size={16} /></button>
                           )}
-                        </>
-                      ) : (
-                        <div className="flex gap-2">
-                           <button onClick={() => acceptInvitation(emp.id)} className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase tracking-wider">Accept</button>
-                           <button onClick={() => revokeInvitation(emp.id)} className="text-red-500 hover:text-red-600 font-bold text-xs uppercase tracking-wider">Revoke</button>
-                        </div>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -291,7 +254,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         </div>
       )}
 
-      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Send Invitation'} width="max-w-3xl">
+      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Employee Details'} width="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
@@ -333,7 +296,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
           <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
             <button type="submit" disabled={isSaving} className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest flex items-center gap-2">
-                {isSaving ? <Loader2 size={14} className="animate-spin" /> : (editingEmployee ? 'Update Records' : 'Send Invitation')}
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : 'Update Records'}
             </button>
           </div>
         </form>

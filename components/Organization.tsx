@@ -33,7 +33,7 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
         <div className="org-node-card group bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:border-teal-500/50 transition-all w-36 relative z-10">
            <div className="flex flex-col items-center">
              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-50 mb-1.5 shadow-sm bg-slate-100">
-                <img src={node.avatar || `https://ui-avatars.com/api/?name=${node.firstName}+${node.lastName}`} className="w-full h-full object-cover" alt="" />
+                <img src={node.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(node.firstName)}+${encodeURIComponent(node.lastName)}`} className="w-full h-full object-cover" alt="" />
              </div>
              <div className="text-center w-full min-w-0">
                 <h4 className="font-bold text-slate-800 dark:text-slate-100 text-[11px] truncate px-1">{node.firstName} {node.lastName}</h4>
@@ -60,16 +60,25 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
 };
 
 const Organization = () => {
-  const { currentUser, projects, positions, employees, updateProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast } = useAppContext();
+  const { currentUser, projects, positions, employees, addProject, updateProject, deleteProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast } = useAppContext();
   const [activeTab, setActiveTab] = useState<'employees' | 'positions' | 'projects' | 'chart' | 'map'>('projects');
   
   const [mapType, setMapType] = useState<'streets-vector' | 'satellite' | 'topo-vector' | 'dark-gray-vector'>('streets-vector');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
 
+  const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const [projectForm, setProjectForm] = useState({
+      name: '',
+      description: '',
+      status: 'Active' as const,
+      dueDate: '',
+      tasks: [] as string[]
+  });
 
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const tree = useMemo(() => buildOrgTree(employees), [employees]);
@@ -90,54 +99,92 @@ const Organization = () => {
           container: mapContainerRef.current,
           map: map,
           zoom: 3,
-          center: [20, 20],
-          ui: { components: ["zoom"] }
+          center: [0, 20],
+          ui: { components: ["zoom"] },
+          popup: {
+            dockEnabled: false,
+            dockOptions: { buttonEnabled: false, breakpoint: false },
+            visibleElements: {
+              closeButton: true
+            }
+          }
         });
 
         const graphicsLayer = new GraphicsLayer();
         map.add(graphicsLayer);
         viewInstanceRef.current = view;
 
-        const graphics: any[] = [];
-        employees.forEach(emp => {
-          if (emp.location?.latitude && emp.location?.longitude) {
-            const point = { type: "point", longitude: emp.location.longitude, latitude: emp.location.latitude };
-            const symbol = {
-              type: "picture-marker",
-              url: "https://static.arcgis.com/images/Symbols/Shapes/BluePin1LargeB.png",
-              width: "32px",
-              height: "32px",
-              yoffset: 16
-            };
+        view.when(() => {
+            const graphics: any[] = [];
+            
+            employees.forEach(emp => {
+              const lat = parseFloat(String(emp.location?.latitude));
+              const lon = parseFloat(String(emp.location?.longitude));
 
-            const popupTemplate = {
-              title: `${emp.firstName} ${emp.lastName}`,
-              content: `
-                <div style="font-family: Inter, sans-serif; min-width: 240px;">
-                  <div style="background:#0d9488; height: 60px; position:relative; border-radius: 8px 8px 0 0;">
-                    <img src="${emp.avatar}" style="width: 60px; height: 60px; border-radius: 50%; border: 4px solid white; position: absolute; bottom: -20px; left: 20px; object-fit: cover;" />
-                  </div>
-                  <div style="padding: 30px 20px 20px 20px;">
-                    <h4 style="margin: 0; font-weight: 800; font-size: 16px;">${emp.firstName} ${emp.lastName}</h4>
-                    <p style="margin: 4px 0; color: #0d9488; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">${emp.position || 'Team'}</p>
-                    <div style="margin-top: 15px; border-top: 1px solid #f1f5f9; padding-top: 10px; font-size: 12px; color: #64748b;">
-                        <p style="margin: 4px 0;">📍 ${emp.workLocation || 'Office'}</p>
-                        <p style="margin: 4px 0;">📧 ${emp.email}</p>
+              if (!isNaN(lat) && !isNaN(lon)) {
+                // Autocast Point and Symbol - often more robust for WebGL template store issues
+                const point = {
+                    type: "point",
+                    longitude: lon,
+                    latitude: lat,
+                    spatialReference: { wkid: 4326 }
+                };
+                
+                // Construct validated Avatar URL
+                const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
+                    ? emp.avatar 
+                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}&background=0D9488&color=fff`;
+
+                const symbol = {
+                  type: "picture-marker",
+                  url: avatarUrl,
+                  width: 32, // Strictly numeric
+                  height: 32,
+                  outline: {
+                      color: [255, 255, 255, 0.8],
+                      width: 2
+                  }
+                };
+
+                const popupTemplate = {
+                  title: `${emp.firstName} ${emp.lastName}`,
+                  content: `
+                    <div style="font-family: 'Inter', sans-serif; min-width: 280px;">
+                      <div style="background:#0d9488; height: 80px; position:relative; border-radius: 12px 12px 0 0; overflow: hidden;">
+                        <div style="position:absolute; top:0; right:0; bottom:0; left:0; background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.3));"></div>
+                        <img src="${avatarUrl}" style="width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; position: absolute; bottom: -20px; left: 24px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1;" onerror="this.src='https://ui-avatars.com/api/?name=User&background=0D9488&color=fff'"/>
+                      </div>
+                      <div style="padding: 36px 24px 24px 24px; background: white;">
+                        <h4 style="margin: 0; font-weight: 800; font-size: 20px; color: #1e293b;">${emp.firstName} ${emp.lastName}</h4>
+                        <p style="margin: 4px 0; color: #0d9488; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;">${emp.position || 'Empower Team'}</p>
+                        <div style="margin-top: 20px; border-top: 1px solid #f1f5f9; padding-top: 16px; font-size: 13px; color: #64748b;">
+                            <p style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
+                              <span style="font-size: 16px;">📍</span> ${emp.workLocation || 'Office Location'}
+                            </p>
+                            <p style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
+                              <span style="font-size: 16px;">📧</span> ${emp.email}
+                            </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              `
-            };
+                  `
+                };
 
-            const graphic = new Graphic({ geometry: point, symbol: symbol, popupTemplate: popupTemplate });
-            graphics.push(graphic);
-            graphicsLayer.add(graphic);
-          }
+                const graphic = new Graphic({ 
+                    geometry: point, 
+                    symbol: symbol as any, 
+                    popupTemplate: popupTemplate 
+                });
+                
+                graphics.push(graphic);
+                graphicsLayer.add(graphic);
+              }
+            });
+            
+            if (graphics.length > 0) {
+                view.goTo(graphics).catch(() => {});
+            }
         });
-        
-        if (graphics.length > 0) {
-            view.goTo(graphics).catch(() => {});
-        }
     }).catch(err => {
       console.error("ArcGIS module load failed:", err);
     });
@@ -150,6 +197,24 @@ const Organization = () => {
     };
   }, [activeTab, employees, mapType]);
 
+  const handleCreateProject = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsProcessing(true);
+      try {
+          await addProject({
+              ...projectForm,
+              id: Math.random().toString(36).substr(2, 9)
+          });
+          setShowProjectModal(false);
+          setProjectForm({ name: '', description: '', status: 'Active', dueDate: '', tasks: [] });
+          showToast("New project created successfully.", "success");
+      } catch (err) {
+          showToast("Failed to create project.", "error");
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+
   const handleUpdateProject = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingProject) return;
@@ -158,6 +223,12 @@ const Organization = () => {
       setIsProcessing(false);
       setEditingProject(null);
       showToast("Project updated successfully.", "success");
+  };
+
+  const handleDeleteProject = async (id: string | number) => {
+      if (!window.confirm("Are you sure you want to delete this project?")) return;
+      await deleteProject(id);
+      showToast("Project removed.", "info");
   };
 
   const handleUpdatePosition = async (e: React.FormEvent) => {
@@ -174,19 +245,27 @@ const Organization = () => {
     <div className="space-y-6 animate-fade-in relative">
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Organization</h2><p className="text-sm text-slate-500 dark:text-slate-400">Manage structure, assets, and global presence.</p></div>
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
-             {[
-               { id: 'projects', label: 'Projects', icon: Layout },
-               { id: 'employees', label: 'Directory', icon: Users },
-               { id: 'positions', label: 'Positions', icon: Briefcase },
-               { id: 'chart', label: 'Org Chart', icon: Network },
-               { id: 'map', label: 'Global Map', icon: Globe }
-             ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-4 py-2 rounded-md text-sm transition capitalize flex items-center gap-2 ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 shadow text-teal-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>
-                  <tab.icon size={14} />
-                  <span>{tab.label}</span>
+          <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
+               {[
+                 { id: 'projects', label: 'Projects', icon: Layout },
+                 { id: 'employees', label: 'Employees', icon: Users },
+                 { id: 'positions', label: 'Positions', icon: Briefcase },
+                 { id: 'chart', label: 'Org Chart', icon: Network },
+                 { id: 'map', label: 'Employees Location', icon: MapPin }
+               ].map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-4 py-2 rounded-md text-sm transition capitalize flex items-center gap-2 ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 shadow text-teal-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>
+                    <tab.icon size={14} />
+                    <span>{tab.label}</span>
+                  </button>
+               ))}
+            </div>
+            {activeTab === 'projects' && isPowerUser && (
+                <button onClick={() => setShowProjectModal(true)} className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-bold shadow-lg shadow-teal-500/20">
+                    <Plus size={18} />
+                    <span>New Project</span>
                 </button>
-             ))}
+            )}
           </div>
        </div>
 
@@ -209,7 +288,7 @@ const Organization = () => {
                         {isPowerUser && (
                             <div className="flex gap-2 mt-4 pt-4 border-t dark:border-slate-700">
                                 <button onClick={() => setEditingProject(project)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"><Edit2 size={16}/></button>
-                                <button className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                <button onClick={() => handleDeleteProject(project.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
                             </div>
                         )}
                     </div>
@@ -218,17 +297,18 @@ const Organization = () => {
        )}
 
        {activeTab === 'map' && (
-           <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[600px] relative shadow-2xl">
-               <div className="absolute top-6 right-6 z-[1000] w-24">
-                   <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-2 ring-1 ring-black/5">
+           <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[700px] relative shadow-2xl">
+               <div className="absolute top-6 right-6 z-[1000] w-32">
+                   <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-2 ring-1 ring-black/5">
+                       <h4 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 mb-1 ml-1 tracking-widest">Map Design</h4>
                        {[
                            { id: 'streets-vector', icon: Navigation, label: 'Street' },
                            { id: 'satellite', icon: Globe, label: 'Satellite' },
                            { id: 'dark-gray-vector', icon: MapIcon, label: 'Dark' }
                        ].map(type => (
-                           <button key={type.id} onClick={() => setMapType(type.id as any)} className={`p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all ${mapType === type.id ? 'bg-teal-600 text-white shadow-xl scale-105' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
-                             <type.icon size={18} />
-                             <span className="text-[8px] font-black uppercase">{type.label}</span>
+                           <button key={type.id} onClick={() => setMapType(type.id as any)} className={`p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all ${mapType === type.id ? 'bg-teal-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                             <type.icon size={20} />
+                             <span className="text-[9px] font-black uppercase tracking-tight">{type.label}</span>
                            </button>
                        ))}
                    </div>
@@ -275,11 +355,26 @@ const Organization = () => {
           </div>
        )}
 
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title="New Project Creation" width="max-w-md">
+           <form onSubmit={handleCreateProject} className="space-y-4">
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Project Name</label><input required type="text" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} placeholder="e.g. Apollo Phase II" className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea rows={3} value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} placeholder="Strategic goals and overview..." className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Status</label><select value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Due Date</label><input type="date" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                </div>
+                <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" disabled={isProcessing} className="px-8 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg">{isProcessing ? 'Creating...' : 'Create Project'}</button></div>
+           </form>
+       </DraggableModal>
+
        <DraggableModal isOpen={!!editingProject} onClose={() => setEditingProject(null)} title="Update Project Effort" width="max-w-md">
            <form onSubmit={handleUpdateProject} className="space-y-4">
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Project Name</label><input required type="text" value={editingProject?.name || ''} onChange={e => setEditingProject(p => p ? {...p, name: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Description</label><textarea rows={3} value={editingProject?.description || ''} onChange={e => setEditingProject(p => p ? {...p, description: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Status</label><select value={editingProject?.status || 'Active'} onChange={e => setEditingProject(p => p ? {...p, status: e.target.value as any} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Status</label><select value={editingProject?.status || 'Active'} onChange={e => setEditingProject(p => p ? {...p, status: e.target.value as any} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white"><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
+                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Due Date</label><input type="date" value={editingProject?.dueDate || ''} onChange={e => setEditingProject(p => p ? {...p, dueDate: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
+                </div>
                 <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setEditingProject(null)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" className="px-8 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg">Save Changes</button></div>
            </form>
        </DraggableModal>
@@ -288,7 +383,7 @@ const Organization = () => {
            <form onSubmit={handleUpdatePosition} className="space-y-4">
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Position Title</label><input required type="text" value={editingPosition?.title || ''} onChange={e => setEditingPosition(p => p ? {...p, title: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Role Description</label><textarea rows={3} value={editingPosition?.description || ''} onChange={e => setEditingPosition(p => p ? {...p, description: e.target.value} : null)} className="w-full px-4 py-2 border rounded-xl dark:bg-slate-700 dark:text-white" /></div>
-                <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setEditingPosition(null)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold uppercase shadow-lg">Update Role</button></div>
+                <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={() => setEditingPosition(null)} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Cancel</button><button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg">Update Role</button></div>
            </form>
        </DraggableModal>
     </div>
