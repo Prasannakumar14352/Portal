@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronLeft, ChevronRight, ChevronDown, BookOpen, Clock, PieChart, Info, MapPin, CalendarDays, UserCheck, Flame, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Loader2, Mail, User as UserIcon, Settings2, Users, Layers, Activity, Fingerprint
+  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -99,7 +99,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast, notify, sendLeaveRequestEmail, sendLeaveStatusEmail, employees, deleteLeave } = useAppContext();
+  const { showToast, notify, employees, deleteLeave } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -120,10 +120,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
+  // Logic: Approvers are determined strictly by System Role (Admin, HR, or Manager)
   const availableManagers = useMemo(() => {
     return users.filter(u => {
-      const role = (u.role || '').toLowerCase();
-      return (role.includes('manager') || role.includes('admin') || role.includes('hr')) && String(u.id) !== String(currentUser?.id);
+      const isApprover = u.role === UserRole.ADMIN || u.role === UserRole.HR || u.role === UserRole.MANAGER;
+      return isApprover && String(u.id) !== String(currentUser?.id);
     });
   }, [users, currentUser]);
 
@@ -136,7 +137,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     if (!currentUser) return [];
     
     return leaveTypes.map(type => {
-      // Find all approved leaves for this user and this specific category
       const approvedLeaves = leaves.filter(l => 
         String(l.userId) === String(currentUser.id) && 
         l.type === type.name && 
@@ -150,7 +150,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         } else {
           const start = new Date(l.startDate);
           const end = new Date(l.endDate);
-          // Calculate duration (End - Start + 1 day)
           const diffTime = Math.abs(end.getTime() - start.getTime());
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
           usedDays += diffDays;
@@ -501,10 +500,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Approver (By Position)</label>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Approver (By System Role)</label>
                 <select required className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={formData.approverId} onChange={e => setFormData({...formData, approverId: e.target.value})}>
-                    <option value="" disabled>Select Approving Manager...</option>
-                    {availableManagers.map(mgr => <option key={mgr.id} value={String(mgr.id)}>{mgr.name} ({mgr.position || mgr.role})</option>)}
+                    <option value="" disabled>Select Approving Authority...</option>
+                    {availableManagers.map(mgr => (
+                      <option key={mgr.id} value={String(mgr.id)}>
+                        {mgr.name} ({mgr.role})
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
