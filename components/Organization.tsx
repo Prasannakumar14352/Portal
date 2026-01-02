@@ -90,25 +90,30 @@ const Organization = () => {
       "esri/Map",
       "esri/views/MapView",
       "esri/Graphic",
-      "esri/layers/GraphicsLayer"
-    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer]) => {
+      "esri/layers/GraphicsLayer",
+      "esri/geometry/Point",
+      "esri/geometry/SpatialReference",
+      "esri/symbols/SimpleMarkerSymbol",
+      "esri/widgets/Home"
+    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Point, SpatialReference, SimpleMarkerSymbol, Home]) => {
         if (!mapContainerRef.current) return;
 
         const map = new EsriMap({ basemap: mapType });
         const view = new MapView({
           container: mapContainerRef.current,
           map: map,
-          zoom: 3,
-          center: [0, 20],
+          zoom: 4,
+          center: [78.9629, 20.5937], // Centered on India
           ui: { components: ["zoom"] },
           popup: {
             dockEnabled: false,
             dockOptions: { buttonEnabled: false, breakpoint: false },
-            visibleElements: {
-              closeButton: true
-            }
+            visibleElements: { closeButton: true }
           }
         });
+
+        const homeWidget = new Home({ view: view });
+        view.ui.add(homeWidget, "top-left");
 
         const graphicsLayer = new GraphicsLayer();
         map.add(graphicsLayer);
@@ -116,73 +121,64 @@ const Organization = () => {
 
         view.when(() => {
             const graphics: any[] = [];
-            
+            const wgs84 = new SpatialReference({ wkid: 4326 });
+
             employees.forEach(emp => {
-              const lat = parseFloat(String(emp.location?.latitude));
-              const lon = parseFloat(String(emp.location?.longitude));
+                const lat = parseFloat(String(emp.location?.latitude));
+                const lon = parseFloat(String(emp.location?.longitude));
 
-              if (!isNaN(lat) && !isNaN(lon)) {
-                // Autocast Point and Symbol - often more robust for WebGL template store issues
-                const point = {
-                    type: "point",
-                    longitude: lon,
-                    latitude: lat,
-                    spatialReference: { wkid: 4326 }
-                };
-                
-                // Construct validated Avatar URL
-                const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
-                    ? emp.avatar 
-                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}&background=0D9488&color=fff`;
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    const point = new Point({
+                        longitude: lon,
+                        latitude: lat,
+                        spatialReference: wgs84
+                    });
 
-                const symbol = {
-                  type: "picture-marker",
-                  url: avatarUrl,
-                  width: 32, // Strictly numeric
-                  height: 32,
-                  outline: {
-                      color: [255, 255, 255, 0.8],
-                      width: 2
-                  }
-                };
+                    const symbol = new SimpleMarkerSymbol({
+                        style: "circle",
+                        color: [13, 148, 136], // Teal-600
+                        size: 14,
+                        outline: {
+                            color: [255, 255, 255],
+                            width: 2
+                        }
+                    });
 
-                const popupTemplate = {
-                  title: `${emp.firstName} ${emp.lastName}`,
-                  content: `
-                    <div style="font-family: 'Inter', sans-serif; min-width: 280px;">
-                      <div style="background:#0d9488; height: 80px; position:relative; border-radius: 12px 12px 0 0; overflow: hidden;">
-                        <div style="position:absolute; top:0; right:0; bottom:0; left:0; background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.3));"></div>
-                        <img src="${avatarUrl}" style="width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; position: absolute; bottom: -20px; left: 24px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1;" onerror="this.src='https://ui-avatars.com/api/?name=User&background=0D9488&color=fff'"/>
-                      </div>
-                      <div style="padding: 36px 24px 24px 24px; background: white;">
-                        <h4 style="margin: 0; font-weight: 800; font-size: 20px; color: #1e293b;">${emp.firstName} ${emp.lastName}</h4>
-                        <p style="margin: 4px 0; color: #0d9488; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;">${emp.position || 'Empower Team'}</p>
-                        <div style="margin-top: 20px; border-top: 1px solid #f1f5f9; padding-top: 16px; font-size: 13px; color: #64748b;">
-                            <p style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
-                              <span style="font-size: 16px;">📍</span> ${emp.workLocation || 'Office Location'}
-                            </p>
-                            <p style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
-                              <span style="font-size: 16px;">📧</span> ${emp.email}
-                            </p>
-                        </div>
-                      </div>
-                    </div>
-                  `
-                };
+                    const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
+                        ? emp.avatar 
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}&background=0D9488&color=fff`;
 
-                const graphic = new Graphic({ 
-                    geometry: point, 
-                    symbol: symbol as any, 
-                    popupTemplate: popupTemplate 
-                });
-                
-                graphics.push(graphic);
-                graphicsLayer.add(graphic);
-              }
+                    const popupTemplate = {
+                        title: `${emp.firstName} ${emp.lastName}`,
+                        content: `
+                            <div style="font-family: 'Inter', sans-serif; min-width: 260px;">
+                                <div style="background:#0d9488; height: 60px; position:relative; border-radius: 12px 12px 0 0;">
+                                    <img src="${avatarUrl}" style="width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; position: absolute; bottom: -20px; left: 20px; object-fit: cover; background: #f1f5f9;" />
+                                </div>
+                                <div style="padding: 28px 20px 20px 20px; background: white;">
+                                    <h4 style="margin: 0; font-weight: 800; font-size: 16px; color: #1e293b;">${emp.firstName} ${emp.lastName}</h4>
+                                    <p style="margin: 2px 0; color: #0d9488; font-weight: 700; font-size: 10px; text-transform: uppercase;">${emp.position || 'Empower Team'}</p>
+                                    <div style="margin-top: 15px; border-top: 1px solid #f1f5f9; padding-top: 10px; font-size: 12px; color: #64748b;">
+                                        <p style="margin: 4px 0;">📍 ${emp.workLocation || 'Office Location'}</p>
+                                        <p style="margin: 4px 0;">📧 ${emp.email}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `
+                    };
+
+                    const graphic = new Graphic({
+                        geometry: point,
+                        symbol: symbol,
+                        popupTemplate: popupTemplate
+                    });
+
+                    graphics.push(graphic);
+                }
             });
-            
+
             if (graphics.length > 0) {
-                view.goTo(graphics).catch(() => {});
+                graphicsLayer.addMany(graphics);
             }
         });
     }).catch(err => {
