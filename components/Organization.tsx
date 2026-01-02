@@ -107,10 +107,11 @@ const Organization = () => {
       );
   }, [employees, directorySearch]);
 
-  // Handle Main Basemap Updates
+  // Handle Main Basemap Updates with defensive checks
   useEffect(() => {
-    if (!viewInstanceRef.current) return;
     const view = viewInstanceRef.current;
+    if (!view || !view.map) return;
+    
     if (isImagery) {
       view.map.basemap = "satellite";
     } else {
@@ -118,10 +119,11 @@ const Organization = () => {
     }
   }, [theme, isImagery]);
 
-  // Handle Edit Modal Basemap Updates
+  // Handle Edit Modal Basemap Updates with defensive checks
   useEffect(() => {
-    if (!editMapViewRef.current) return;
     const view = editMapViewRef.current;
+    if (!view || !view.map) return;
+    
     if (isEditImagery) {
       view.map.basemap = "satellite";
     } else {
