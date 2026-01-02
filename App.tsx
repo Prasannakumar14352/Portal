@@ -87,27 +87,20 @@ const App: React.FC = () => {
   } = useAppContext();
 
   // --- Routing Logic ---
-  
-  // Sync view state based on URL Hash
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace(/^#\/?/, '');
       if (hash && pathToView[hash]) {
         setCurrentView(pathToView[hash]);
       } else if (!hash && currentUser) {
-        // Redirect to dashboard if hash is empty but user is logged in
         window.location.hash = '/dashboard';
       }
     };
-
-    // Initial check
     handleHashChange();
-
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [currentUser]);
 
-  // Handle Internal View Change
   const handleViewChange = useCallback((viewId: string) => {
     const path = viewToPath[viewId];
     if (path) {
@@ -117,16 +110,26 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   }, []);
 
-  const users: User[] = employees.map(emp => ({
-    id: emp.id,
-    employeeId: emp.employeeId,
-    name: `${emp.firstName} ${emp.lastName}`,
-    role: emp.role?.includes('Manager') ? (emp.department === 'HR' ? UserRole.HR : UserRole.MANAGER) : UserRole.EMPLOYEE,
-    position: emp.position, // Critical: Ensuring position field is passed for filtering
-    avatar: emp.avatar,
-    managerId: emp.managerId,
-    jobTitle: emp.jobTitle || emp.position || emp.role
-  }));
+  // Map backend employees to standard UI Users with strict Role checking
+  const users: User[] = employees.map(emp => {
+    // Direct mapping of role strings to Enum values
+    let roleEnum = UserRole.EMPLOYEE;
+    const dbRole = (emp.role || '').toLowerCase();
+    if (dbRole.includes('admin')) roleEnum = UserRole.ADMIN;
+    else if (dbRole.includes('hr manager')) roleEnum = UserRole.HR;
+    else if (dbRole.includes('team manager') || dbRole === 'manager') roleEnum = UserRole.MANAGER;
+
+    return {
+      id: emp.id,
+      employeeId: emp.employeeId,
+      name: `${emp.firstName} ${emp.lastName}`,
+      role: roleEnum,
+      position: emp.position, // Important for Approval dropdown filtering
+      avatar: emp.avatar,
+      managerId: emp.managerId,
+      jobTitle: emp.jobTitle || emp.position || emp.role
+    };
+  });
 
   const handleLogin = (user: User) => {
     handleViewChange('dashboard');
@@ -163,7 +166,7 @@ const App: React.FC = () => {
         <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading EMP Portal...</p>
+                <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading Portal...</p>
             </div>
         </div>
     );
@@ -213,14 +216,7 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden transition-colors duration-200">
       <ToastContainer />
-      
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
       <Sidebar 
         currentView={currentView} 
         onChangeView={handleViewChange} 
@@ -228,7 +224,6 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      
       <div className="flex-1 flex flex-col h-full md:ml-64 transition-all duration-300">
         <Header 
           user={currentUser} 
@@ -236,11 +231,8 @@ const App: React.FC = () => {
           onChangeView={handleViewChange}
           onMenuClick={() => setIsSidebarOpen(true)}
         />
-        
         <main className="flex-1 p-4 md:p-8 overflow-y-auto mt-16 scrollbar-hide">
-          <div className="max-w-7xl mx-auto pb-10">
-            {renderContent()}
-          </div>
+          <div className="max-w-7xl mx-auto pb-10">{renderContent()}</div>
         </main>
       </div>
     </div>

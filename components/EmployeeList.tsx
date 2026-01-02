@@ -1,9 +1,9 @@
-
-import React, { useState, useMemo, useRef } from 'react';
-import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2, Shield, LocateFixed } from 'lucide-react';
 import { Employee, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
+import { loadModules } from 'esri-loader';
 
 interface EmployeeListProps {
   employees: Employee[];
@@ -36,12 +36,78 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
 
-  const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
-
   const [formData, setFormData] = useState<any>({
     firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE,
-    salary: 0, position: '', provisionInAzure: false, managerId: ''
+    salary: 0, position: '', provisionInAzure: false, managerId: '',
+    location: { latitude: 20.5937, longitude: 78.9629, address: '' }
   });
+
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<any>(null);
+
+  const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
+
+  useEffect(() => {
+    if (!showModal || !mapDivRef.current || !editingEmployee) return;
+
+    loadModules([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/Graphic",
+      "esri/layers/GraphicsLayer"
+    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer]) => {
+        if (!mapDivRef.current) return;
+
+        const map = new EsriMap({ basemap: "streets-vector" });
+        const view = new MapView({
+          container: mapDivRef.current,
+          map: map,
+          zoom: 4,
+          center: [formData.location?.longitude || 78, formData.location?.latitude || 20],
+          ui: { components: ["zoom"] }
+        });
+
+        const graphicsLayer = new GraphicsLayer();
+        map.add(graphicsLayer);
+        viewRef.current = view;
+
+        const updateMarker = (lon: number, lat: number) => {
+            graphicsLayer.removeAll();
+            const point = { type: "point", longitude: lon, latitude: lat };
+            const symbol = {
+                type: "simple-marker",
+                style: "circle",
+                color: [13, 148, 136], // Teal
+                size: "14px",
+                outline: { color: [255, 255, 255], width: 2 }
+            };
+            const graphic = new Graphic({ geometry: point, symbol: symbol });
+            graphicsLayer.add(graphic);
+        };
+
+        if (formData.location?.latitude) {
+            updateMarker(formData.location.longitude, formData.location.latitude);
+        }
+
+        view.on("click", (event: any) => {
+            const { longitude, latitude } = event.mapPoint;
+            updateMarker(longitude, latitude);
+            setFormData((prev: any) => ({
+                ...prev,
+                location: { ...prev.location, latitude, longitude }
+            }));
+        });
+    }).catch(err => {
+      console.error("ArcGIS module load failed in modal:", err);
+    });
+
+    return () => {
+        if (viewRef.current) {
+            viewRef.current.destroy();
+            viewRef.current = null;
+        }
+    };
+  }, [showModal, !!editingEmployee]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
@@ -50,16 +116,20 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
              emp.lastName.toLowerCase().includes(term) ||
              emp.email.toLowerCase().includes(term) ||
              String(emp.employeeId).toLowerCase().includes(term) ||
-             (emp.position || '').toLowerCase().includes(term);
+             (emp.position || '').toLowerCase().includes(term) ||
+             (emp.role || '').toLowerCase().includes(term);
     });
   }, [employees, searchTerm]);
 
   const filteredInvitations = useMemo(() => {
-    return invitations.filter(inv => 
-      inv.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inv.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inv.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    return invitations.filter(inv => {
+      const term = searchTerm.toLowerCase();
+      return inv.firstName.toLowerCase().includes(term) ||
+             inv.lastName.toLowerCase().includes(term) ||
+             inv.email.toLowerCase().includes(term) ||
+             (inv.position || '').toLowerCase().includes(term) ||
+             (inv.role || '').toLowerCase().includes(term);
+    });
   }, [invitations, searchTerm]);
 
   const paginatedItems = activeTab === 'active' 
@@ -68,40 +138,23 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
 
   const totalPages = Math.ceil((activeTab === 'active' ? filteredEmployees.length : filteredInvitations.length) / itemsPerPage);
 
-  const handleAzureSyncFromPortal = async () => {
-    setIsSyncing(true);
-    await syncAzureUsers();
-    setIsSyncing(false);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
         if (editingEmployee) {
-          const finalEmp = { ...editingEmployee, ...formData } as Employee;
-          await onUpdateEmployee(finalEmp);
+          await onUpdateEmployee({ ...editingEmployee, ...formData });
           setShowModal(false);
         } else {
-          await inviteEmployee({
-              ...formData,
-              provisionInAzure: provisionInAzure
-          });
+          await inviteEmployee({ ...formData, provisionInAzure: provisionInAzure });
           setShowModal(false);
           setActiveTab('invitations');
         }
     } catch (err) {
-        console.error("Submission error:", err);
-        showToast("Operation failed. Please try again.", "error");
+        showToast("Operation failed.", "error");
     } finally {
         setIsSaving(false);
     }
-  };
-
-  const copyInviteLink = (inv: Invitation) => {
-      const link = `${window.location.origin}/accept-invite?token=${inv.token}`;
-      navigator.clipboard.writeText(link);
-      showToast("Invitation link copied to clipboard!", "success");
   };
 
   const openViewModal = (emp: Employee) => {
@@ -130,38 +183,37 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         </div>
         <div className="flex flex-wrap gap-2">
             {isPowerUser && (
-                <button 
-                  onClick={handleAzureSyncFromPortal} 
-                  disabled={isSyncing}
-                  className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50"
-                >
-                    <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-                    <span>Sync FROM Azure</span>
-                </button>
+                <>
+                  <button onClick={() => { setEditingEmployee(null); setFormData({ firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE, salary: 0, position: '', provisionInAzure: false, managerId: '', location: { latitude: 20.5937, longitude: 78.9629, address: '' } }); setShowModal(true); }} className="flex items-center space-x-2 bg-teal-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-teal-700 transition">
+                      <Plus size={16} />
+                      <span>Invite Member</span>
+                  </button>
+                  <button onClick={async () => { setIsSyncing(true); await syncAzureUsers(); setIsSyncing(false); }} disabled={isSyncing} className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50">
+                      <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+                      <span>Sync FROM Azure</span>
+                  </button>
+                </>
             )}
         </div>
       </div>
 
       <div className="flex border-b border-slate-200 dark:border-slate-700">
-          <button 
-            onClick={() => setActiveTab('active')}
-            className={`px-6 py-3 text-sm font-bold transition-colors relative ${activeTab === 'active' ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
+          <button onClick={() => { setActiveTab('active'); setCurrentPage(1); }} className={`px-6 py-3 text-sm font-bold transition-colors relative ${activeTab === 'active' ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>
             Active Directory ({employees.length})
             {activeTab === 'active' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>}
           </button>
+          {isPowerUser && (
+              <button onClick={() => { setActiveTab('invitations'); setCurrentPage(1); }} className={`px-6 py-3 text-sm font-bold transition-colors relative ${activeTab === 'invitations' ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                Invitations ({invitations.length})
+                {activeTab === 'invitations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"></div>}
+              </button>
+          )}
       </div>
 
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+          <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder={`Search members...`} 
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+              <input type="text" placeholder={`Search ${activeTab === 'active' ? 'members' : 'invitations'}...`} className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
       </div>
 
@@ -171,183 +223,141 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
                 <th className="px-6 py-4">{activeTab === 'active' ? 'Employee' : 'Invitee'}</th>
-                <th className="px-6 py-4">{activeTab === 'active' ? 'ID' : 'Invited On'}</th>
+                <th className="px-6 py-4">{activeTab === 'active' ? 'ID' : 'Invited Date'}</th>
                 <th className="px-6 py-4">Position</th>
-                <th className="px-6 py-4">{activeTab === 'active' ? 'Status' : 'Azure Sync'}</th>
+                <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {activeTab === 'active' ? (
-                  paginatedItems.map((emp: any) => (
-                    <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-3">
-                          <img src={emp.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" />
-                          <div>
-                            <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-white text-sm">
-                                {emp.firstName} {emp.lastName}
-                                {emp.password === 'ms-auth-user' && (
-                                    <span title="Synced with Azure Portal">
-                                        <Cloud size={14} className="text-blue-500" />
-                                    </span>
-                                )}
-                            </div>
-                            <div className="text-[11px] text-slate-400 font-medium">{emp.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-black text-slate-500">{emp.employeeId}</td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs text-slate-900 dark:text-slate-200 font-bold">{emp.position || 'Consultant'}</div>
-                      </td>
-                      <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>{emp.status}</span></td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end space-x-1">
+              {paginatedItems.map((emp: any) => (
+                <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-3">
+                      <img src={emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName + ' ' + emp.lastName)}&background=0D9488&color=fff`} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" />
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-white text-sm">{emp.firstName} {emp.lastName}</div>
+                        <div className="text-[11px] text-slate-400 font-medium">{emp.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-black text-slate-500">{activeTab === 'active' ? emp.employeeId : emp.invitedDate}</td>
+                  <td className="px-6 py-4 text-xs text-slate-900 dark:text-slate-200 font-bold">{emp.position || 'Consultant'}</td>
+                  <td className="px-6 py-4">
+                     <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                        <Shield size={12} className="text-blue-500" /> {emp.role}
+                     </div>
+                  </td>
+                  <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${activeTab === 'active' ? (emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100') : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{activeTab === 'active' ? emp.status : 'Invited'}</span></td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end space-x-1">
+                      {activeTab === 'active' ? (
+                        <>
                           <button onClick={() => openViewModal(emp)} className="text-slate-400 hover:text-blue-600 p-2" title="View Profile"><Eye size={16} /></button>
-                          {isPowerUser && <button onClick={() => { setEditingEmployee(emp); setFormData({ ...emp, managerId: emp.managerId || '' }); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2" title="Edit & Sync"><Edit2 size={16} /></button>}
+                          {isPowerUser && (
+                            <button onClick={() => { setEditingEmployee(emp); setFormData({ ...emp, managerId: emp.managerId || '' }); setShowModal(true); }} className="text-slate-400 hover:text-teal-600 p-2" title="Edit Employee"><Edit2 size={16} /></button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex gap-2">
+                           <button onClick={() => acceptInvitation(emp.id)} className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase tracking-wider">Accept</button>
+                           <button onClick={() => revokeInvitation(emp.id)} className="text-red-500 hover:text-red-600 font-bold text-xs uppercase tracking-wider">Revoke</button>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-              ) : (
-                  paginatedItems.map((inv: any) => (
-                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400">
-                             <Clock size={20} />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800 dark:text-white text-sm">{inv.firstName} {inv.lastName}</div>
-                            <div className="text-[11px] text-slate-400 font-medium">{inv.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{inv.invitedDate}</td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs text-slate-900 dark:text-slate-200 font-bold">{inv.position}</div>
-                        <div className="text-[10px] text-slate-400 uppercase tracking-tight">{inv.role}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {inv.provisionInAzure ? (
-                            <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase">
-                                <Cloud size={12}/> Provisioning
-                            </span>
-                        ) : (
-                            <span className="text-slate-400 text-[10px] font-bold uppercase">Local Only</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                           <button onClick={() => copyInviteLink(inv)} className="p-2 text-slate-400 hover:text-teal-600 transition-colors" title="Copy Link"><Copy size={16}/></button>
-                           <button onClick={() => acceptInvitation(inv.id)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-700 flex items-center gap-1.5" title="Accept"><CheckCircle size={12}/> Accept</button>
-                           <button onClick={() => revokeInvitation(inv.id)} className="text-slate-400 hover:text-red-600 p-2" title="Revoke"><XCircle size={18} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-              )}
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
               {paginatedItems.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">No records found.</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm italic">
+                    No records found in this directory.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <DraggableModal isOpen={showViewModal} onClose={() => setShowViewModal(false)} title="Employee Profile" width="max-w-xl">
-        {viewingEmployee && (
-          <div className="space-y-6">
-            <div className="flex flex-col items-center text-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-               <img src={viewingEmployee.avatar} className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 shadow-xl mb-4 object-cover" alt="" />
-               <div className="flex items-center gap-2 justify-center">
-                   <h3 className="text-xl font-black text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
-                   {viewingEmployee.password === 'ms-auth-user' && <Cloud className="text-blue-500" size={18} />}
-               </div>
-               <p className="text-teal-600 dark:text-teal-400 font-bold uppercase tracking-widest text-xs mt-1">{viewingEmployee.position || 'Consultant'}</p>
-               <div className="mt-4 flex gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${viewingEmployee.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{viewingEmployee.status}</span>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <DetailRow icon={Hash} label="Employee ID" value={viewingEmployee.employeeId} />
-                <DetailRow icon={Mail} label="Email Address" value={viewingEmployee.email} />
-                <DetailRow icon={Phone} label="Contact Number" value={viewingEmployee.phone || 'Not Provided'} />
-                <DetailRow icon={Calendar} label="Join Date" value={viewingEmployee.joinDate} />
-                <DetailRow icon={MapPin} label="Work Location" value={viewingEmployee.workLocation || 'Office HQ India'} />
-                <DetailRow icon={Briefcase} label="System Role" value={viewingEmployee.role} />
-                {viewingEmployee.managerId && (
-                  <DetailRow 
-                    icon={UserCheck} 
-                    label="Reports To" 
-                    value={employees.find(e => String(e.id) === String(viewingEmployee.managerId))?.firstName + ' ' + employees.find(e => String(e.id) === String(viewingEmployee.managerId))?.lastName} 
-                  />
-                )}
-            </div>
-
-            <div className="pt-6 border-t dark:border-slate-700 flex justify-end">
-               <button onClick={() => setShowViewModal(false)} className="px-8 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest">Close Profile</button>
-            </div>
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center px-2">
+          <p className="text-xs text-slate-400 font-medium">Page {currentPage} of {totalPages}</p>
+          <div className="flex gap-1">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition"><ChevronLeft size={16}/></button>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)} className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition"><ChevronRight size={16}/></button>
           </div>
-        )}
-      </DraggableModal>
+        </div>
+      )}
 
-      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Send New Invitation'} width="max-w-2xl">
+      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Send Invitation'} width="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required disabled={isSaving} type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required disabled={isSaving} type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm transition-all dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
+            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label><input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
           </div>
 
-          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><div className="relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input required disabled={isSaving} type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div></div>
+          <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email ID</label><input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Position</label>
-              <select required disabled={isSaving} value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm transition-all dark:text-white">
+              <select required value={formData.position} onChange={(e) => setFormData({...formData, position: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm dark:text-white">
                  <option value="" disabled>Select Position...</option>
                  {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">System Role</label>
-              <select required disabled={isSaving} value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white">
+              <select required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm outline-none focus:ring-2 focus:ring-teal-500 dark:text-white">
                  {SYSTEM_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Salary (Annual)</label><input disabled={isSaving} type="number" value={formData.salary} onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
-            <div>
-             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Reporting Manager</label>
-             <div className="relative">
-                <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <select 
-                  disabled={isSaving}
-                  value={formData.managerId} 
-                  onChange={(e) => setFormData({...formData, managerId: e.target.value})} 
-                  className="w-full pl-11 pr-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500 appearance-none"
-                >
-                    <option value="">No Manager Assigned</option>
-                    {employees.filter(emp => String(emp.id) !== String(editingEmployee?.id)).map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.firstName} {emp.lastName}</option>
-                    ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-             </div>
-          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Location Adjustment</label>
+                <div className="flex items-center gap-2 text-[10px] text-teal-600 font-bold">
+                    <LocateFixed size={12}/> Click map to update coordinates
+                </div>
+            </div>
+            <div ref={mapDivRef} className="h-60 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-inner bg-slate-50"></div>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Lat: <span className="text-slate-800 dark:text-slate-200">{formData.location?.latitude?.toFixed(4) || 'N/A'}</span></div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight text-right">Lon: <span className="text-slate-800 dark:text-slate-200">{formData.location?.longitude?.toFixed(4) || 'N/A'}</span></div>
+            </div>
           </div>
 
           <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
-            <button type="submit" disabled={isSaving} className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest min-w-[160px] flex items-center justify-center gap-2">
-                {isSaving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : (editingEmployee ? 'Update Records' : 'Generate Invitation')}
+            <button type="submit" disabled={isSaving} className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest flex items-center gap-2">
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : (editingEmployee ? 'Update Records' : 'Send Invitation')}
             </button>
           </div>
         </form>
+      </DraggableModal>
+
+      <DraggableModal isOpen={showViewModal} onClose={() => setShowViewModal(false)} title="Employee Profile" width="max-w-xl">
+        {viewingEmployee && (
+          <div className="space-y-6">
+            <div className="flex flex-col items-center text-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+               <img src={viewingEmployee.avatar} className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 shadow-xl mb-4 object-cover" alt="" />
+               <h3 className="text-xl font-black text-slate-800 dark:text-white">{viewingEmployee.firstName} {viewingEmployee.lastName}</h3>
+               <p className="text-teal-600 dark:text-teal-400 font-bold uppercase tracking-widest text-xs mt-1">{viewingEmployee.position || 'Consultant'}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailRow icon={Hash} label="Employee ID" value={viewingEmployee.employeeId} />
+                <DetailRow icon={Mail} label="Email Address" value={viewingEmployee.email} />
+                <DetailRow icon={Phone} label="Contact Number" value={viewingEmployee.phone || 'Not Provided'} />
+                <DetailRow icon={Calendar} label="Join Date" value={viewingEmployee.joinDate} />
+            </div>
+            <div className="pt-6 border-t dark:border-slate-700 flex justify-end">
+               <button onClick={() => setShowViewModal(false)} className="px-8 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest">Close Profile</button>
+            </div>
+          </div>
+        )}
       </DraggableModal>
     </div>
   );
