@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2, Shield, LocateFixed } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2, Shield, LocateFixed, UserPlus } from 'lucide-react';
 import { Employee, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -47,7 +47,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => {
-    if (!showModal || !mapDivRef.current || !editingEmployee) return;
+    if (!showModal || !mapDivRef.current) return;
 
     loadModules([
       "esri/Map",
@@ -123,6 +123,16 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
   const paginatedItems = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
 
+  const handleAddNew = () => {
+    setEditingEmployee(null);
+    setFormData({
+      firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE,
+      salary: 0, position: '', provisionInAzure: false, managerId: '',
+      location: { latitude: 20.5937, longitude: 78.9629, address: '' }
+    });
+    setShowModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -167,10 +177,23 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         </div>
         <div className="flex flex-wrap gap-2">
             {isPowerUser && (
-                <button onClick={async () => { setIsSyncing(true); await syncAzureUsers(); setIsSyncing(false); }} disabled={isSyncing} className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50">
-                    <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-                    <span>Sync FROM Azure</span>
-                </button>
+                <>
+                  <button 
+                    onClick={handleAddNew}
+                    className="flex items-center space-x-2 bg-teal-600 text-white px-4 py-2 rounded-lg shadow-lg shadow-teal-500/20 text-sm font-bold hover:bg-teal-700 transition"
+                  >
+                      <Plus size={18} />
+                      <span>Add Employee</span>
+                  </button>
+                  <button 
+                    onClick={async () => { setIsSyncing(true); await syncAzureUsers(); setIsSyncing(false); }} 
+                    disabled={isSyncing} 
+                    className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50"
+                  >
+                      <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+                      <span>Sync FROM Azure</span>
+                  </button>
+                </>
             )}
         </div>
       </div>
@@ -254,7 +277,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         </div>
       )}
 
-      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Employee Details'} width="max-w-3xl">
+      <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmployee ? 'Edit & Sync Employee' : 'Add New Employee'} width="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">First Name</label><input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500" /></div>
@@ -279,6 +302,19 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
             </div>
           </div>
 
+          {!editingEmployee && (
+            <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+               <input 
+                 type="checkbox" 
+                 id="provisionInAzure" 
+                 checked={provisionInAzure} 
+                 onChange={e => setProvisionInAzure(e.target.checked)}
+                 className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+               />
+               <label htmlFor="provisionInAzure" className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-tight">Provision in Azure AD (Microsoft 365)</label>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center justify-between mb-2">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Location Adjustment</label>
@@ -296,7 +332,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
           <div className="pt-6 flex justify-end space-x-3 border-t dark:border-slate-700">
             <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</button>
             <button type="submit" disabled={isSaving} className="px-8 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold text-xs shadow-lg uppercase tracking-widest flex items-center gap-2">
-                {isSaving ? <Loader2 size={14} className="animate-spin" /> : 'Update Records'}
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : editingEmployee ? 'Update Records' : 'Create Record'}
             </button>
           </div>
         </form>

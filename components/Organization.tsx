@@ -5,7 +5,7 @@ import {
   Briefcase, Trash2, Edit2, Users, Plus, X, Network, MapPin, 
   Globe, Navigation, Map as MapIcon, ChevronDown, ChevronRight, 
   Calendar, Minus, Layout, Search, Locate, Target, UserPlus, 
-  RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare
+  RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare, Layers
 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
@@ -65,10 +65,11 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
 };
 
 const Organization = () => {
-  const { currentUser, projects, positions, employees, addProject, updateProject, deleteProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast, syncAzureUsers } = useAppContext();
+  const { theme, currentUser, projects, positions, employees, addProject, updateProject, deleteProject, updatePosition, deletePosition, addEmployee, updateEmployee, deleteEmployee, showToast, syncAzureUsers } = useAppContext();
   const [activeTab, setActiveTab] = useState<'projects' | 'directory' | 'positions' | 'chart'>('directory');
   
   const [directorySearch, setDirectorySearch] = useState('');
+  const [isImagery, setIsImagery] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
   const graphicsLayerRef = useRef<any>(null);
@@ -76,10 +77,12 @@ const Organization = () => {
   // Modal State
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
+  const [showAddModalQuick, setShowAddModalQuick] = useState(false); // Quick add from sidebar
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [employeeFormData, setEmployeeFormData] = useState<any>(null);
+  const [isEditImagery, setIsEditImagery] = useState(false);
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -104,17 +107,41 @@ const Organization = () => {
       );
   }, [employees, directorySearch]);
 
+  // Handle Main Basemap Updates
+  useEffect(() => {
+    if (!viewInstanceRef.current) return;
+    const view = viewInstanceRef.current;
+    if (isImagery) {
+      view.map.basemap = "satellite";
+    } else {
+      view.map.basemap = theme === 'light' ? 'topo-vector' : 'dark-gray-vector';
+    }
+  }, [theme, isImagery]);
+
+  // Handle Edit Modal Basemap Updates
+  useEffect(() => {
+    if (!editMapViewRef.current) return;
+    const view = editMapViewRef.current;
+    if (isEditImagery) {
+      view.map.basemap = "satellite";
+    } else {
+      view.map.basemap = theme === 'light' ? 'topo-vector' : 'dark-gray-vector';
+    }
+  }, [theme, isEditImagery]);
+
   // Main Map Hook
   useEffect(() => {
     if (activeTab !== 'directory' || !mapContainerRef.current) return;
 
     loadModules([
       "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", 
-      "esri/widgets/Home", "esri/widgets/BasemapGallery", "esri/widgets/Expand", "esri/Basemap"
-    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Home, BasemapGallery, Expand, Basemap]) => {
+      "esri/widgets/Home"
+    ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Home]) => {
         if (!mapContainerRef.current) return;
 
-        const map = new EsriMap({ basemap: "streets-vector" });
+        const initialBasemap = isImagery ? "satellite" : (theme === 'light' ? 'topo-vector' : 'dark-gray-vector');
+        
+        const map = new EsriMap({ basemap: initialBasemap });
         const view = new MapView({
           container: mapContainerRef.current,
           map: map,
@@ -135,29 +162,6 @@ const Organization = () => {
 
         view.when(() => {
             view.ui.add(new Home({ view: view }), "top-left");
-            
-            const basemapGallery = new BasemapGallery({
-              view: view,
-              source: [
-                Basemap.fromId("streets-vector"),
-                Basemap.fromId("satellite"),
-                Basemap.fromId("hybrid"),
-                Basemap.fromId("topo-vector"),
-                Basemap.fromId("dark-gray-vector"),
-                Basemap.fromId("gray-vector"),
-                Basemap.fromId("osm")
-              ]
-            });
-
-            const bgExpand = new Expand({ 
-              view: view, 
-              content: basemapGallery, 
-              expanded: false, 
-              group: "top-left", 
-              tooltip: "Select Basemap"
-            });
-            view.ui.add(bgExpand, "top-left");
-
             refreshMapMarkers(filteredDirectoryEmployees);
         }).catch((err: any) => console.error("Map initialization failed", err));
     }).catch(err => console.error("ArcGIS load failed:", err));
@@ -180,14 +184,15 @@ const Organization = () => {
 
   // Edit Modal Map Hook
   useEffect(() => {
-    if (!editingEmployee || !editMapRef.current) return;
+    if ((!editingEmployee && !showAddModalQuick) || !editMapRef.current) return;
 
     loadModules([
       "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer",
-      "esri/widgets/BasemapGallery", "esri/widgets/Expand", "esri/widgets/Home", "esri/Basemap"
+      "esri/widgets/Home"
     ], { css: true })
-      .then(([EsriMap, MapView, Graphic, GraphicsLayer, BasemapGallery, Expand, Home, Basemap]) => {
-        const map = new EsriMap({ basemap: "streets-vector" });
+      .then(([EsriMap, MapView, Graphic, GraphicsLayer, Home]) => {
+        const initialBasemap = isEditImagery ? "satellite" : (theme === 'light' ? 'topo-vector' : 'dark-gray-vector');
+        const map = new EsriMap({ basemap: initialBasemap });
         const view = new MapView({
           container: editMapRef.current!,
           map: map,
@@ -198,22 +203,6 @@ const Organization = () => {
 
         view.when(() => {
             view.ui.add(new Home({ view: view }), "top-left");
-            const bgExpand = new Expand({ 
-              view: view, 
-              content: new BasemapGallery({ 
-                view: view,
-                source: [
-                    Basemap.fromId("streets-vector"),
-                    Basemap.fromId("satellite"),
-                    Basemap.fromId("topo-vector"),
-                    Basemap.fromId("dark-gray-vector")
-                ]
-              }), 
-              expanded: false,
-              group: "top-left",
-              tooltip: "Change Basemap"
-            });
-            view.ui.add(bgExpand, "top-left");
         });
 
         const layer = new GraphicsLayer();
@@ -249,7 +238,7 @@ const Organization = () => {
       });
 
     return () => editMapViewRef.current?.destroy();
-  }, [!!editingEmployee]);
+  }, [!!editingEmployee, showAddModalQuick]);
 
   const refreshMapMarkers = async (list: Employee[]) => {
       if (!graphicsLayerRef.current) return;
@@ -342,10 +331,17 @@ const Organization = () => {
       e.preventDefault();
       if (!employeeFormData) return;
       setIsProcessing(true);
-      await updateEmployee(employeeFormData);
+      if (editingEmployee) {
+          await updateEmployee(employeeFormData);
+          setEditingEmployee(null);
+      } else {
+          // It's a new employee from the quick add
+          const { provisionInAzure, ...empData } = employeeFormData;
+          await useAppContext().inviteEmployee(empData);
+          setShowAddModalQuick(false);
+      }
       setIsProcessing(false);
-      setEditingEmployee(null);
-      showToast("Employee details synchronized.", "success");
+      showToast("Records synchronized.", "success");
   };
 
   const handleUpdatePosition = async (e: React.FormEvent) => {
@@ -362,6 +358,16 @@ const Organization = () => {
       setIsSyncing(true);
       await syncAzureUsers();
       setIsSyncing(false);
+  };
+
+  const openQuickAdd = () => {
+      setEditingEmployee(null);
+      setEmployeeFormData({
+          firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE,
+          salary: 0, position: '', provisionInAzure: false, managerId: '',
+          location: { latitude: 20.5937, longitude: 78.9629, address: '' }
+      });
+      setShowAddModalQuick(true);
   };
 
   return (
@@ -421,8 +427,19 @@ const Organization = () => {
                        <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building2 size={14} className="text-teal-600"/> Corporate Directory</h3>
-                               <div className="bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-lg border border-teal-100 dark:border-teal-800 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase">
-                                   {filteredDirectoryEmployees.length} Total
+                               <div className="flex items-center gap-2">
+                                    {isPowerUser && (
+                                        <button 
+                                            onClick={openQuickAdd}
+                                            className="p-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition shadow-sm"
+                                            title="Quick Add Employee"
+                                        >
+                                            <Plus size={14} />
+                                        </button>
+                                    )}
+                                    <div className="bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-lg border border-teal-100 dark:border-teal-800 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase">
+                                        {filteredDirectoryEmployees.length} Total
+                                    </div>
                                </div>
                            </div>
                            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1.5">
@@ -472,6 +489,21 @@ const Organization = () => {
                    <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
                        <div ref={mapContainerRef} className="w-full h-full z-0 grayscale-[0.2] contrast-[1.1]"></div>
                        
+                       {/* Custom Basemap Toggle Overlay */}
+                       <div className="absolute top-4 left-14 z-10">
+                            <button 
+                                onClick={() => setIsImagery(!isImagery)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xl transition-all duration-300 backdrop-blur-md font-black text-[10px] uppercase tracking-widest ${
+                                    isImagery 
+                                    ? 'bg-teal-600 border-teal-500 text-white' 
+                                    : 'bg-white/80 dark:bg-slate-900/80 border-white/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900'
+                                }`}
+                            >
+                                <Layers size={14} />
+                                <span>{isImagery ? 'Map View' : 'Imagery'}</span>
+                            </button>
+                       </div>
+
                        {/* Floating UI Overlays */}
                        <div className="absolute top-6 right-6 z-10 hidden sm:flex flex-col gap-3 pointer-events-none">
                            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-xl pointer-events-auto">
@@ -570,7 +602,7 @@ const Organization = () => {
            <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />
        </DraggableModal>
 
-       <DraggableModal isOpen={!!editingEmployee} onClose={() => setEditingEmployee(null)} title="Modify Employee Profile" width="max-w-3xl">
+       <DraggableModal isOpen={!!editingEmployee || showAddModalQuick} onClose={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} title={editingEmployee ? "Modify Employee Profile" : "Add New Employee"} width="max-w-3xl">
            <form onSubmit={handleUpdateEmployee} className="space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</label><input required type="text" value={employeeFormData?.firstName || ''} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-inner" /></div>
@@ -580,10 +612,34 @@ const Organization = () => {
                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Designation</label><select required value={employeeFormData?.position || ''} onChange={e => setEmployeeFormData({...employeeFormData, position: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500"><option value="" disabled>Select Position...</option>{positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}</select></div>
                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Employment State</label><select required value={employeeFormData?.status || EmployeeStatus.ACTIVE} onChange={e => setEmployeeFormData({...employeeFormData, status: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500"><option value={EmployeeStatus.ACTIVE}>Active</option><option value={EmployeeStatus.ON_LEAVE}>On Leave</option><option value={EmployeeStatus.INACTIVE}>Inactive</option></select></div>
                </div>
+               
+               {showAddModalQuick && (
+                <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+                    <input 
+                        type="checkbox" 
+                        id="provisionAzureQuick" 
+                        checked={employeeFormData?.provisionInAzure || false} 
+                        onChange={e => setEmployeeFormData({...employeeFormData, provisionInAzure: e.target.checked})}
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="provisionAzureQuick" className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-tight">Provision in Azure AD (Microsoft 365)</label>
+                </div>
+               )}
+
                <div>
                    <div className="flex items-center justify-between mb-2 px-1">
                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2"><LocateFixed size={12} className="text-teal-600"/> GLOBAL POSITIONING</label>
-                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Click on map to calibrate</span>
+                       <div className="flex items-center gap-2">
+                           <button 
+                                type="button"
+                                onClick={() => setIsEditImagery(!isEditImagery)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase transition-all ${isEditImagery ? 'bg-teal-600 border-teal-500 text-white shadow-lg shadow-teal-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'}`}
+                           >
+                               <Layers size={10} />
+                               {isEditImagery ? 'Map' : 'Imagery'}
+                           </button>
+                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Click map to calibrate</span>
+                       </div>
                    </div>
                    <div ref={editMapRef} className="h-64 rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 shadow-2xl overflow-hidden grayscale-[0.2] contrast-[1.1]"></div>
                    <div className="flex justify-between mt-3 px-4 py-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700 text-[10px] font-black font-mono text-slate-400">
@@ -592,8 +648,8 @@ const Organization = () => {
                    </div>
                </div>
                <div className="flex justify-end gap-3 pt-8 border-t dark:border-slate-700">
-                   <button type="button" onClick={() => setEditingEmployee(null)} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">ABORT CHANGES</button>
-                   <button type="submit" disabled={isProcessing} className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/30 hover:bg-teal-700 transition flex items-center gap-2 active:scale-95">{isProcessing ? <Loader2 size={16} className="animate-spin" /> : 'COMMIT UPDATES'}</button>
+                   <button type="button" onClick={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">ABORT CHANGES</button>
+                   <button type="submit" disabled={isProcessing} className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/30 hover:bg-teal-700 transition flex items-center gap-2 active:scale-95">{isProcessing ? <Loader2 size={16} className="animate-spin" /> : editingEmployee ? 'COMMIT UPDATES' : 'CREATE RECORD'}</button>
                </div>
            </form>
        </DraggableModal>
