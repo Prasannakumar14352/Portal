@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, LogOut, ChevronDown, User as UserIcon, Info, AlertTriangle, CheckCircle, XCircle, Menu, Moon, Sun } from 'lucide-react';
 import { User } from '../types';
@@ -51,7 +50,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-800 dark:border-slate-700 border-b border-slate-200 fixed top-0 right-0 left-0 md:left-64 z-10 flex items-center justify-between px-4 md:px-8 shadow-sm transition-all duration-300">
+    <header className="h-16 bg-white dark:bg-slate-800 dark:border-slate-700 border-b border-slate-200 fixed top-0 right-0 left-0 md:left-64 z-40 flex items-center justify-between px-4 md:px-8 shadow-sm transition-all duration-300">
       <div className="flex items-center gap-3">
         <button 
             onClick={onMenuClick}

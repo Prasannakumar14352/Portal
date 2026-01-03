@@ -491,8 +491,8 @@ const Organization = () => {
                    <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
                        <div ref={mapContainerRef} className="w-full h-full z-0 grayscale-[0.2] contrast-[1.1]"></div>
                        
-                       {/* Custom Basemap Toggle Overlay */}
-                       <div className="absolute top-4 left-14 z-10">
+                       {/* Custom Basemap Toggle Overlay - Moved slightly further from edge */}
+                       <div className="absolute top-4 left-16 z-10">
                             <button 
                                 onClick={() => setIsImagery(!isImagery)}
                                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xl transition-all duration-300 backdrop-blur-md font-black text-[10px] uppercase tracking-widest ${
@@ -506,8 +506,8 @@ const Organization = () => {
                             </button>
                        </div>
 
-                       {/* Floating UI Overlays */}
-                       <div className="absolute top-6 right-6 z-10 hidden sm:flex flex-col gap-3 pointer-events-none">
+                       {/* Floating UI Overlays - Moved to Bottom Right to clear User Dropdown */}
+                       <div className="absolute bottom-6 right-6 z-10 hidden sm:flex flex-col gap-3 pointer-events-none">
                            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-xl pointer-events-auto">
                                <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Globe size={12}/> Regional Sync</h4>
                                <div className="flex items-center gap-3">
