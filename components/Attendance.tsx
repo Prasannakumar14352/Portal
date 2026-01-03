@@ -61,8 +61,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     if (!currentUser) return undefined;
     const userRecords = records.filter(r => String(r.employeeId) === String(currentUser.id));
     // Find the latest record that hasn't been checked out
+    // Ensuring we treat empty string or null as unclosed
     return userRecords
-      .filter(r => !r.checkOut)
+      .filter(r => !r.checkOut || r.checkOut === "")
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   }, [records, currentUser]);
 
@@ -239,12 +240,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
              {!pendingRecord ? (
                 <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-36 h-36 bg-emerald-50 dark:bg-emerald-900/10 rounded-full border-4 border-emerald-100 dark:border-emerald-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-emerald-500/5">
                    <PlayCircle size={44} className="text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform" />
-                   <span className="font-black text-[10px] text-emerald-700 dark:text-emerald-500 uppercase tracking-widest">Punch In</span>
+                   <span className="font-black text-[10px] text-emerald-700 dark:text-emerald-500 uppercase tracking-widest">Check In</span>
                 </button>
              ) : (
                 <button onClick={handleCheckOutClick} className="flex flex-col items-center justify-center w-36 h-36 bg-rose-50 dark:bg-rose-900/10 rounded-full border-4 border-rose-100 dark:border-rose-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-rose-500/5">
                    <StopCircle size={44} className="text-rose-600 mb-1.5 group-hover:scale-110 transition-transform" />
-                   <span className="font-black text-[10px] text-rose-700 dark:text-rose-500 uppercase tracking-widest">Punch Out</span>
+                   <span className="font-black text-[10px] text-rose-700 dark:text-rose-500 uppercase tracking-widest">Check Out</span>
                    <span className="text-xs font-mono font-bold text-slate-500 mt-1">{calculateDuration(pendingRecord)}</span>
                    {pendingRecord.date < formatDateISO(new Date()) && (
                        <span className="text-[8px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-black uppercase mt-1">Pending Sync</span>
@@ -462,7 +463,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </div>
               </div>
 
-              <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black shadow-lg shadow-teal-500/20 text-xs uppercase tracking-widest hover:bg-teal-700 transition active:scale-95">Close Session & Punch Out</button>
+              <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black shadow-lg shadow-teal-500/20 text-xs uppercase tracking-widest hover:bg-teal-700 transition active:scale-95">Close Session & Check Out</button>
           </form>
       </DraggableModal>
 
