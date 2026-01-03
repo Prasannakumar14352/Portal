@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, User } from '../types';
@@ -68,9 +67,8 @@ const Profile = () => {
     }
   }, [currentUser]);
 
-  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
-  const canEditAdminFields = isEditMode && isHR;
-  const canEditPersonalFields = isEditMode;
+  // Relaxed permissions: Users can edit their own profiles
+  const canEditAnyField = isEditMode;
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -130,8 +128,8 @@ const Profile = () => {
       <div className="flex justify-between items-center">
         <div><h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">My Profile</h2><p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Personal and professional identity.</p></div>
         <div className="flex gap-3">
-          {!isEditMode ? (<button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-3 rounded-2xl font-bold text-sm shadow-sm transition-all"><Edit3 size={18} /><span>Edit</span></button>) : (
-            <><button onClick={() => { if(currentUser) initializeFormData(currentUser); setIsEditMode(false); }} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 px-6 py-3 rounded-2xl font-bold text-sm">Cancel</button><button onClick={() => setShowConfirm(true)} disabled={isSaving} className="flex items-center gap-2 bg-teal-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-teal-500/20">{isSaving ? <Clock className="animate-spin" size={18} /> : <Save size={18} />}<span>Save</span></button></>
+          {!isEditMode ? (<button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-3 rounded-2xl font-bold text-sm shadow-sm transition-all"><Edit3 size={18} /><span>Edit Profile</span></button>) : (
+            <><button onClick={() => { if(currentUser) initializeFormData(currentUser); setIsEditMode(false); }} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 px-6 py-3 rounded-2xl font-bold text-sm">Cancel</button><button onClick={() => setShowConfirm(true)} disabled={isSaving} className="flex items-center gap-2 bg-teal-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-teal-500/20">{isSaving ? <Clock className="animate-spin" size={18} /> : <Save size={18} />}<span>Save Changes</span></button></>
           )}
         </div>
       </div>
@@ -148,14 +146,28 @@ const Profile = () => {
         <div className="lg:col-span-8 space-y-8">
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
                 <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600"><UserIcon size={20} /></div><h3 className="text-xl font-bold text-slate-800 dark:text-white">Profile Detail</h3></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><InputField label="Name" icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} disabled={!canEditAdminFields} /><InputField label="Phone" icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} disabled={!canEditPersonalFields} /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputField label="Name" icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} disabled={!canEditAnyField} />
+                  <InputField label="Phone" icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} disabled={!canEditAnyField} />
+                </div>
             </div>
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
                 <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl text-emerald-600"><Briefcase size={20} /></div><h3 className="text-xl font-bold text-slate-800 dark:text-white">Employment</h3></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputField label="Designation" icon={UserSquare} value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} disabled={!canEditAdminFields} />
+                    <InputField label="Designation" icon={UserSquare} value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} disabled={!canEditAnyField} />
                     <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Working Model</label><div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100' : 'bg-white dark:bg-slate-800 border-slate-200 focus-within:ring-2 focus-within:ring-teal-500/20'}`}><Clock size={18} className="text-slate-400" /><select disabled={!isEditMode} value={formData.workLocation} onChange={e => setFormData({...formData, workLocation: e.target.value})} className="w-full bg-transparent outline-none text-sm font-medium dark:text-slate-200 appearance-none">{WORK_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}</select></div></div>
-                    <InputField label="Join Date" icon={Calendar} type="date" value={formData.hireDate} onChange={(v: string) => setFormData({...formData, hireDate: v})} disabled={!canEditAdminFields} />
+                    <InputField label="Join Date" icon={Calendar} type="date" value={formData.hireDate} onChange={(v: string) => setFormData({...formData, hireDate: v})} disabled={!canEditAnyField} />
+                </div>
+                <div className="space-y-1.5 pt-2">
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase ml-1">Professional Bio</label>
+                    <textarea 
+                      disabled={!canEditAnyField}
+                      value={formData.bio}
+                      onChange={e => setFormData({...formData, bio: e.target.value})}
+                      rows={4}
+                      className={`w-full p-4 rounded-xl border transition-all outline-none text-sm leading-relaxed ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 text-slate-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-teal-500/20 dark:text-slate-200'}`}
+                      placeholder="Share your expertise and experience..."
+                    />
                 </div>
             </div>
         </div>

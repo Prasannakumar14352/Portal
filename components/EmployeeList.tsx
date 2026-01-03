@@ -44,6 +44,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
   const mapDivRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<any>(null);
 
+  // Strict check for HR or Admin roles
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => {
@@ -173,7 +174,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Directory Management</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Manage employees and external directory synchronization.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">View employees and manage organizational access.</p>
         </div>
         <div className="flex flex-wrap gap-2">
             {isPowerUser && (

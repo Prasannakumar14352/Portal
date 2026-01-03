@@ -568,7 +568,11 @@ const Organization = () => {
            <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-slate-50 dark:bg-slate-900/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100 dark:border-slate-700">
-                        <tr><th className="px-8 py-6">ROLE TITLE</th><th className="px-8 py-6">CORE RESPONSIBILITIES</th><th className="px-8 py-6 text-right w-32">ACTIONS</th></tr>
+                        <tr>
+                            <th className="px-8 py-6">ROLE TITLE</th>
+                            <th className="px-8 py-6">CORE RESPONSIBILITIES</th>
+                            {isPowerUser && <th className="px-8 py-6 text-right w-32">ACTIONS</th>}
+                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                         {positions.map(pos => (
@@ -580,12 +584,14 @@ const Organization = () => {
                                     </div>
                                 </td>
                                 <td className="px-8 py-6 text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{pos.description}</td>
-                                <td className="px-8 py-6 text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <button onClick={() => setEditingPosition(pos)} className="p-2 text-slate-300 hover:text-teal-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-transparent transition-all"><Edit2 size={16}/></button>
-                                        <button onClick={() => deletePosition(pos.id)} className="p-2 text-slate-300 hover:text-rose-600 transition-all"><Trash2 size={16}/></button>
-                                    </div>
-                                </td>
+                                {isPowerUser && (
+                                    <td className="px-8 py-6 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button onClick={() => setEditingPosition(pos)} className="p-2 text-slate-300 hover:text-teal-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-transparent transition-all"><Edit2 size={16}/></button>
+                                            <button onClick={() => deletePosition(pos.id)} className="p-2 text-slate-300 hover:text-rose-600 transition-all"><Trash2 size={16}/></button>
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>
