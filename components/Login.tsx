@@ -34,23 +34,38 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     const trimmedEmail = email.trim();
-    // Smart Login Dispatcher:
-    // Check if user exists in local DB and is flagged for MS Auth OR uses a common MS domain
     const targetUser = employees.find(emp => emp.email.toLowerCase() === trimmedEmail.toLowerCase());
+
+    // Priority 1: If a password is provided and the user isn't strictly an SSO-only user, try local login first.
+    if (password && (!targetUser || targetUser.password !== 'ms-auth-user')) {
+        const success = await login(trimmedEmail, password);
+        if (success) {
+            setIsLoading(false);
+            return;
+        }
+        // If local login failed with the provided password, we proceed to check for MS SSO fallback.
+    }
+
+    // Priority 2: SSO Flow
+    // Trigger if strictly SSO user OR no password provided for a Microsoft domain
     const isMSAccount = (targetUser && targetUser.password === 'ms-auth-user') || isMicrosoftDomain(trimmedEmail);
     
     if (isMSAccount) {
         showToast("Microsoft account detected. Launching secure sign-in...", "info");
-        const success = await loginWithMicrosoft();
+        // Pass the entered email as a loginHint to skip the "Pick an account" screen
+        const success = await loginWithMicrosoft(trimmedEmail);
         if (!success) {
             showToast("Microsoft authentication was cancelled or failed.", "error");
         }
-        setIsLoading(false);
-        return;
+    } else {
+        // Standard local login fallback if not a Microsoft account
+        if (!password) {
+            showToast("Please enter a password for this local account.", "warning");
+        } else {
+            await login(trimmedEmail, password);
+        }
     }
-
-    // Normal Local Login Flow
-    await login(trimmedEmail, password);
+    
     setIsLoading(false);
   };
   
@@ -129,11 +144,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <input 
                             type="password" 
                             className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                            placeholder="Your password (leave blank for SSO)"
+                            placeholder={isMicrosoftDomain(email) ? "Optional for Microsoft SSO" : "Your password"}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />
                     </div>
+                    {isMicrosoftDomain(email) && (
+                        <p className="text-[10px] text-teal-600 font-bold mt-1.5 uppercase tracking-tight flex items-center gap-1">
+                            <Sparkles size={10}/> Tip: Leave password blank to sign in via Microsoft 365
+                        </p>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-between">

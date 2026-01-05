@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -68,7 +67,7 @@ interface AppContextType {
   toggleTheme: () => void;
   refreshData: () => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
-  loginWithMicrosoft: () => Promise<boolean>;
+  loginWithMicrosoft: (emailHint?: string) => Promise<boolean>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<boolean>;
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
@@ -295,14 +294,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
-  const loginWithMicrosoft = async (): Promise<boolean> => {
+  const loginWithMicrosoft = async (emailHint?: string): Promise<boolean> => {
     if (isInteracting) return false;
     let instance = msalInstance || await initMsal();
     if (!instance) return false;
     setIsInteracting(true);
     try {
         await instance.handleRedirectPromise();
-        const result = await instance.loginPopup(loginRequest);
+        // Use loginHint to skip the 'Pick an account' screen
+        const result = await instance.loginPopup({
+            ...loginRequest,
+            loginHint: emailHint
+        });
         if (result && result.account) {
             const ok = await processAzureLogin(result.account, result.accessToken);
             setIsInteracting(false);
