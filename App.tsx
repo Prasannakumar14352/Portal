@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -14,6 +13,7 @@ import Reports from './components/Reports';
 import Profile from './components/Profile';
 import Holidays from './components/Holidays';
 import Payslips from './components/Payslips';
+import Settings from './components/Settings';
 import { User, UserRole, LeaveRequest, LeaveStatus } from './types';
 import { useAppContext } from './contexts/AppContext';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
@@ -28,7 +28,8 @@ const viewToPath: Record<string, string> = {
   'holidays': 'holidays',
   'payslips': 'payslips',
   'profile': 'profile',
-  'ai-assistant': 'ai-assistant'
+  'ai-assistant': 'ai-assistant',
+  'settings': 'settings'
 };
 
 const pathToView: Record<string, string> = Object.fromEntries(
@@ -190,6 +191,8 @@ const App: React.FC = () => {
         return <Holidays />;
       case 'payslips':
         return <Payslips />;
+      case 'settings':
+        return <Settings />;
       case 'leaves':
         return (
           <LeaveManagement 

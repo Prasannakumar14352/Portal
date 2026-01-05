@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import { Lock, Mail, ChevronRight, Loader2, CheckCircle2, Layout, User as UserIcon, Building2, Users, Clock, Sparkles, X, ShieldCheck, FileText, ArrowLeft } from 'lucide-react';
@@ -21,45 +20,53 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [resetUsername, setResetUsername] = useState('');
   const [isResetting, setIsResetting] = useState(false);
 
-  // Check if Mock Data is enabled (default true unless explicitly set to 'false')
+  // Check if Mock Data is enabled
   const showDemoAccess = process.env.VITE_USE_MOCK_DATA !== 'false';
+
+  const isMicrosoftDomain = (emailStr: string) => {
+      const domains = ['outlook.com', 'hotmail.com', 'live.com', 'microsoft.com', 'msn.com'];
+      const domain = emailStr.split('@')[1]?.toLowerCase();
+      return domains.includes(domain);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Smart Login Check:
-    const targetUser = employees.find(emp => emp.email.toLowerCase() === email.trim().toLowerCase());
+    const trimmedEmail = email.trim();
+    // Smart Login Dispatcher:
+    // Check if user exists in local DB and is flagged for MS Auth OR uses a common MS domain
+    const targetUser = employees.find(emp => emp.email.toLowerCase() === trimmedEmail.toLowerCase());
+    const isMSAccount = (targetUser && targetUser.password === 'ms-auth-user') || isMicrosoftDomain(trimmedEmail);
     
-    if (targetUser && targetUser.password === 'ms-auth-user') {
-        showToast("This account uses Microsoft Sign-In. Redirecting...", "info");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await loginWithMicrosoft();
+    if (isMSAccount) {
+        showToast("Microsoft account detected. Launching secure sign-in...", "info");
+        const success = await loginWithMicrosoft();
+        if (!success) {
+            showToast("Microsoft authentication was cancelled or failed.", "error");
+        }
         setIsLoading(false);
         return;
     }
 
-    // Normal Login Flow
-    await new Promise(resolve => setTimeout(resolve, 800));
-    await login(email, password);
+    // Normal Local Login Flow
+    await login(trimmedEmail, password);
     setIsLoading(false);
-  };
-
-  const handleMicrosoftLogin = async () => {
-      setIsLoading(true);
-      await loginWithMicrosoft();
-      setIsLoading(false);
   };
   
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!resetEmail) return;
+      
       setIsResetting(true);
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      await forgotPassword(resetEmail);
+      const success = await forgotPassword(resetEmail);
       setIsResetting(false);
-      setShowForgotPasswordModal(false);
-      setResetEmail('');
-      setResetUsername('');
+      
+      if (success) {
+          setShowForgotPasswordModal(false);
+          setResetEmail('');
+          setResetUsername('');
+      }
   };
 
   const openForgotPassword = () => {
@@ -95,7 +102,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     Welcome back
                 </h2>
                 <p className="text-slate-500 mt-2">
-                    Sign in to your account to access the platform.
+                    Sign in with your organizational email to access the platform.
                 </p>
             </div>
 
@@ -108,7 +115,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             type="text"
                             required
                             className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                            placeholder="Your username or email"
+                            placeholder="Your email address"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
@@ -121,9 +128,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input 
                             type="password" 
-                            required
                             className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                            placeholder="Your password"
+                            placeholder="Your password (leave blank for SSO)"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />
@@ -143,7 +149,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <button 
                     type="submit" 
                     disabled={isLoading}
-                    className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-3.5 rounded-lg transition-all duration-200 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                    className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                 >
                     {isLoading ? (
                         <Loader2 className="animate-spin" size={20} />
@@ -153,26 +159,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </button>
             </form>
 
-            <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase tracking-widest">Or continue with</span>
-                <div className="flex-grow border-t border-slate-200"></div>
+            <div className="pt-4 flex items-center gap-2 text-xs text-slate-400 justify-center">
+                <ShieldCheck size={14} className="text-teal-600" />
+                <span>Encrypted connection with Microsoft 365 Bridge</span>
             </div>
-
-            <button 
-                type="button"
-                onClick={handleMicrosoftLogin}
-                disabled={isLoading}
-                className="w-full bg-white hover:bg-slate-50 text-slate-700 font-medium py-3 rounded-lg border border-slate-300 transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-70 shadow-sm"
-            >
-                <svg width="20" height="20" viewBox="0 0 23 23">
-                    <path fill="#f35325" d="M1 1h10v10H1z"/>
-                    <path fill="#81bc06" d="M12 1h10v10H12z"/>
-                    <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-                    <path fill="#ffba08" d="M12 12h10v10H1z"/>
-                </svg>
-                Sign in with Microsoft
-            </button>
 
             {/* Demo Credentials Helper */}
             {showDemoAccess && (
@@ -261,34 +251,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     </div>
                     
                     <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                        Enter your username and email to request a password reset. For security reasons, an administrator must review and process your request before a new password is issued.
+                        Enter your registered email address to request a secure password reset. An email with reset instructions will be sent immediately.
                     </p>
 
                     <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Username</label>
-                            <div className="relative">
-                                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input 
-                                    type="text"
-                                    required
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                                    placeholder="Your username"
-                                    value={resetUsername}
-                                    onChange={(e) => setResetUsername(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Email Address</label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                 <input 
                                     type="email"
                                     required
                                     className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                                    placeholder="Your email"
+                                    placeholder="yourname@empower.com"
                                     value={resetEmail}
                                     onChange={(e) => setResetEmail(e.target.value)}
                                 />
@@ -308,7 +283,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 disabled={isResetting}
                                 className="px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg transition-all shadow-md flex items-center justify-center min-w-[140px]"
                             >
-                                {isResetting ? <Loader2 className="animate-spin" size={20} /> : 'Submit Request'}
+                                {isResetting ? <Loader2 className="animate-spin" size={20} /> : 'Send Reset Link'}
                             </button>
                         </div>
                     </form>
@@ -318,7 +293,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div className="w-full md:w-1/2 bg-teal-700 p-8 md:p-12 text-white flex flex-col justify-center">
                     <h3 className="text-2xl font-bold mb-4">Reset Your Password</h3>
                     <p className="text-teal-100 text-sm mb-8 leading-relaxed">
-                        We understand you might need to reset your password sometimes. Please provide your username and email address. For security reasons, an administrator must review and process your request.
+                        We use a multi-layered security approach for account recovery. If you use a Microsoft account, you should follow the standard Microsoft password reset procedure.
                     </p>
                     
                     <ul className="space-y-6">
@@ -331,13 +306,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <li className="flex items-start gap-3">
                             <Users className="text-teal-300 flex-shrink-0" size={24} />
                             <div>
-                                <h4 className="font-semibold text-sm">Administrator approval required</h4>
+                                <h4 className="font-semibold text-sm">Automated Link Generation</h4>
                             </div>
                         </li>
                         <li className="flex items-start gap-3">
                             <Mail className="text-teal-300 flex-shrink-0" size={24} />
                             <div>
-                                <h4 className="font-semibold text-sm">Email notification when new password is issued</h4>
+                                <h4 className="font-semibold text-sm">Direct SMTP delivery</h4>
                             </div>
                         </li>
                     </ul>

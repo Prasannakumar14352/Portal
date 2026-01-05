@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -247,6 +246,37 @@ apiRouter.post('/notify/leave-request', async (req, res) => {
         });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PASSWORD RESET NOTIFICATION ROUTE
+apiRouter.post('/notify/reset-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const resetToken = Math.random().toString(36).substring(2, 15);
+        const resetLink = `${process.env.FRONTEND_URL || 'https://empowercorp.portal'}?reset=${resetToken}`;
+        
+        await transporter.sendMail({
+            from: `"EmpowerCorp Security" <${SMTP_USER}>`,
+            to: email,
+            subject: `Account Recovery Request - EmpowerCorp HR`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #0d9488;">Password Recovery</h2>
+                    <p>A request was made to reset the password for your account associated with <strong>${email}</strong>.</p>
+                    <p>To proceed, please click the secure link below:</p>
+                    <div style="margin: 30px 0; text-align: center;">
+                        <a href="${resetLink}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset My Password</a>
+                    </div>
+                    <p style="color: #666; font-size: 12px;">If you did not request this, please ignore this email or contact HR support if you believe your account is compromised.</p>
+                    <p style="color: #666; font-size: 12px;">This link will expire in 1 hour.</p>
+                </div>
+            `
+        });
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Mail Error:", err);
+        res.status(500).json({ error: "Failed to send reset email" });
+    }
 });
 
 app.use('/api', apiRouter);

@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { LayoutDashboard, Users, Calendar, Clock, MessageSquareText, Building2, Timer, BarChart3, FileText, Coffee, X } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, MessageSquareText, Building2, Timer, BarChart3, FileText, Coffee, X, Settings } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface SidebarProps {
@@ -19,6 +18,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
       { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'holidays', label: 'Holidays', icon: Coffee },
       { id: 'ai-assistant', label: 'HR Assistant', icon: MessageSquareText },
+      { id: 'settings', label: 'Settings', icon: Settings },
     ];
 
     if (userRole === UserRole.EMPLOYEE) {
@@ -31,7 +31,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
         { id: 'payslips', label: 'Payslips', icon: FileText },
         commonItems[1], // Reports
         commonItems[2], // Holidays
-        commonItems[3]  // AI
+        commonItems[3], // AI
+        commonItems[4]  // Settings
       ];
     }
 
@@ -45,7 +46,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
       { id: 'leaves', label: 'Leave Management', icon: Calendar },
       { id: 'payslips', label: 'Payslips', icon: FileText },
       commonItems[2], // Holidays
-      commonItems[3]  // AI
+      commonItems[3], // AI
+      commonItems[4]  // Settings
     ];
   };
 

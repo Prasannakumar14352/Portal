@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -294,79 +295,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
-  const inviteEmployee = async (data: Partial<Invitation>) => {
-    try {
-        const id = Math.random().toString(36).substr(2, 9);
-        const token = Math.random().toString(36).substring(2, 15);
-        const newInvitation: Invitation = {
-          id, email: data.email!, firstName: data.firstName!, lastName: data.lastName!,
-          role: data.role!, position: data.position!, department: data.department!,
-          salary: data.salary || 0, invitedDate: formatDateISO(new Date()), token,
-          provisionInAzure: data.provisionInAzure || false
-        };
-        
-        await db.addInvitation(newInvitation);
-        await refreshData();
-        showToast(`Invitation sent and saved for ${data.email}`, 'success');
-    } catch (err: any) {
-        console.error("Invitation Flow Error:", err);
-        showToast(`Action failed: ${err.message}`, 'error');
-    }
-  };
-
-  const acceptInvitation = async (id: string) => {
-    const invite = invitations.find(inv => inv.id === id);
-    if (!invite) return;
-
-    if (invite.provisionInAzure) {
-      if (!msalInstance) {
-          showToast("Azure setup skipped: MSAL not initialized.", "warning");
-      } else {
-          const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
-          if (!account) {
-              showToast("Azure setup failed: Administrator must be signed in with Microsoft.", "error");
-              return;
-          }
-          try {
-              const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All", "User.Read.All"], account: account });
-              const existingAzureUsers = await microsoftGraphService.fetchActiveUsers(tokenResponse.accessToken);
-              const alreadyInAzure = existingAzureUsers.some(au => au.mail?.toLowerCase() === invite.email.toLowerCase() || au.userPrincipalName?.toLowerCase() === invite.email.toLowerCase());
-              
-              if (alreadyInAzure) {
-                  showToast("User already exists in Azure. Linking locally...", "info");
-              } else {
-                  await microsoftGraphService.createUser(tokenResponse.accessToken, { ...invite, jobTitle: invite.position, password: "EmpowerUser2025!" });
-                  showToast("Provisioned in Azure successfully.", "success");
-              }
-          } catch (err: any) { 
-              console.error("Azure Provisioning Error:", err);
-              showToast(`Azure Error: ${err.message}`, "error");
-              return;
-          }
-      }
-    }
-
-    const currentDepts = await db.getDepartments();
-    const currentEmps = await db.getEmployees();
-    const numericIds = Array.isArray(currentEmps) ? currentEmps.map(e => Number(e.id)).filter(id => !isNaN(id)) : [];
-    const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1001;
-    const matchedDept = Array.isArray(currentDepts) ? currentDepts.find(d => d.name === invite.department) : null;
-    
-    const newEmp: Employee = {
-      id: nextId, employeeId: `${nextId}`, firstName: invite.firstName, lastName: invite.lastName, email: invite.email,
-      password: invite.provisionInAzure ? 'ms-auth-user' : 'password123', 
-      role: invite.role, position: invite.position, department: invite.department,
-      departmentId: matchedDept ? matchedDept.id : '', joinDate: formatDateISO(new Date()), status: EmployeeStatus.ACTIVE,
-      salary: invite.salary, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.firstName + ' ' + invite.lastName)}&background=0D9488&color=fff`,
-      jobTitle: invite.position, phone: '', workLocation: 'Office HQ India'
-    };
-    
-    await db.addEmployee(newEmp);
-    await db.deleteInvitation(id);
-    await refreshData();
-    showToast(`${invite.firstName} has joined the team!`, 'success');
-  };
-
   const loginWithMicrosoft = async (): Promise<boolean> => {
     if (isInteracting) return false;
     let instance = msalInstance || await initMsal();
@@ -384,9 +312,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return false;
     } catch (error: any) { 
         setIsInteracting(false);
-        showToast("Microsoft Sign-In failed.", "error");
+        console.error("Microsoft Sign-In Error:", error);
         return false;
     }
+  };
+
+  const forgotPassword = async (email: string): Promise<boolean> => {
+      try {
+          const res = await fetch(`${API_BASE}/notify/reset-password`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email })
+          });
+          if (!res.ok) throw new Error("Server error");
+          showToast("Password reset email sent. Please check your inbox.", "success");
+          return true;
+      } catch (err) {
+          console.error("Reset Password Error:", err);
+          showToast("Failed to send reset email. Contact IT Support.", "error");
+          return false;
+      }
   };
 
   const syncAzureUsers = async () => {
@@ -581,10 +526,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  // Fix: Adding inviteEmployee implementation to fix AppContext scope error
+  const inviteEmployee = async (data: Partial<Invitation>) => {
+    const invite: Invitation = {
+      id: Math.random().toString(36).substr(2, 9),
+      token: Math.random().toString(36).substr(2, 15),
+      invitedDate: formatDateISO(new Date()),
+      email: data.email || '',
+      firstName: data.firstName || '',
+      lastName: data.lastName || '',
+      role: data.role || UserRole.EMPLOYEE,
+      position: data.position || '',
+      department: data.department || '',
+      salary: data.salary || 0,
+      provisionInAzure: !!data.provisionInAzure
+    };
+
+    if (invite.provisionInAzure && msalInstance) {
+        try {
+            const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+            if (account) {
+                const tokenResponse = await msalInstance.acquireTokenSilent({ scopes: ["User.ReadWrite.All"], account });
+                await microsoftGraphService.createUser(tokenResponse.accessToken, invite);
+                showToast("User provisioned in Azure AD", "success");
+            }
+        } catch (e) {
+            console.error("Azure Provisioning failed during invite:", e);
+            showToast("Azure provisioning failed, but local invite created.", "warning");
+        }
+    }
+
+    await db.addInvitation(invite);
+    showToast(`Invitation sent to ${invite.email}`, "success");
+    await refreshData();
+  };
+
+  // Fix: Adding acceptInvitation implementation to fix AppContext scope error
+  const acceptInvitation = async (id: string) => {
+    const invite = invitations.find(i => String(i.id) === String(id));
+    if (!invite) {
+        showToast("Invitation not found", "error");
+        return;
+    }
+
+    const newEmp: Employee = {
+      id: Math.random().toString(36).substr(2, 9),
+      employeeId: `EMP-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      firstName: invite.firstName,
+      lastName: invite.lastName,
+      email: invite.email,
+      role: invite.role,
+      position: invite.position,
+      department: invite.department,
+      joinDate: formatDateISO(new Date()),
+      status: EmployeeStatus.ACTIVE,
+      salary: invite.salary,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.firstName + ' ' + invite.lastName)}&background=0D9488&color=fff`,
+    };
+
+    await db.addEmployee(newEmp);
+    await db.deleteInvitation(id);
+    await refreshData();
+    showToast("Employee account activated.", "success");
+  };
+
   const value = {
     employees, users: employees, invitations, departments, roles, positions, projects, leaves, leaveTypes, attendance, timeEntries, notifications, 
     holidays, payslips, toasts, isLoading, currentUser, theme,
-    login, loginWithMicrosoft, logout, forgotPassword: async () => true, refreshData, showToast, removeToast, toggleTheme,
+    login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     inviteEmployee, acceptInvitation, revokeInvitation: async (id: string) => { await db.deleteInvitation(id); await refreshData(); showToast("Invite revoked."); },
     addEmployee: async (emp: Employee) => { await db.addEmployee(emp); await refreshData(); showToast('Added.', 'success'); },
     updateEmployee: async (emp: Employee) => { await db.updateEmployee(emp); await refreshData(); showToast('Updated.', 'success'); },
@@ -614,8 +623,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTimeEntry: async (e: any) => { await db.addTimeEntry({...e, id: Math.random().toString(36).substr(2,9)}); await refreshData(); },
     updateTimeEntry: async (id: any, d: any) => { const ex = timeEntries.find(e => String(e.id) === String(id)); if(ex) { await db.updateTimeEntry({...ex, ...d}); await refreshData(); } },
     deleteTimeEntry: async (id: any) => { await db.deleteTimeEntry(id.toString()); await refreshData(); },
-    checkIn: async () => { if(!currentUser) return; try { const now = new Date(); const rec: AttendanceRecord = { id: Math.random().toString(36).substr(2,9), employeeId: currentUser.id, employeeName: currentUser.name, date: formatDateISO(now), checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: 'Present', workLocation: 'Office' }; await db.addAttendance(rec); await refreshData(); showToast("Punch In Successful", "success"); } catch(e) { showToast("Punch In Failed", "error"); } },
-    checkOut: async () => { if(!currentUser) return; const today = formatDateISO(new Date()); const rec = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today && !a.checkOut); if(rec) { try { const now = new Date(); await db.updateAttendance({...rec, checkOut: formatTime12(now), checkOutTime: now.toISOString()}); await refreshData(); showToast("Punch Out Successful", "success"); } catch(e) { showToast("Punch Out Failed", "error"); } } },
+    checkIn: async () => { if(!currentUser) return; try { const now = new Date(); const rec: AttendanceRecord = { id: Math.random().toString(36).substr(2,9), employeeId: currentUser.id, employeeName: currentUser.name, date: formatDateISO(now), checkIn: formatTime12(now), checkInTime: now.toISOString(), checkOut: '', status: 'Present', workLocation: 'Office' }; await db.addAttendance(rec); await refreshData(); showToast("Check In Successful", "success"); } catch(e) { showToast("Check In Failed", "error"); } },
+    checkOut: async () => { if(!currentUser) return; const today = formatDateISO(new Date()); const rec = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today && !a.checkOut); if(rec) { try { const now = new Date(); await db.updateAttendance({...rec, checkOut: formatTime12(now), checkOutTime: now.toISOString()}); await refreshData(); showToast("Check Out Successful", "success"); } catch(e) { showToast("Check Out Failed", "error"); } } },
     updateAttendanceRecord: async (r: any) => { await db.updateAttendance(r); await refreshData(); },
     deleteAttendanceRecord: async (id: any) => { await db.deleteAttendance(id.toString()); await refreshData(); },
     getTodayAttendance: () => { if(!currentUser) return undefined; const today = formatDateISO(new Date()); return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today); },
