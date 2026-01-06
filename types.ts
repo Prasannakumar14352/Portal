@@ -15,6 +15,21 @@ export enum EmployeeStatus {
   INVITED = 'Invited'
 }
 
+export interface UserSettings {
+  notifications: {
+    emailLeaves: boolean;
+    emailAttendance: boolean;
+    pushWeb: boolean;
+    pushMobile: boolean;
+    systemAlerts: boolean;
+  };
+  appConfig: {
+    aiAssistant: boolean;
+    azureSync: boolean;
+    strictSso: boolean;
+  };
+}
+
 export interface Invitation {
   id: string;
   email: string;
@@ -84,6 +99,7 @@ export interface Employee {
   workLocation?: string;
   phone?: string;
   jobTitle?: string;
+  settings?: UserSettings;
 }
 
 export interface LeaveTypeConfig {
@@ -186,6 +202,7 @@ export interface User {
   workLocation?: string;
   hireDate?: string;
   email?: string; 
+  settings?: UserSettings;
 }
 
 export interface Notification {

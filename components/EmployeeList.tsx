@@ -222,6 +222,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
                 <th className="px-6 py-4">ID</th>
                 <th className="px-6 py-4">Position</th>
                 <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Hire Date</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -245,6 +246,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
                         <Shield size={12} className="text-blue-500" /> {emp.role}
                      </div>
                   </td>
+                  <td className="px-6 py-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-400">{emp.joinDate || 'N/A'}</td>
                   <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>{emp.status}</span></td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end space-x-1">
@@ -258,7 +260,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
               ))}
               {paginatedItems.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm italic">
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-400 text-sm italic">
                     No records found in this directory.
                   </td>
                 </tr>

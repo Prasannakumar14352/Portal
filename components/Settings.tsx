@@ -1,40 +1,48 @@
-import React, { useState } from 'react';
-import { Bell, Mail, Monitor, Shield, Eye, Database, Sparkles, Smartphone, Moon, Sun, Lock, Save, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Bell, Mail, Monitor, Shield, Eye, Database, Sparkles, Smartphone, Moon, Sun, Lock, Save, RotateCcw, Zap } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
-import { UserRole } from '../types';
+import { UserRole, UserSettings } from '../types';
 
 const Settings = () => {
-  const { theme, toggleTheme, currentUser, showToast } = useAppContext();
+  const { theme, toggleTheme, currentUser, updateUser, showToast } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Local state for the settings form
+  const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
+
+  // Load initial settings from user data
+  useEffect(() => {
+    if (currentUser?.settings) {
+      setLocalSettings(JSON.parse(JSON.stringify(currentUser.settings)));
+    }
+  }, [currentUser]);
+
+  // Determine if there are unsaved changes
+  const isDirty = useMemo(() => {
+    if (!currentUser?.settings || !localSettings) return false;
+    return JSON.stringify(localSettings) !== JSON.stringify(currentUser.settings);
+  }, [localSettings, currentUser]);
+
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
-  // Local state for settings simulation
-  const [notifications, setNotifications] = useState({
-    emailLeaves: true,
-    emailAttendance: false,
-    pushWeb: true,
-    pushMobile: true,
-    systemAlerts: true
-  });
-
-  const [appConfig, setAppConfig] = useState({
-    aiAssistant: true,
-    azureSync: true,
-    strictSso: false
-  });
-
   const handleSave = async () => {
+    if (!currentUser || !localSettings || !isDirty) return;
+    
     setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsSaving(false);
-    showToast("Application settings saved successfully.", "success");
+    try {
+        await updateUser(currentUser.id, { settings: localSettings });
+        showToast("Settings synchronized with database.", "success");
+    } catch (err) {
+        showToast("Failed to sync settings.", "error");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const Toggle = ({ enabled, onChange, label, sublabel, icon: Icon }: any) => (
-    <div className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/20 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-teal-500/30 transition-all group">
+    <div className={`flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/20 rounded-2xl border transition-all group ${enabled ? 'border-teal-500/20 shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}>
       <div className="flex items-start gap-4">
-        <div className={`p-2 rounded-lg ${enabled ? 'bg-teal-50 text-teal-600' : 'bg-slate-100 text-slate-400'} transition-colors`}>
+        <div className={`p-2 rounded-lg ${enabled ? 'bg-teal-50 text-teal-600 dark:bg-teal-900/30' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'} transition-colors`}>
           <Icon size={20} />
         </div>
         <div>
@@ -51,21 +59,32 @@ const Settings = () => {
     </div>
   );
 
+  if (!localSettings) return null;
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Settings</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Manage preferences and organizational configurations.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Configure your personal experience and organizational defaults.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-4">
+            {isDirty && (
+                <span className="hidden md:flex items-center gap-1.5 text-[10px] font-black text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg animate-pulse uppercase tracking-widest border border-amber-200 dark:border-amber-800">
+                    <Zap size={10} /> Unsaved Changes
+                </span>
+            )}
             <button 
                 onClick={handleSave} 
-                disabled={isSaving}
-                className="bg-teal-600 text-white px-6 py-2.5 rounded-xl hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-black shadow-lg shadow-teal-500/20 disabled:opacity-70"
+                disabled={isSaving || !isDirty}
+                className={`px-6 py-2.5 rounded-xl transition-all flex items-center space-x-2 text-sm font-black shadow-lg ${
+                    isDirty 
+                    ? 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-500/30' 
+                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 cursor-not-allowed shadow-none border border-slate-200 dark:border-slate-700'
+                }`}
             >
                 {isSaving ? <RotateCcw size={18} className="animate-spin" /> : <Save size={18} />}
-                <span>{isSaving ? 'SAVING...' : 'SAVE CHANGES'}</span>
+                <span>{isSaving ? 'SYNCING...' : 'SAVE CHANGES'}</span>
             </button>
         </div>
       </div>
@@ -82,29 +101,29 @@ const Settings = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Toggle 
-              enabled={notifications.emailLeaves} 
-              onChange={(v: boolean) => setNotifications({...notifications, emailLeaves: v})}
+              enabled={localSettings.notifications.emailLeaves} 
+              onChange={(v: boolean) => setLocalSettings({...localSettings, notifications: {...localSettings.notifications, emailLeaves: v}})}
               label="Leave Updates"
               sublabel="Email alerts when leave status changes."
               icon={Mail}
             />
             <Toggle 
-              enabled={notifications.pushWeb} 
-              onChange={(v: boolean) => setNotifications({...notifications, pushWeb: v})}
+              enabled={localSettings.notifications.pushWeb} 
+              onChange={(v: boolean) => setLocalSettings({...localSettings, notifications: {...localSettings.notifications, pushWeb: v}})}
               label="Web Push"
               sublabel="Browser notifications for real-time alerts."
               icon={Monitor}
             />
             <Toggle 
-              enabled={notifications.systemAlerts} 
-              onChange={(v: boolean) => setNotifications({...notifications, systemAlerts: v})}
+              enabled={localSettings.notifications.systemAlerts} 
+              onChange={(v: boolean) => setLocalSettings({...localSettings, notifications: {...localSettings.notifications, systemAlerts: v}})}
               label="Security Alerts"
               sublabel="Notify on new logins or account changes."
               icon={Shield}
             />
             <Toggle 
-              enabled={notifications.pushMobile} 
-              onChange={(v: boolean) => setNotifications({...notifications, pushMobile: v})}
+              enabled={localSettings.notifications.pushMobile} 
+              onChange={(v: boolean) => setLocalSettings({...localSettings, notifications: {...localSettings.notifications, pushMobile: v}})}
               label="Mobile Sync"
               sublabel="Sync notifications with Empower mobile app."
               icon={Smartphone}
@@ -133,7 +152,7 @@ const Settings = () => {
              </div>
              <button 
                 onClick={toggleTheme}
-                className="px-6 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all"
+                className="px-6 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all dark:text-slate-100"
              >
                 {theme === 'light' ? 'Go Dark' : 'Go Light'}
              </button>
@@ -152,22 +171,22 @@ const Settings = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Toggle 
-                enabled={appConfig.aiAssistant} 
-                onChange={(v: boolean) => setAppConfig({...appConfig, aiAssistant: v})}
+                enabled={localSettings.appConfig.aiAssistant} 
+                onChange={(v: boolean) => setLocalSettings({...localSettings, appConfig: {...localSettings.appConfig, aiAssistant: v}})}
                 label="AI Assistant"
                 sublabel="Enable Gemini HR Intelligence for all users."
                 icon={Sparkles}
               />
               <Toggle 
-                enabled={appConfig.azureSync} 
-                onChange={(v: boolean) => setAppConfig({...appConfig, azureSync: v})}
+                enabled={localSettings.appConfig.azureSync} 
+                onChange={(v: boolean) => setLocalSettings({...localSettings, appConfig: {...localSettings.appConfig, azureSync: v}})}
                 label="Azure AD Real-time"
                 sublabel="Keep directory in sync with Microsoft 365."
                 icon={Database}
               />
               <Toggle 
-                enabled={appConfig.strictSso} 
-                onChange={(v: boolean) => setAppConfig({...appConfig, strictSso: v})}
+                enabled={localSettings.appConfig.strictSso} 
+                onChange={(v: boolean) => setLocalSettings({...localSettings, appConfig: {...localSettings.appConfig, strictSso: v}})}
                 label="Strict SSO Enforcement"
                 sublabel="Disable password logins for all employees."
                 icon={Lock}

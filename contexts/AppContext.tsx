@@ -4,7 +4,7 @@ import { msalConfig, loginRequest } from "../services/authConfig";
 import { db } from '../services/db';
 import { emailService } from '../services/emailService';
 import { microsoftGraphService, AzureUser } from '../services/microsoftGraphService';
-import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role, Position, Invitation } from '../types';
+import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, LeaveStatus, Notification, UserRole, Department, Project, User, TimeEntry, ToastMessage, Payslip, Holiday, EmployeeStatus, Role, Position, Invitation, UserSettings } from '../types';
 
 const formatDateISO = (date: Date) => {
   const y = date.getFullYear();
@@ -43,6 +43,21 @@ const safeParseObject = (val: any) => {
         } catch (e) { return undefined; }
     }
     return undefined;
+};
+
+const defaultSettings: UserSettings = {
+  notifications: {
+    emailLeaves: true,
+    emailAttendance: false,
+    pushWeb: true,
+    pushMobile: true,
+    systemAlerts: true
+  },
+  appConfig: {
+    aiAssistant: true,
+    azureSync: true,
+    strictSso: false
+  }
 };
 
 interface AppContextType {
@@ -160,6 +175,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ...e, 
         projectIds: safeParseArray(e.projectIds),
         location: safeParseObject(e.location),
+        settings: safeParseObject(e.settings) || defaultSettings,
         bio: e.bio || ''
       })) : [];
 
@@ -179,6 +195,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setHolidays(Array.isArray(holidayData) ? holidayData : []);
       setPayslips(Array.isArray(payslipData) ? payslipData : []);
       setInvitations(Array.isArray(inviteData) ? inviteData : []);
+
+      // Refresh Current User if logged in
+      if (currentUser) {
+          const updatedSelf = sanitizedEmployees.find(e => String(e.id) === String(currentUser.id));
+          if (updatedSelf) {
+              setCurrentUser({
+                id: updatedSelf.id, employeeId: updatedSelf.employeeId, name: `${updatedSelf.firstName} ${updatedSelf.lastName}`, email: updatedSelf.email,
+                role: updatedSelf.role as UserRole, position: updatedSelf.position, avatar: updatedSelf.avatar, managerId: updatedSelf.managerId, jobTitle: updatedSelf.jobTitle || updatedSelf.role,
+                departmentId: updatedSelf.departmentId, projectIds: updatedSelf.projectIds, location: updatedSelf.location, workLocation: updatedSelf.workLocation, hireDate: updatedSelf.joinDate,
+                settings: updatedSelf.settings
+              });
+          }
+      }
     } catch (error) {
       console.error("Failed to refresh data:", error);
     }
@@ -229,7 +258,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   email: email, password: 'ms-auth-user', role: mappedSystemRole, position: azureJobTitle, department: mappedDeptName,
                   departmentId: mappedDeptId, projectIds: [], managerId: '', joinDate: mappedHireDate, status: EmployeeStatus.ACTIVE,
                   salary: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name || 'User')}&background=0D9488&color=fff`,
-                  jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
+                  jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India', settings: defaultSettings
               };
               await db.addEmployee(newEmp);
               targetUser = newEmp;
@@ -257,7 +286,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               setCurrentUser({ 
                   id: targetUser.id, employeeId: targetUser.employeeId, name: `${targetUser.firstName} ${targetUser.lastName}`, email: targetUser.email,
                   role: targetUser.role as UserRole, position: targetUser.position, avatar: targetUser.avatar, managerId: targetUser.managerId, jobTitle: targetUser.jobTitle || targetUser.role,
-                  departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: safeParseObject(targetUser.location), workLocation: targetUser.workLocation, hireDate: targetUser.joinDate
+                  departmentId: targetUser.departmentId, projectIds: targetUser.projectIds, location: safeParseObject(targetUser.location), workLocation: targetUser.workLocation, hireDate: targetUser.joinDate,
+                  settings: safeParseObject(targetUser.settings) || defaultSettings
               });
               return true;
           }
@@ -372,7 +402,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             department: mappedDeptName, departmentId: mappedDeptId, projectIds: [], managerId: '',
             joinDate: formatDateISO(new Date()), status: EmployeeStatus.ACTIVE, salary: 0, 
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(au.displayName)}&background=random`,
-            jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India'
+            jobTitle: azureJobTitle, phone: '', workLocation: 'Office HQ India', settings: defaultSettings
           };
           await db.addEmployee(newEmp);
           nextId++;
@@ -390,7 +420,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentUser({ 
             id: user.id, employeeId: user.employeeId, name: `${user.firstName} ${user.lastName}`, email: user.email,
             role: user.role as UserRole, position: user.position, avatar: user.avatar, managerId: user.managerId, jobTitle: user.jobTitle || user.role,
-            departmentId: user.departmentId, projectIds: user.projectIds, location: safeParseObject(user.location), workLocation: user.workLocation, hireDate: user.joinDate
+            departmentId: user.departmentId, projectIds: user.projectIds, location: safeParseObject(user.location), workLocation: user.workLocation, hireDate: user.joinDate,
+            settings: safeParseObject(user.settings) || defaultSettings
         });
         showToast(`Welcome back!`, 'success');
         return true;
@@ -585,6 +616,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: EmployeeStatus.ACTIVE,
       salary: invite.salary,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.firstName + ' ' + invite.lastName)}&background=0D9488&color=fff`,
+      settings: defaultSettings
     };
 
     await db.addEmployee(newEmp);
