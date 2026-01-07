@@ -139,16 +139,23 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
             />
             <div className="hidden md:block text-left">
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{user.name}</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{user.position || user.role}</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight">
+                {user.position || 'Team Member'} • <span className="text-teal-600 dark:text-teal-400">{user.role}</span>
+              </p>
             </div>
             <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
           </button>
 
           {showProfile && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 duration-200 z-50">
+            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 duration-200 z-50">
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 mb-1 bg-slate-50/50 dark:bg-slate-900/50">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{user.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.position || user.role}</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider mt-0.5">
+                  {user.position || 'Team Member'}
+                </p>
+                <p className="text-[9px] text-teal-600 dark:text-teal-400 font-bold uppercase tracking-widest mt-1">
+                  System {user.role}
+                </p>
               </div>
               <button 
                 onClick={() => {
