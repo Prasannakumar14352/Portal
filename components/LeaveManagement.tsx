@@ -335,9 +335,16 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     let nextStatus: LeaveStatusEnum = LeaveStatusEnum.APPROVED;
     
     // Sequential Flow Logic
-    if (leaveToProcess.status === LeaveStatusEnum.PENDING_MANAGER && currentUser.role === UserRole.MANAGER) {
-        nextStatus = LeaveStatusEnum.PENDING_HR;
-    } else if (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN) {
+    if (leaveToProcess.status === LeaveStatusEnum.PENDING_MANAGER) {
+        // IMPROVED: If HR is the approver, they approve DIRECTLY.
+        if (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN) {
+            nextStatus = LeaveStatusEnum.APPROVED;
+        } else {
+            // Only standard managers move the request to HR verification
+            nextStatus = LeaveStatusEnum.PENDING_HR;
+        }
+    } else if (leaveToProcess.status === LeaveStatusEnum.PENDING_HR) {
+        // HR approving at the second level
         nextStatus = LeaveStatusEnum.APPROVED;
     }
 
@@ -399,10 +406,20 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {leaves.map(leave => {
                       const isDesignatedManager = String(leave.approverId) === String(currentUser?.id);
-                      const canApprove = isDesignatedManager || isHR;
                       const isOwnRequest = String(leave.userId) === String(currentUser?.id);
-                      const isPending = leave.status === LeaveStatusEnum.PENDING_MANAGER || leave.status === LeaveStatusEnum.PENDING_HR;
-                      const canEditDelete = isOwnRequest && leave.status === LeaveStatusEnum.PENDING_MANAGER;
+                      
+                      // Sequential Visibility Logic:
+                      // 1. Manager level: Show if user is the designated approver and it's pending manager review
+                      const isPendingManagerLevel = leave.status === LeaveStatusEnum.PENDING_MANAGER;
+                      const canManagerAction = isDesignatedManager && isPendingManagerLevel;
+                      
+                      // 2. HR level: Show if user is HR/Admin and it has passed manager level
+                      const isPendingHRLevel = leave.status === LeaveStatusEnum.PENDING_HR;
+                      const canHRAction = isHR && isPendingHRLevel;
+
+                      // Combined permission
+                      const canApprove = (canManagerAction || canHRAction) && !isOwnRequest;
+                      const canEditDelete = isOwnRequest && isPendingManagerLevel;
 
                       return (
                         <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
@@ -420,7 +437,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                           <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
                           <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-2">
-                                  {canApprove && isPending && !isOwnRequest && (
+                                  {canApprove && (
                                       <>
                                           <button onClick={() => openApproveDialog(leave)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors" title="Approve"><CheckCircle2 size={16}/></button>
                                           <button onClick={() => openRejectDialog(leave)} className="p-2 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-100 transition-colors" title="Reject"><XCircle size={16}/></button>
@@ -674,8 +691,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Authorize Request?</h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 px-4 leading-relaxed">
                       Approving <strong>{leaveToProcess?.type}</strong> for <strong>{leaveToProcess?.userName}</strong>.
-                      {currentUser?.role === UserRole.MANAGER && leaveToProcess?.status === LeaveStatusEnum.PENDING_MANAGER && (
-                          <span className="block mt-2 font-bold text-teal-600">This will be forwarded to HR for final sign-off.</span>
+                      {leaveToProcess?.status === LeaveStatusEnum.PENDING_MANAGER && (
+                          currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN 
+                          ? <span className="block mt-2 font-bold text-emerald-600">This will be approved directly.</span>
+                          : <span className="block mt-2 font-bold text-teal-600">This will be forwarded to HR for final sign-off.</span>
                       )}
                   </p>
               </div>
