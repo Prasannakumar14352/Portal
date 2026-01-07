@@ -62,6 +62,26 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       isBillable: true
   });
 
+  const NO_PROJECT_ID = "NO_PROJECT";
+
+  // Dynamic Subtasks logic shared with TimeLogs
+  const availableTasks = useMemo(() => {
+    if (!logFormData.projectId || logFormData.projectId === NO_PROJECT_ID) {
+      return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training'];
+    }
+    const project = projects.find(p => String(p.id) === String(logFormData.projectId));
+    if (!project) return [];
+    
+    let tasks = project.tasks;
+    if (typeof tasks === 'string') {
+        try {
+            const parsed = JSON.parse(tasks);
+            tasks = Array.isArray(parsed) ? parsed : [];
+        } catch (e) { tasks = []; }
+    }
+    return Array.isArray(tasks) ? tasks : [];
+  }, [logFormData.projectId, projects]);
+
   // Strict check for HR or Admin roles
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
@@ -142,7 +162,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           // 1. Submit the Time Log
           await addTimeEntry({
               userId: currentUser.id,
-              projectId: logFormData.projectId === "NO_PROJECT" ? "" : logFormData.projectId,
+              projectId: logFormData.projectId === NO_PROJECT_ID ? "" : logFormData.projectId,
               task: logFormData.task,
               date: pendingRecord.date,
               durationMinutes: totalMinutes,
@@ -375,12 +395,21 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                       <select required value={logFormData.projectId} onChange={e => setLogFormData({...logFormData, projectId: e.target.value, task: ''})} className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm">
                           <option value="" disabled>Select Project...</option>
                           {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
-                          <option value="NO_PROJECT">General / Administrative</option>
+                          <option value={NO_PROJECT_ID}>General / Administrative</option>
                       </select>
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Current Task</label>
-                      <input required type="text" placeholder="e.g. Design Review" value={logFormData.task} onChange={e => setLogFormData({...logFormData, task: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" />
+                      <select 
+                        required 
+                        disabled={!logFormData.projectId}
+                        value={logFormData.task} 
+                        onChange={e => setLogFormData({...logFormData, task: e.target.value})} 
+                        className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm disabled:opacity-50"
+                      >
+                          <option value="" disabled>{logFormData.projectId ? "Select subtask..." : "Select project first"}</option>
+                          {availableTasks.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                   </div>
               </div>
 
@@ -431,7 +460,30 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           </form>
       </DraggableModal>
 
-      {/* Delete and Edit Modals omitted for brevity - preserved from previous turn */}
+      {/* Shared Delete Confirmation */}
+      <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Record?" width="max-w-sm">
+          <div className="text-center">
+              <AlertCircle size={48} className="text-rose-600 mx-auto mb-4" />
+              <p className="text-slate-600 dark:text-slate-300 text-sm mb-6">Are you sure you want to permanently remove this attendance record? This action cannot be undone.</p>
+              <div className="flex gap-3">
+                  <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 font-bold rounded-xl text-xs uppercase">Keep Record</button>
+                  <button onClick={async () => { if(recordToDelete) { await deleteAttendanceRecord(recordToDelete.id); setShowDeleteConfirm(false); } }} className="flex-1 py-3 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase shadow-lg shadow-rose-500/20">Confirm Delete</button>
+              </div>
+          </div>
+      </DraggableModal>
+
+      {/* Edit Record Modal */}
+      <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modify Entry Records" width="max-w-md">
+          <form onSubmit={handleEditSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check In Date</label><input required type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkInDate} onChange={e => setEditForm({...editForm, checkInDate: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check In Time</label><input required type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkInTime} onChange={e => setEditForm({...editForm, checkInTime: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check Out Date (Optional)</label><input type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkOutDate} onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check Out Time (Optional)</label><input type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkOutTime} onChange={e => setEditForm({...editForm, checkOutTime: e.target.value})} /></div>
+              </div>
+              <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black shadow-lg text-[10px] uppercase tracking-widest hover:bg-teal-700 transition active:scale-95">Commit Overwrites</button>
+          </form>
+      </DraggableModal>
     </div>
   );
 };
