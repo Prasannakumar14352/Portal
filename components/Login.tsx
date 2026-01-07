@@ -89,9 +89,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setShowForgotPasswordModal(true);
   };
 
-  const fillDemoCreds = (role: 'admin' | 'employee') => {
+  const fillDemoCreds = (role: 'admin' | 'employee' | 'manager') => {
       if (role === 'admin') {
           setEmail('superadmin@empower.com');
+          setPassword('password123');
+      } else if (role === 'manager') {
+          setEmail('bob.smith@empower.com');
           setPassword('password123');
       } else {
           setEmail('alice.j@empower.com');
@@ -188,9 +191,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {showDemoAccess && (
                 <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
                     <p className="text-xs text-center text-slate-400 mb-2 uppercase font-bold tracking-wider">Quick Demo Access</p>
-                    <div className="flex gap-2 justify-center">
+                    <div className="flex gap-2 justify-center flex-wrap">
                         <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
                             Fill Admin
+                        </button>
+                        <button onClick={() => fillDemoCreds('manager')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
+                            Fill Manager
                         </button>
                         <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
                             Fill Employee

@@ -336,7 +336,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     
     // Sequential Flow Logic
     if (leaveToProcess.status === LeaveStatusEnum.PENDING_MANAGER) {
-        // IMPROVED: If HR is the approver, they approve DIRECTLY.
+        // If HR is the approver, they approve DIRECTLY.
         if (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN) {
             nextStatus = LeaveStatusEnum.APPROVED;
         } else {
@@ -405,19 +405,24 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {leaves.map(leave => {
-                      const isDesignatedManager = String(leave.approverId) === String(currentUser?.id);
-                      const isOwnRequest = String(leave.userId) === String(currentUser?.id);
+                      // Robust ID comparison using trim and toString to avoid numeric/string mismatches
+                      const currentUserIdStr = String(currentUser?.id || '').trim();
+                      const leaveUserIdStr = String(leave.userId || '').trim();
+                      const leaveApproverIdStr = String(leave.approverId || '').trim();
+
+                      const isDesignatedApprover = leaveApproverIdStr === currentUserIdStr;
+                      const isOwnRequest = leaveUserIdStr === currentUserIdStr;
                       
                       // Sequential Visibility Logic:
-                      // 1. Manager level: Show if user is the designated approver and it's pending manager review
+                      // 1. Manager level: Show if user is the assigned approver for this request
                       const isPendingManagerLevel = leave.status === LeaveStatusEnum.PENDING_MANAGER;
-                      const canManagerAction = isDesignatedManager && isPendingManagerLevel;
+                      const canManagerAction = isDesignatedApprover && isPendingManagerLevel;
                       
-                      // 2. HR level: Show if user is HR/Admin and it has passed manager level
+                      // 2. HR level: Show if user has HR/Admin role AND manager has already approved
                       const isPendingHRLevel = leave.status === LeaveStatusEnum.PENDING_HR;
                       const canHRAction = isHR && isPendingHRLevel;
 
-                      // Combined permission
+                      // Final Permission check
                       const canApprove = (canManagerAction || canHRAction) && !isOwnRequest;
                       const canEditDelete = isOwnRequest && isPendingManagerLevel;
 
