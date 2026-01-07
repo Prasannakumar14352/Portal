@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal
+  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -99,11 +99,20 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast, notify, employees, deleteLeave } = useAppContext();
+  const { showToast, notify, employees, deleteLeave, sendLeaveStatusEmail } = useAppContext();
+  
+  // Modals state
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+
+  // Active data state
   const [leaveToDelete, setLeaveToDelete] = useState<LeaveRequest | null>(null);
+  const [leaveToProcess, setLeaveToProcess] = useState<LeaveRequest | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [approvalComment, setApprovalComment] = useState('');
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types'>('requests');
@@ -120,7 +129,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
-  // Logic: Approvers are determined strictly by System Role (Admin, HR, or Manager)
   const availableManagers = useMemo(() => {
     return users.filter(u => {
       const isApprover = u.role === UserRole.ADMIN || u.role === UserRole.HR || u.role === UserRole.MANAGER;
@@ -132,7 +140,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     return users.filter(u => String(u.id) !== String(currentUser?.id));
   }, [users, currentUser]);
 
-  // --- Leave Balance Calculation Logic ---
   const userBalances = useMemo(() => {
     if (!currentUser) return [];
     
@@ -277,16 +284,64 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       setIsProcessing(true);
       try {
         await updateLeaveStatus(leave.id, newStatus, comment);
+        
         const employee = employees.find(emp => String(emp.id) === String(leave.userId));
-        if (employee) {
-            await notify(`Your leave status is now: ${newStatus}`, employee.id);
+        
+        // Logical Workflow: Notify HR if Manager just approved to second level
+        if (newStatus === LeaveStatusEnum.PENDING_HR) {
+            const hrManagers = users.filter(u => u.role === UserRole.HR || u.role === UserRole.ADMIN);
+            hrManagers.forEach(hr => notify(`Manager approved ${leave.userName}'s leave. Final action required.`, hr.id));
+        } else if (employee) {
+            // Standard notification for final statuses
+            await notify(`Your leave status for ${leave.type} is now: ${newStatus}`, employee.id);
+            if (employee.email) {
+                await sendLeaveStatusEmail({
+                    to: employee.email,
+                    employeeName: leave.userName,
+                    status: newStatus,
+                    type: leave.type,
+                    managerComment: comment
+                });
+            }
         }
-        showToast(`Status: ${newStatus}`, "success");
+
+        showToast(`Status updated to ${newStatus}`, "success");
+        setShowRejectModal(false);
+        setShowApproveModal(false);
+        setRejectionReason('');
+        setApprovalComment('');
       } catch (err) {
         showToast("Failed to update status", "error");
       } finally {
         setIsProcessing(false);
       }
+  };
+
+  const openRejectDialog = (leave: LeaveRequest) => {
+    setLeaveToProcess(leave);
+    setRejectionReason('');
+    setShowRejectModal(true);
+  };
+
+  const openApproveDialog = (leave: LeaveRequest) => {
+      setLeaveToProcess(leave);
+      setApprovalComment('');
+      setShowApproveModal(true);
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!leaveToProcess || !currentUser) return;
+    
+    let nextStatus: LeaveStatusEnum = LeaveStatusEnum.APPROVED;
+    
+    // Sequential Flow Logic
+    if (leaveToProcess.status === LeaveStatusEnum.PENDING_MANAGER && currentUser.role === UserRole.MANAGER) {
+        nextStatus = LeaveStatusEnum.PENDING_HR;
+    } else if (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN) {
+        nextStatus = LeaveStatusEnum.APPROVED;
+    }
+
+    await handleStatusUpdate(leaveToProcess, nextStatus, approvalComment);
   };
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -308,7 +363,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                  <div className="w-16 h-16 border-4 border-teal-600/20 border-t-teal-600 rounded-full animate-spin"></div>
                  <Mail size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-teal-600" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white">Processing...</h3>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white">Syncing Records...</h3>
            </div>
         </div>
       )}
@@ -367,14 +422,14 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                               <div className="flex justify-end gap-2">
                                   {canApprove && isPending && !isOwnRequest && (
                                       <>
-                                          <button onClick={() => handleStatusUpdate(leave, LeaveStatusEnum.APPROVED)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100" title="Approve"><CheckCircle2 size={16}/></button>
-                                          <button onClick={() => { const reason = window.prompt("Reason for rejection:"); if(reason) handleStatusUpdate(leave, LeaveStatusEnum.REJECTED, reason); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg border border-rose-100" title="Reject"><XCircle size={16}/></button>
+                                          <button onClick={() => openApproveDialog(leave)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors" title="Approve"><CheckCircle2 size={16}/></button>
+                                          <button onClick={() => openRejectDialog(leave)} className="p-2 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-100 transition-colors" title="Reject"><XCircle size={16}/></button>
                                       </>
                                   )}
                                   {canEditDelete && (
                                       <>
-                                          <button onClick={() => handleEditClick(leave)} className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100"><Edit2 size={16}/></button>
-                                          <button onClick={() => handleDeleteTrigger(leave)} className="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg border border-slate-100"><Trash2 size={16}/></button>
+                                          <button onClick={() => handleEditClick(leave)} className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-100"><Edit2 size={16}/></button>
+                                          <button onClick={() => handleDeleteTrigger(leave)} className="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg border border-slate-100 hover:bg-slate-100"><Trash2 size={16}/></button>
                                       </>
                                   )}
                               </div>
@@ -419,7 +474,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
             </div>
           ))}
           {isHR && (
-             <button onClick={handleAddType} className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-teal-600 hover:border-teal-200 dark:hover:border-teal-800 transition-all group">
+             <button onClick={handleAddType} className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-12 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-teal-600 hover:border-teal-200 dark:hover:border-teal-800 transition-all group">
                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full group-hover:bg-teal-50 transition-colors">
                     <Plus size={32} />
                 </div>
@@ -568,6 +623,87 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
               <button type="submit" className="px-12 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg hover:bg-teal-700 transition-all hover:scale-[1.02] active:scale-95">Submit Request</button>
             </div>
         </form>
+      </DraggableModal>
+
+      {/* Rejection Modal */}
+      <DraggableModal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="Decline Leave Request" width="max-w-md">
+          <div className="space-y-6">
+              <div className="bg-rose-50 dark:bg-rose-900/20 p-5 rounded-2xl border border-rose-100 dark:border-rose-800 flex items-start gap-4">
+                  <XCircle className="text-rose-600 shrink-0" size={24} />
+                  <div>
+                      <p className="text-xs font-bold text-rose-800 dark:text-rose-400 uppercase tracking-wide mb-1">Confirmation Required</p>
+                      <p className="text-[10px] text-rose-700 dark:text-rose-500 leading-relaxed font-medium">You are declining the <strong>{leaveToProcess?.type}</strong> request for <strong>{leaveToProcess?.userName}</strong>. A reason is <strong>mandatory</strong> to inform the employee.</p>
+                  </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Reason for Rejection (Mandatory)</label>
+                  <div className="relative">
+                      <MessageSquare className="absolute left-4 top-4 text-slate-400" size={18} />
+                      <textarea 
+                          required 
+                          rows={4} 
+                          className="w-full border border-slate-200 dark:border-slate-600 rounded-2xl pl-11 pr-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-rose-500 shadow-sm" 
+                          value={rejectionReason} 
+                          onChange={e => setRejectionReason(e.target.value)} 
+                          placeholder="Provide context on why this request cannot be approved..."
+                      ></textarea>
+                  </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+                  <button type="button" onClick={() => setShowRejectModal(false)} className="px-6 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
+                  <button 
+                    onClick={() => { if(leaveToProcess) handleStatusUpdate(leaveToProcess, LeaveStatusEnum.REJECTED, rejectionReason); }}
+                    disabled={!rejectionReason.trim()}
+                    className="px-10 py-3.5 bg-rose-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-rose-500/20 hover:bg-rose-700 transition disabled:opacity-50 active:scale-95"
+                  >
+                    Confirm Rejection
+                  </button>
+              </div>
+          </div>
+      </DraggableModal>
+
+      {/* Approval Confirmation Modal */}
+      <DraggableModal isOpen={showApproveModal} onClose={() => setShowApproveModal(false)} title="Approve Leave" width="max-w-md">
+          <div className="space-y-6">
+              <div className="text-center">
+                  <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-100 dark:border-emerald-800">
+                      <CheckCircle2 className="text-emerald-600" size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Authorize Request?</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 px-4 leading-relaxed">
+                      Approving <strong>{leaveToProcess?.type}</strong> for <strong>{leaveToProcess?.userName}</strong>.
+                      {currentUser?.role === UserRole.MANAGER && leaveToProcess?.status === LeaveStatusEnum.PENDING_MANAGER && (
+                          <span className="block mt-2 font-bold text-teal-600">This will be forwarded to HR for final sign-off.</span>
+                      )}
+                  </p>
+              </div>
+
+              <div className="space-y-1.5 px-2">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 tracking-widest">Approval Comments (Optional)</label>
+                  <div className="relative">
+                      <MessageSquare className="absolute left-4 top-4 text-slate-400" size={18} />
+                      <textarea 
+                          rows={3} 
+                          className="w-full border border-slate-200 dark:border-slate-600 rounded-2xl pl-11 pr-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-sm" 
+                          value={approvalComment} 
+                          onChange={e => setApprovalComment(e.target.value)} 
+                          placeholder="Provide any additional notes (optional)..."
+                      ></textarea>
+                  </div>
+              </div>
+              
+              <div className="flex gap-3 pt-6 border-t dark:border-slate-700">
+                  <button onClick={() => setShowApproveModal(false)} className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-700 text-slate-400 font-bold rounded-xl text-[10px] uppercase tracking-widest">Go Back</button>
+                  <button 
+                    onClick={handleApproveConfirm}
+                    className="flex-1 px-4 py-3 bg-teal-600 text-white font-bold rounded-xl text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition-all"
+                  >
+                    Confirm & Approve
+                  </button>
+              </div>
+          </div>
       </DraggableModal>
 
       {/* Leave Type CRUD Modal */}
