@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from 'recharts';
 import { useAppContext } from '../contexts/AppContext';
-import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck, Zap } from 'lucide-react';
+import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck, Zap, Layout, TrendingUp } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UserRole } from '../types';
@@ -26,7 +26,7 @@ const Reports = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
-  const isHR = currentUser?.role === UserRole.HR;
+  const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -40,11 +40,17 @@ const Reports = () => {
 
   // --- Data Aggregation Helpers ---
 
+  // 0. Base Data Filtering (Role Based)
+  const reportTimeEntries = useMemo(() => {
+      if (isPowerUser) return timeEntries;
+      return timeEntries.filter(t => String(t.userId) === String(currentUser?.id));
+  }, [timeEntries, currentUser, isPowerUser]);
+
   // 1. Unified Record Normal vs Extra Hours Distribution
   const extraHoursDistribution = useMemo(() => {
       let normal = 0;
       let extra = 0;
-      timeEntries.forEach(e => {
+      reportTimeEntries.forEach(e => {
           normal += e.durationMinutes;
           extra += (e.extraMinutes || 0);
       });
@@ -52,26 +58,81 @@ const Reports = () => {
           { name: 'Normal Hours', value: parseFloat((normal / 60).toFixed(1)) },
           { name: 'Extra Hours', value: parseFloat((extra / 60).toFixed(1)) }
       ];
-  }, [timeEntries]);
+  }, [reportTimeEntries]);
 
   // 2. Project Time Allocation (Combined Normal + Extra)
   const projectTimeAllocation = useMemo(() => {
     const allocation: Record<string, number> = {};
-    timeEntries.forEach(e => {
-        const projName = projects.find(p => String(p.id) === String(e.projectId))?.name || 'General';
+    reportTimeEntries.forEach(e => {
+        const projName = projects.find(p => String(p.id) === String(e.projectId))?.name || 'General / Admin';
         allocation[projName] = (allocation[projName] || 0) + e.durationMinutes + (e.extraMinutes || 0);
     });
     return Object.keys(allocation).map(name => ({ 
         name, 
         value: parseFloat((allocation[name] / 60).toFixed(1))
-    }));
-  }, [timeEntries, projects]);
+    })).sort((a, b) => b.value - a.value);
+  }, [reportTimeEntries, projects]);
 
-  // 3. Team Member Contributions (Unified Stacked Bar)
+  // 3. Project Progress (Based on Tasks Completed vs Total Tasks)
+  const projectProgressData = useMemo(() => {
+      return projects.map(proj => {
+          const projectEntries = reportTimeEntries.filter(t => String(t.projectId) === String(proj.id));
+          const uniqueTasksLogged = new Set(projectEntries.map(t => t.task)).size;
+          
+          // Parse tasks from project definition
+          let totalTasks = 0;
+          if (Array.isArray(proj.tasks)) {
+              totalTasks = proj.tasks.length;
+          } else if (typeof proj.tasks === 'string') {
+              try { totalTasks = JSON.parse(proj.tasks).length; } catch(e) { totalTasks = 5; } // Default if parse fails
+          } else {
+              totalTasks = 5; // Fallback
+          }
+          
+          if (totalTasks === 0) totalTasks = 1; // Prevent NaN
+
+          // Calculate percentage based on unique tasks touched vs total defined
+          const progress = Math.min(100, Math.round((uniqueTasksLogged / totalTasks) * 100));
+          
+          return {
+              name: proj.name,
+              progress: progress,
+              hours: parseFloat((projectEntries.reduce((sum, e) => sum + e.durationMinutes + (e.extraMinutes || 0), 0) / 60).toFixed(1))
+          };
+      }).filter(p => p.hours > 0).sort((a, b) => b.progress - a.progress);
+  }, [projects, reportTimeEntries]);
+
+  // 4. Project Activity Timeline (Daily Hours per Project)
+  const projectTimelineData = useMemo(() => {
+      // Get last 7 days dates
+      const dates = [...Array(7)].map((_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+      });
+
+      // Get top 3 projects
+      const topProjects = projectTimeAllocation.slice(0, 3).map(p => p.name);
+
+      return dates.map(date => {
+          const entry: any = { date: new Date(date).toLocaleDateString(undefined, {weekday:'short'}) };
+          topProjects.forEach(projName => {
+              const totalMins = reportTimeEntries
+                  .filter(t => t.date === date && (projects.find(p => String(p.id) === String(t.projectId))?.name || 'General / Admin') === projName)
+                  .reduce((sum, t) => sum + t.durationMinutes + (t.extraMinutes || 0), 0);
+              entry[projName] = parseFloat((totalMins / 60).toFixed(1));
+          });
+          return entry;
+      });
+  }, [reportTimeEntries, projects, projectTimeAllocation]);
+
+  // 5. Team Member Contributions (Unified Stacked Bar)
   const teamContributionData = useMemo(() => {
     const contrib: Record<string, { normal: number, extra: number }> = {};
-    timeEntries.forEach(e => {
-        // Fix: Use String comparison to avoid undefined user match
+    // For team performance, we likely want to see everyone if we are admin, otherwise just us
+    const entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+
+    entriesToUse.forEach(e => {
         const user = users.find(u => String(u.id) === String(e.userId));
         const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
         if (!contrib[name]) contrib[name] = { normal: 0, extra: 0 };
@@ -85,12 +146,12 @@ const Reports = () => {
         extraHours: parseFloat((contrib[name].extra / 60).toFixed(1)),
         totalHours: parseFloat(((contrib[name].normal + contrib[name].extra) / 60).toFixed(1))
     })).sort((a, b) => b.totalHours - a.totalHours);
-  }, [timeEntries, users]);
+  }, [timeEntries, reportTimeEntries, users, isPowerUser]);
 
   const billableData = useMemo(() => {
       let billable = 0;
       let nonBillable = 0;
-      timeEntries.forEach(e => {
+      reportTimeEntries.forEach(e => {
           const total = e.durationMinutes + (e.extraMinutes || 0);
           if (e.isBillable) billable += total;
           else nonBillable += total;
@@ -99,7 +160,23 @@ const Reports = () => {
           { name: 'Billable', value: parseFloat((billable / 60).toFixed(1)) },
           { name: 'Non-Billable', value: parseFloat((nonBillable / 60).toFixed(1)) }
       ];
-  }, [timeEntries]);
+  }, [reportTimeEntries]);
+
+  // 6. Attendance Status Distribution
+  const attendanceStatusData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    // Filter attendance if not power user
+    const recordsToUse = isPowerUser ? attendance : attendance.filter(a => String(a.employeeId) === String(currentUser?.id));
+    
+    recordsToUse.forEach(rec => {
+        const status = rec.status || 'Present';
+        counts[status] = (counts[status] || 0) + 1;
+    });
+    return Object.keys(counts).map(status => ({
+        name: status,
+        value: counts[status]
+    }));
+  }, [attendance, isPowerUser, currentUser]);
 
   const handleExport = async (format: 'pdf' | 'csv') => {
     setShowExportMenu(false);
@@ -113,7 +190,7 @@ const Reports = () => {
         case 'Time Logs':
             title = 'Time Logs Report';
             filename = 'time_logs_report';
-            dataToExport = timeEntries.map(t => ({ 
+            dataToExport = reportTimeEntries.map(t => ({ 
                 Date: t.date, 
                 Project: projects.find(p => String(p.id) === String(t.projectId))?.name || 'N/A', 
                 User: users.find(u => String(u.id) === String(t.userId))?.firstName || 'Unknown', 
@@ -121,6 +198,16 @@ const Reports = () => {
                 NormalHours: (t.durationMinutes/60).toFixed(2),
                 ExtraHours: ((t.extraMinutes || 0)/60).toFixed(2),
                 Billable: t.isBillable ? 'Yes' : 'No'
+            }));
+            break;
+        case 'Projects':
+            title = 'Projects Performance Report';
+            filename = 'projects_report';
+            dataToExport = projectProgressData.map(p => ({
+                Project: p.name,
+                TotalHours: p.hours,
+                ProgressPercent: `${p.progress}%`,
+                Status: p.progress === 100 ? 'Completed' : 'In Progress'
             }));
             break;
         case 'Team Performance':
@@ -131,6 +218,19 @@ const Reports = () => {
                  NormalHours: d.normalHours,
                  ExtraHours: d.extraHours,
                  TotalHours: d.totalHours
+             }));
+             break;
+        case 'Attendance':
+             title = 'Attendance Report';
+             filename = 'attendance_report';
+             const attRecs = isPowerUser ? attendance : attendance.filter(a => String(a.employeeId) === String(currentUser?.id));
+             dataToExport = attRecs.map(a => ({
+                 Date: a.date,
+                 Employee: a.employeeName,
+                 Status: a.status,
+                 CheckIn: a.checkIn,
+                 CheckOut: a.checkOut,
+                 Location: a.workLocation || 'Office'
              }));
              break;
         default:
@@ -200,7 +300,7 @@ const Reports = () => {
 
       <div className="border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
         <nav className="flex space-x-8 min-w-max pb-1">
-          {['Dashboard', 'Time Logs', 'Attendance', 'Team Performance'].map((tab) => (
+          {['Dashboard', 'Projects', 'Time Logs', 'Attendance', 'Team Performance'].map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === tab ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>{tab}</button>
           ))}
         </nav>
@@ -208,6 +308,94 @@ const Reports = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
+        {/* --- PROJECTS TAB CONTENT --- */}
+        {activeTab === 'Projects' && (
+            <>
+                {/* 1. Allocation Pie Chart */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Layout size={18} className="text-blue-500" /> Project Time Allocation
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">Total effort hours distributed by project.</p>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={projectTimeAllocation}
+                                    cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" 
+                                    label={({name, percent}) => percent > 0.1 ? `${(percent * 100).toFixed(0)}%` : ''}
+                                >
+                                    {projectTimeAllocation.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                                <Legend verticalAlign="bottom" height={36}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 2. Progress Bar Chart */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <TrendingUp size={18} className="text-emerald-500" /> Project Progress
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">Completion % based on engaged tasks vs. total scope.</p>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={projectProgressData} layout="vertical" margin={{ left: 20, right: 30 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                                <XAxis type="number" domain={[0, 100]} hide />
+                                <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 11}} stroke="#94a3b8" />
+                                <Tooltip 
+                                    cursor={{fill: 'transparent'}} 
+                                    contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}
+                                    formatter={(value: any) => [`${value}%`, 'Progress']}
+                                />
+                                <Bar dataKey="progress" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} name="Progress %">
+                                    {projectProgressData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 3. Activity Line Chart (Full Width) */}
+                <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Clock size={18} className="text-amber-500" /> Project Activity Timeline (Last 7 Days)
+                    </h3>
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={projectTimelineData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.1} />
+                                <XAxis dataKey="date" tick={{fontSize: 12}} stroke="#94a3b8" />
+                                <YAxis stroke="#94a3b8" />
+                                <Tooltip contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}} />
+                                <Legend />
+                                {Object.keys(projectTimelineData[0] || {}).filter(k => k !== 'date').map((key, index) => (
+                                    <Line 
+                                        key={key} 
+                                        type="monotone" 
+                                        dataKey={key} 
+                                        stroke={COLORS[index % COLORS.length]} 
+                                        strokeWidth={2}
+                                        dot={{r: 3}}
+                                        activeDot={{r: 6}}
+                                    />
+                                ))}
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </>
+        )}
+        
+        {/* --- EXISTING TABS CONTENT --- */}
+
         {/* Extra Hours Pie Chart */}
         {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
@@ -244,6 +432,36 @@ const Reports = () => {
                                 cx="50%" cy="50%" outerRadius={80} dataKey="value"
                             >
                                 {billableData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : '#94a3b8'} />)}
+                            </Pie>
+                            <Tooltip contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                            <Legend verticalAlign="bottom" height={36}/>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        )}
+
+        {/* Attendance Chart - Added for Attendance Tab */}
+        {(activeTab === 'Dashboard' || activeTab === 'Attendance') && (
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                    <CalendarCheck size={18} className="text-emerald-500" /> 
+                    Attendance Overview
+                </h3>
+                <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={attendanceStatusData}
+                                cx="50%" cy="50%" 
+                                innerRadius={60} 
+                                outerRadius={80} 
+                                paddingAngle={5} 
+                                dataKey="value"
+                            >
+                                {attendanceStatusData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || COLORS[index % COLORS.length]} />
+                                ))}
                             </Pie>
                             <Tooltip contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                             <Legend verticalAlign="bottom" height={36}/>
