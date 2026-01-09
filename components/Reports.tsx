@@ -5,9 +5,10 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from 'recharts';
 import { useAppContext } from '../contexts/AppContext';
-import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck, Zap, Layout, TrendingUp, Users, CheckCircle2 } from 'lucide-react';
+import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck, Zap, Layout, TrendingUp, Users, CheckCircle2, DollarSign } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { UserRole } from '../types';
 
 const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1'];
@@ -22,6 +23,7 @@ const Reports = () => {
   const { timeEntries, projects, users, attendance, currentUser, showToast } = useAppContext();
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [filterPeriod, setFilterPeriod] = useState('This Month');
+  const [filterProject, setFilterProject] = useState('All');
   
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -126,10 +128,14 @@ const Reports = () => {
       });
   }, [reportTimeEntries, projects, projectTimeAllocation]);
 
-  // 5. Team Member Contributions (Total Hours - Simple Bar)
+  // 5. Team Member Contributions (Total Hours - Simple Bar) - FILTERED BY PROJECT
   const teamContributionData = useMemo(() => {
     const contrib: Record<string, number> = {};
-    const entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+    let entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+
+    if (filterProject !== 'All') {
+        entriesToUse = entriesToUse.filter(e => String(e.projectId) === filterProject);
+    }
 
     entriesToUse.forEach(e => {
         const user = users.find(u => String(u.id) === String(e.userId));
@@ -141,12 +147,16 @@ const Reports = () => {
         name,
         hours: parseFloat((contrib[name] / 60).toFixed(1))
     })).sort((a, b) => b.hours - a.hours);
-  }, [timeEntries, reportTimeEntries, users, isPowerUser]);
+  }, [timeEntries, reportTimeEntries, users, isPowerUser, filterProject]);
 
-  // 6. User Workload (Tasks Assigned vs Completed)
+  // 6. User Workload (Tasks Assigned vs Completed) - FILTERED BY PROJECT & STACKED
   const userWorkloadData = useMemo(() => {
       const load: Record<string, { allTasks: Set<string>, approvedTasks: Set<string> }> = {};
-      const entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+      let entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+
+      if (filterProject !== 'All') {
+          entriesToUse = entriesToUse.filter(e => String(e.projectId) === filterProject);
+      }
 
       entriesToUse.forEach(e => {
           const user = users.find(u => String(u.id) === String(e.userId));
@@ -159,12 +169,18 @@ const Reports = () => {
           }
       });
 
-      return Object.keys(load).map(name => ({
-          name,
-          assigned: load[name].allTasks.size,
-          completed: load[name].approvedTasks.size
-      })).sort((a, b) => b.assigned - a.assigned);
-  }, [timeEntries, reportTimeEntries, users, isPowerUser]);
+      return Object.keys(load).map(name => {
+          const total = load[name].allTasks.size;
+          const completed = load[name].approvedTasks.size;
+          const pending = total - completed;
+          return {
+              name,
+              completed,
+              pending,
+              total
+          };
+      }).sort((a, b) => b.total - a.total);
+  }, [timeEntries, reportTimeEntries, users, isPowerUser, filterProject]);
 
   const billableData = useMemo(() => {
       let billable = 0;
@@ -203,6 +219,7 @@ const Reports = () => {
     let filename = 'report';
     let title = 'Report';
 
+    // Prepare data based on active tab
     switch(activeTab) {
         case 'Time Logs':
             title = 'Time Logs Report';
@@ -248,7 +265,7 @@ const Reports = () => {
                  Location: a.workLocation || 'Office'
              }));
              break;
-        default:
+        default: // Dashboard
              title = 'Dashboard Summary Report';
              filename = 'dashboard_report';
              dataToExport = [
@@ -263,16 +280,74 @@ const Reports = () => {
     }
 
     if (format === 'pdf') {
-        const doc = new jsPDF();
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let currentY = 15;
+
+        // Header
         doc.setFontSize(16);
-        doc.text(title, 14, 15);
+        doc.text(title, 14, currentY);
+        currentY += 8;
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, currentY);
+        currentY += 10;
+
+        // Determine which charts to capture
+        let chartIds: string[] = [];
+        if (activeTab === 'Dashboard') {
+             chartIds = ['chart-effort-split', 'chart-billable', 'chart-attendance', 'chart-team-contributions']; 
+        } else if (activeTab === 'Time Logs') {
+             chartIds = ['chart-effort-split', 'chart-billable'];
+        } else if (activeTab === 'Projects') {
+             chartIds = ['chart-project-allocation', 'chart-project-progress', 'chart-project-activity'];
+        } else if (activeTab === 'Attendance') {
+             chartIds = ['chart-attendance'];
+        } else if (activeTab === 'Team Performance') {
+             chartIds = ['chart-team-contributions', 'chart-user-workload', 'chart-team-billable'];
+        }
+
+        // Capture Charts
+        for (const id of chartIds) {
+            const element = document.getElementById(id);
+            if (element) {
+                try {
+                    const canvas = await html2canvas(element, { 
+                        scale: 2, 
+                        useCORS: true, 
+                        backgroundColor: '#ffffff'
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgProps = doc.getImageProperties(imgData);
+                    const pdfWidth = pageWidth - 28;
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                    if (currentY + pdfHeight > pageHeight - 20) {
+                        doc.addPage();
+                        currentY = 20;
+                    }
+
+                    doc.addImage(imgData, 'PNG', 14, currentY, pdfWidth, pdfHeight);
+                    currentY += pdfHeight + 10;
+                } catch (e) {
+                    console.warn(`Chart capture failed for ${id}`, e);
+                }
+            }
+        }
+
+        // Add Table
         autoTable(doc, {
             head: [Object.keys(dataToExport[0])],
             body: dataToExport.map(row => Object.values(row)),
-            startY: 25,
+            startY: currentY,
             styles: { fontSize: 8 },
             headStyles: { fillColor: [16, 185, 129] },
+            margin: { top: 20 },
+            pageBreak: 'auto'
         });
+        
         doc.save(`${filename}_${Date.now()}.pdf`);
     } else {
         const headers = Object.keys(dataToExport[0]);
@@ -299,13 +374,19 @@ const Reports = () => {
             <select className="w-full sm:w-auto bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)}>
                 <option>This Month</option><option>Last Month</option><option>This Year</option>
             </select>
+            
+            <select className="w-full sm:w-auto bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
+                <option value="All">All Projects</option>
+                {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            </select>
+
             <div className="relative w-full sm:w-auto" ref={exportMenuRef}>
               <button onClick={() => setShowExportMenu(!showExportMenu)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-colors">
                 <Download size={16} /> Export
               </button>
               {showExportMenu && (
                 <div className="absolute right-0 top-full mt-2 w-full sm:w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                    <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"><FileText size={16}/> PDF Summary</button>
+                    <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"><FileText size={16}/> PDF Report</button>
                     <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"><FileSpreadsheet size={16}/> CSV Details</button>
                 </div>
               )}
@@ -327,7 +408,7 @@ const Reports = () => {
         {activeTab === 'Team Performance' && (
             <div className="col-span-1 lg:col-span-2 space-y-6">
                 {/* 1. Team Contributions - Bar Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div id="chart-team-contributions" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <Users size={18} className="text-purple-500" /> Team Member Contributions
                     </h3>
@@ -346,12 +427,12 @@ const Reports = () => {
                     </div>
                 </div>
 
-                {/* 2. User Workload - Grouped Bar Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                {/* 2. User Workload - Stacked Bar Chart */}
+                <div id="chart-user-workload" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <CheckCircle2 size={18} className="text-blue-500" /> User Workload
                     </h3>
-                    <p className="text-xs text-slate-500 mb-4">Tasks assigned vs completed per user.</p>
+                    <p className="text-xs text-slate-500 mb-4">Tasks breakdown per user (Stacked).</p>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={userWorkloadData} margin={{bottom: 20}}>
@@ -360,15 +441,15 @@ const Reports = () => {
                                 <YAxis stroke="#94a3b8" />
                                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
                                 <Legend verticalAlign="top" align="right" />
-                                <Bar dataKey="assigned" name="Assigned Tasks" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={20} />
-                                <Bar dataKey="completed" name="Completed Tasks" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar dataKey="completed" stackId="a" name="Completed Tasks" fill="#10b981" radius={[0, 0, 4, 4]} barSize={30} />
+                                <Bar dataKey="pending" stackId="a" name="Pending Tasks" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={30} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* 3. Billable vs Non-billable - Pie Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div id="chart-team-billable" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <DollarSign size={18} className="text-emerald-500" /> Billable vs Non-billable
                     </h3>
@@ -397,7 +478,7 @@ const Reports = () => {
         {activeTab === 'Projects' && (
             <>
                 {/* 1. Allocation Pie Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div id="chart-project-allocation" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <Layout size={18} className="text-blue-500" /> Project Time Allocation
                     </h3>
@@ -422,7 +503,7 @@ const Reports = () => {
                 </div>
 
                 {/* 2. Progress Bar Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div id="chart-project-progress" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <TrendingUp size={18} className="text-emerald-500" /> Project Progress
                     </h3>
@@ -449,7 +530,7 @@ const Reports = () => {
                 </div>
 
                 {/* 3. Activity Line Chart (Full Width) */}
-                <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div id="chart-project-activity" className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <Clock size={18} className="text-amber-500" /> Project Activity Timeline (Last 7 Days)
                     </h3>
@@ -483,7 +564,7 @@ const Reports = () => {
 
         {/* Extra Hours Pie Chart */}
         {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <div id="chart-effort-split" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2"><Zap size={18} className="text-purple-500" /> Unified Effort Split</h3>
                 </div>
@@ -507,7 +588,7 @@ const Reports = () => {
 
         {/* Billable Chart */}
         {(activeTab === 'Dashboard' || activeTab === 'Time Logs') && (
-             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+             <div id="chart-billable" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Unified Billing Summary (Hours)</h3>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -528,7 +609,7 @@ const Reports = () => {
 
         {/* Attendance Chart - Added for Attendance Tab */}
         {(activeTab === 'Dashboard' || activeTab === 'Attendance') && (
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <div id="chart-attendance" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                     <CalendarCheck size={18} className="text-emerald-500" /> 
                     Attendance Overview
@@ -559,10 +640,5 @@ const Reports = () => {
     </div>
   );
 };
-
-// Helper for Dollar Sign icon not imported
-const DollarSign = ({size, className}: {size: number, className?: string}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-);
 
 export default Reports;
