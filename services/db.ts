@@ -72,6 +72,8 @@ const store = {
 const mockDb = {
     getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
     addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
+    // Mock bulk add simulates array push
+    bulkAddEmployees: async (emps: Employee[]) => { store.employees.push(...emps); return Promise.resolve(); },
     updateEmployee: async (emp: Employee) => {
         const idx = store.employees.findIndex(e => String(e.id) === String(emp.id));
         if(idx !== -1) store.employees[idx] = emp;
@@ -132,7 +134,6 @@ const mockDb = {
         if(idx !== -1) store.leaves[idx] = leave;
         return Promise.resolve(leave);
     },
-    // Fix: Added missing deleteLeave method to mockDb
     deleteLeave: async (id: string) => {
         store.leaves = store.leaves.filter(l => String(l.id) !== String(id));
         return Promise.resolve();
@@ -200,6 +201,8 @@ const mockDb = {
 const apiDb = {
   getEmployees: () => api.get('/employees'),
   addEmployee: (emp: Employee) => api.post('/employees', emp),
+  // New bulk method
+  bulkAddEmployees: (emps: Employee[]) => api.post('/employees/bulk', emps),
   updateEmployee: (emp: Employee) => api.put(`/employees/${emp.id}`, emp),
   deleteEmployee: (id: string) => api.delete(`/employees/${id}`),
 
@@ -226,7 +229,6 @@ const apiDb = {
   getLeaves: () => api.get('/leaves'),
   addLeave: (leave: LeaveRequest) => api.post('/leaves', leave),
   updateLeave: (leave: LeaveRequest) => api.put(`/leaves/${leave.id}`, leave),
-  // Fix: Added missing deleteLeave method to apiDb
   deleteLeave: (id: string) => api.delete(`/leaves/${id}`),
 
   getLeaveTypes: () => api.get('/leave_types'),

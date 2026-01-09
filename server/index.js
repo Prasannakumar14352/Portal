@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -165,6 +166,55 @@ const registerStandardRoutes = (endpoint, table) => {
             await request.query(query);
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    // POST BULK
+    apiRouter.post(`/${endpoint}/bulk`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
+        const transaction = new sql.Transaction(pool);
+        try {
+            await transaction.begin();
+            const items = req.body;
+            if (!Array.isArray(items)) throw new Error("Expected array of items");
+            if (items.length === 0) {
+                 await transaction.commit();
+                 return res.json({ success: true, count: 0 });
+            }
+
+            // Get DB columns schema once to avoid repeated metadata queries
+            const colResult = await pool.request().input('table', table).query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @table`);
+            const dbCols = colResult.recordset.map(r => r.COLUMN_NAME);
+
+            for (const item of items) {
+                 const request = new sql.Request(transaction);
+                 const sets = {};
+                 
+                 dbCols.forEach(col => {
+                    if (item[col] !== undefined) {
+                        let val = item[col];
+                        if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
+                        request.input(col, val);
+                        sets[col] = `@${col}`;
+                    }
+                 });
+                 
+                 const colList = Object.keys(sets).map(c => `[${c}]`).join(', ');
+                 const paramList = Object.values(sets).join(', ');
+                 
+                 if (colList.length > 0) {
+                    await request.query(`INSERT INTO ${table} (${colList}) VALUES (${paramList})`);
+                 }
+            }
+
+            await transaction.commit();
+            res.json({ success: true, count: items.length });
+        } catch (err) {
+            // Check if transaction is active before rolling back
+            // mssql transaction logic can be tricky, check _begun flag or just try/catch rollback
+            try { await transaction.rollback(); } catch(e) { /* ignore if already rolled back */ }
+            console.error("Bulk Insert Error:", err);
+            res.status(500).json({ error: err.message }); 
+        }
     });
 
     // PUT UPDATE
