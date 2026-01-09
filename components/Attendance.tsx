@@ -121,8 +121,20 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const handleCheckOutClick = () => {
     if (!currentUser || !pendingRecord) return;
     
+    // 1. Mandatory Log Check for the Check-In Date
+    // We check against pendingRecord.date, not todayStr, to ensure the specific session has a log.
+    const recordDate = pendingRecord.date;
+    const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === recordDate);
+    
+    if (!hasLog) {
+        setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
+        setShowTimeLogModal(true);
+        return;
+    }
+
     const todayStr = formatDateISO(new Date());
     
+    // 2. Retroactive Checkout Check
     if (pendingRecord.date < todayStr) {
       setRetroForm({ 
         date: todayStr, 
@@ -132,16 +144,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       return;
     }
 
-    // MANDATORY LOG CHECK
-    const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === todayStr);
-    
-    if (!hasLog) {
-        setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
-        setShowTimeLogModal(true);
-        return;
-    }
-
-    // EARLY CHECKOUT CHECK
+    // 3. Early Checkout Check
     const durationHrs = (currentTime.getTime() - new Date(pendingRecord.checkInTime!).getTime()) / 3600000;
     if (durationHrs < 9) {
       setShowEarlyReasonModal(true);
@@ -171,11 +174,32 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               isBillable: logFormData.isBillable
           });
 
-          // 2. Automatically Check Out
+          showToast("Timesheet synced. Proceeding with checkout...", "success");
+          setShowTimeLogModal(false);
+
+          // 2. Continue the Checkout Flow
+          const todayStr = formatDateISO(new Date());
+
+          // A. If Retroactive
+          if (pendingRecord.date < todayStr) {
+              setRetroForm({ 
+                date: todayStr, 
+                time: currentTime.toTimeString().substring(0, 5) 
+              });
+              setShowRetroModal(true);
+              return;
+          }
+
+          // B. If Early
+          const durationHrs = (currentTime.getTime() - new Date(pendingRecord.checkInTime!).getTime()) / 3600000;
+          if (durationHrs < 9) {
+              setShowEarlyReasonModal(true);
+              return;
+          }
+
+          // C. Standard Checkout
           await checkOut();
           
-          setShowTimeLogModal(false);
-          showToast("Timesheet and Attendance synced successfully.", "success");
       } catch (err) {
           showToast("Failed to complete checkout sync.", "error");
       } finally {
@@ -374,7 +398,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <AlertCircle className="text-amber-600 shrink-0" size={24} />
                   <div>
                       <p className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wide mb-1">Timesheet Requirement</p>
-                      <p className="text-[10px] text-amber-700 dark:text-amber-500 leading-relaxed font-medium">You are checking out for the day. Please provide a brief summary of your activities to sync your timesheet.</p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-500 leading-relaxed font-medium">
+                        You are checking out for <strong>{pendingRecord?.date}</strong>. Please provide a brief summary of your activities to sync your timesheet.
+                      </p>
                   </div>
               </div>
 
@@ -421,7 +447,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
                   <button type="button" onClick={() => setShowTimeLogModal(false)} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Abort Checkout</button>
                   <button type="submit" disabled={isSubmittingLog} className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/30 hover:bg-teal-700 transition flex items-center gap-2 active:scale-95">
-                      {isSubmittingLog ? <Loader2 size={16} className="animate-spin" /> : 'COMPLETE & CHECK OUT'}
+                      {isSubmittingLog ? <Loader2 size={16} className="animate-spin" /> : 'SAVE & CONTINUE'}
                   </button>
               </div>
           </form>
