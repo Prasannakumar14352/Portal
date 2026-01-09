@@ -474,10 +474,14 @@ const Organization = () => {
                                            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{emp.position || emp.jobTitle || 'Team Member'}</p>
                                        </div>
                                    </div>
-                                   <div className="text-slate-500 dark:text-slate-400 text-sm flex items-center gap-2 font-medium w-full sm:w-auto justify-start sm:justify-end">
-                                       <Mail size={16} className="text-slate-400" />
+                                   <a 
+                                        href={`mailto:${emp.email}`}
+                                        className="text-slate-500 dark:text-slate-400 text-sm flex items-center gap-2 font-medium w-full sm:w-auto justify-start sm:justify-end hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                   >
+                                       <Mail size={16} className="text-slate-400 group-hover:text-teal-500 transition-colors" />
                                        {emp.email}
-                                   </div>
+                                   </a>
                                </div>
                            ))}
                            {paginatedEmployees.length === 0 && (
