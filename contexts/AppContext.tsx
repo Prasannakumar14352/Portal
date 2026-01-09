@@ -92,6 +92,9 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Initialize MSAL outside the component to ensure it's a singleton and survives re-renders
+const msalInstance = new PublicClientApplication(msalConfig);
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -108,16 +111,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  const msalInstance = new PublicClientApplication(msalConfig);
+  const [isMsalReady, setIsMsalReady] = useState(false);
 
   useEffect(() => {
-    msalInstance.initialize().then(() => {
-      // Handle redirect flow if needed
-      msalInstance.handleRedirectPromise().then((response) => {
-         if (response) handleMsalResponse(response);
-      }).catch(console.error);
-    });
+    // Initialize MSAL
+    const initMsal = async () => {
+      try {
+        if (!msalInstance.getActiveAccount() && !isMsalReady) {
+             await msalInstance.initialize();
+             setIsMsalReady(true);
+             const response = await msalInstance.handleRedirectPromise();
+             if (response) handleMsalResponse(response);
+        } else {
+             setIsMsalReady(true);
+        }
+      } catch (error) {
+        console.log("MSAL Init notice:", error);
+        // If it fails because it's already initialized, we mark ready
+        setIsMsalReady(true); 
+      }
+    };
+    initMsal();
     
     // Check for stored user
     const storedUser = localStorage.getItem('currentUser');
@@ -241,6 +255,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginWithMicrosoft = async (loginHint?: string): Promise<boolean> => {
+      if (!isMsalReady) {
+          showToast("Authentication service is initializing...", "info");
+          return false;
+      }
       try {
           const request = { ...loginRequest, loginHint };
           const response = await msalInstance.loginPopup(request);
@@ -255,7 +273,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    msalInstance.logoutPopup().catch(console.error); // Optional Azure logout
+    if (isMsalReady) {
+        msalInstance.logoutPopup().catch(console.error); // Optional Azure logout
+    }
     showToast('Logged out successfully', 'info');
   };
 
