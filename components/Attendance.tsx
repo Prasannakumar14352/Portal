@@ -118,42 +118,48 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       return Math.max(0, Math.floor(diffMs / 60000));
   };
 
+  // --- Checkout Sequence Logic ---
+
+  // Step 1: Initial Click
   const handleCheckOutClick = () => {
     if (!currentUser || !pendingRecord) return;
     
-    // 1. Mandatory Log Check for the Check-In Date
-    // We check against pendingRecord.date, not todayStr, to ensure the specific session has a log.
-    const recordDate = pendingRecord.date;
-    const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === recordDate);
-    
-    if (!hasLog) {
-        setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
-        setShowTimeLogModal(true);
-        return;
-    }
-
-    const todayStr = formatDateISO(new Date());
-    
-    // 2. Retroactive Checkout Check
-    if (pendingRecord.date < todayStr) {
-      setRetroForm({ 
-        date: todayStr, 
-        time: currentTime.toTimeString().substring(0, 5) 
-      });
-      setShowRetroModal(true);
-      return;
-    }
-
-    // 3. Early Checkout Check
+    // Check 1: Duration < 9 hours (Early Checkout)
     const durationHrs = (currentTime.getTime() - new Date(pendingRecord.checkInTime!).getTime()) / 3600000;
     if (durationHrs < 9) {
       setShowEarlyReasonModal(true);
       return;
     }
 
-    checkOut();
+    proceedToLogCheck();
   };
 
+  // Step 2: Handle Early Reason Submit -> Go to Log Check
+  const handleEarlyCheckoutSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setShowEarlyReasonModal(false);
+      // earlyReason is stored in state, proceed to next step
+      proceedToLogCheck();
+  };
+
+  // Step 3: Check for Time Log
+  const proceedToLogCheck = () => {
+      if (!currentUser || !pendingRecord) return;
+
+      const recordDate = pendingRecord.date;
+      const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === recordDate);
+      
+      if (!hasLog) {
+          // Reset log form for fresh entry
+          setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
+          setShowTimeLogModal(true);
+          return;
+      }
+
+      proceedToRetroCheck();
+  };
+
+  // Step 4: Handle Log Submit -> Go to Retro Check
   const handleMandatoryLogSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!currentUser || !pendingRecord) return;
@@ -161,8 +167,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       setIsSubmittingLog(true);
       try {
           const totalMinutes = getDurationInMinutes(pendingRecord);
-          
-          // 1. Submit the Time Log
           await addTimeEntry({
               userId: currentUser.id,
               projectId: logFormData.projectId === NO_PROJECT_ID ? "" : logFormData.projectId,
@@ -174,46 +178,36 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               isBillable: logFormData.isBillable
           });
 
-          showToast("Timesheet synced. Proceeding with checkout...", "success");
+          showToast("Timesheet synced.", "success");
           setShowTimeLogModal(false);
-
-          // 2. Continue the Checkout Flow
-          const todayStr = formatDateISO(new Date());
-
-          // A. If Retroactive
-          if (pendingRecord.date < todayStr) {
-              setRetroForm({ 
-                date: todayStr, 
-                time: currentTime.toTimeString().substring(0, 5) 
-              });
-              setShowRetroModal(true);
-              return;
-          }
-
-          // B. If Early
-          const durationHrs = (currentTime.getTime() - new Date(pendingRecord.checkInTime!).getTime()) / 3600000;
-          if (durationHrs < 9) {
-              setShowEarlyReasonModal(true);
-              return;
-          }
-
-          // C. Standard Checkout
-          await checkOut();
-          
+          proceedToRetroCheck();
       } catch (err) {
-          showToast("Failed to complete checkout sync.", "error");
+          showToast("Failed to sync log.", "error");
       } finally {
           setIsSubmittingLog(false);
       }
   };
 
-  const handleEarlyCheckoutSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      await checkOut(earlyReason);
-      setShowEarlyReasonModal(false);
-      setEarlyReason('');
+  // Step 5: Check for Retroactive Date
+  const proceedToRetroCheck = () => {
+      if (!pendingRecord) return;
+      const todayStr = formatDateISO(new Date());
+      
+      if (pendingRecord.date < todayStr) {
+        setRetroForm({ 
+          date: todayStr, 
+          time: currentTime.toTimeString().substring(0, 5) 
+        });
+        setShowRetroModal(true);
+        return;
+      }
+
+      // Step 6: Final Checkout (Standard)
+      checkOut(earlyReason);
+      setEarlyReason(''); // Reset reason after use
   };
 
+  // Handle Retro Submit (Final Step for Retro cases)
   const handleRetroSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingRecord) return;
@@ -224,8 +218,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       checkOutTime: coutISO 
     });
     setShowRetroModal(false);
+    setEarlyReason('');
     showToast("Session closed successfully", "success");
   };
+
+  // --- End Checkout Sequence ---
 
   const openEditModal = (record: AttendanceRecord) => {
       setEditingRecord(record);
