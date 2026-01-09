@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from 'recharts';
 import { useAppContext } from '../contexts/AppContext';
-import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck, Zap, Layout, TrendingUp } from 'lucide-react';
+import { Filter, Download, FileText, FileSpreadsheet, Clock, CalendarCheck, Zap, Layout, TrendingUp, Users, CheckCircle2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UserRole } from '../types';
@@ -126,26 +126,44 @@ const Reports = () => {
       });
   }, [reportTimeEntries, projects, projectTimeAllocation]);
 
-  // 5. Team Member Contributions (Unified Stacked Bar)
+  // 5. Team Member Contributions (Total Hours - Simple Bar)
   const teamContributionData = useMemo(() => {
-    const contrib: Record<string, { normal: number, extra: number }> = {};
-    // For team performance, we likely want to see everyone if we are admin, otherwise just us
+    const contrib: Record<string, number> = {};
     const entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
 
     entriesToUse.forEach(e => {
         const user = users.find(u => String(u.id) === String(e.userId));
         const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
-        if (!contrib[name]) contrib[name] = { normal: 0, extra: 0 };
         
-        contrib[name].normal += e.durationMinutes;
-        contrib[name].extra += (e.extraMinutes || 0);
+        contrib[name] = (contrib[name] || 0) + e.durationMinutes + (e.extraMinutes || 0);
     });
     return Object.keys(contrib).map(name => ({
         name,
-        normalHours: parseFloat((contrib[name].normal / 60).toFixed(1)),
-        extraHours: parseFloat((contrib[name].extra / 60).toFixed(1)),
-        totalHours: parseFloat(((contrib[name].normal + contrib[name].extra) / 60).toFixed(1))
-    })).sort((a, b) => b.totalHours - a.totalHours);
+        hours: parseFloat((contrib[name] / 60).toFixed(1))
+    })).sort((a, b) => b.hours - a.hours);
+  }, [timeEntries, reportTimeEntries, users, isPowerUser]);
+
+  // 6. User Workload (Tasks Assigned vs Completed)
+  const userWorkloadData = useMemo(() => {
+      const load: Record<string, { allTasks: Set<string>, approvedTasks: Set<string> }> = {};
+      const entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+
+      entriesToUse.forEach(e => {
+          const user = users.find(u => String(u.id) === String(e.userId));
+          const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
+          if (!load[name]) load[name] = { allTasks: new Set(), approvedTasks: new Set() };
+          
+          load[name].allTasks.add(e.task);
+          if (e.status === 'Approved') {
+              load[name].approvedTasks.add(e.task);
+          }
+      });
+
+      return Object.keys(load).map(name => ({
+          name,
+          assigned: load[name].allTasks.size,
+          completed: load[name].approvedTasks.size
+      })).sort((a, b) => b.assigned - a.assigned);
   }, [timeEntries, reportTimeEntries, users, isPowerUser]);
 
   const billableData = useMemo(() => {
@@ -162,10 +180,9 @@ const Reports = () => {
       ];
   }, [reportTimeEntries]);
 
-  // 6. Attendance Status Distribution
+  // 7. Attendance Status Distribution
   const attendanceStatusData = useMemo(() => {
     const counts: Record<string, number> = {};
-    // Filter attendance if not power user
     const recordsToUse = isPowerUser ? attendance : attendance.filter(a => String(a.employeeId) === String(currentUser?.id));
     
     recordsToUse.forEach(rec => {
@@ -215,9 +232,7 @@ const Reports = () => {
              filename = 'team_performance_report';
              dataToExport = teamContributionData.map(d => ({
                  Employee: d.name,
-                 NormalHours: d.normalHours,
-                 ExtraHours: d.extraHours,
-                 TotalHours: d.totalHours
+                 TotalHours: d.hours
              }));
              break;
         case 'Attendance':
@@ -308,6 +323,76 @@ const Reports = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
+        {/* --- TEAM PERFORMANCE TAB CONTENT --- */}
+        {activeTab === 'Team Performance' && (
+            <div className="col-span-1 lg:col-span-2 space-y-6">
+                {/* 1. Team Contributions - Bar Chart */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Users size={18} className="text-purple-500" /> Team Member Contributions
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">Hours logged by team members over time.</p>
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={teamContributionData} margin={{bottom: 20}}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                                <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={60} tick={{fontSize: 11}} stroke="#94a3b8" />
+                                <YAxis stroke="#94a3b8" />
+                                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                                <Legend verticalAlign="top" align="right" />
+                                <Bar dataKey="hours" name="Hours Logged" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={25} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 2. User Workload - Grouped Bar Chart */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <CheckCircle2 size={18} className="text-blue-500" /> User Workload
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">Tasks assigned vs completed per user.</p>
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={userWorkloadData} margin={{bottom: 20}}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
+                                <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={60} tick={{fontSize: 11}} stroke="#94a3b8" />
+                                <YAxis stroke="#94a3b8" />
+                                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                                <Legend verticalAlign="top" align="right" />
+                                <Bar dataKey="assigned" name="Assigned Tasks" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar dataKey="completed" name="Completed Tasks" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 3. Billable vs Non-billable - Pie Chart */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <DollarSign size={18} className="text-emerald-500" /> Billable vs Non-billable
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">Time tracking distribution by billable status.</p>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={billableData}
+                                    cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                                    label={({name, percent}) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                >
+                                    <Cell fill="#10b981" />
+                                    <Cell fill="#8b5cf6" />
+                                </Pie>
+                                <Tooltip contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
+                                <Legend verticalAlign="bottom" height={36}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* --- PROJECTS TAB CONTENT --- */}
         {activeTab === 'Projects' && (
             <>
@@ -470,29 +555,14 @@ const Reports = () => {
                 </div>
             </div>
         )}
-
-        {/* Team Performance - Stacked Bar */}
-        {(activeTab === 'Dashboard' || activeTab === 'Team Performance') && (
-            <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Total Effort per Team Member (Stacked)</h3>
-                <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={teamContributionData} margin={{bottom: 20}}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#475569" strokeOpacity={0.2} />
-                            <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={60} tick={{fontSize: 11}} stroke="#94a3b8" />
-                            <YAxis stroke="#94a3b8" />
-                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0'}}/>
-                            <Legend verticalAlign="top" align="right" />
-                            <Bar dataKey="normalHours" stackId="a" fill="#10b981" name="Normal Hours" radius={[0, 0, 0, 0]} barSize={30} />
-                            <Bar dataKey="extraHours" stackId="a" fill="#8b5cf6" name="Extra Hours" radius={[4, 4, 0, 0]} barSize={30} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        )}
       </div>
     </div>
   );
 };
+
+// Helper for Dollar Sign icon not imported
+const DollarSign = ({size, className}: {size: number, className?: string}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+);
 
 export default Reports;
