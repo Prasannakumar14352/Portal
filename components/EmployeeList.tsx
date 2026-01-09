@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2, Shield, LocateFixed, UserPlus } from 'lucide-react';
+import { Search, Plus, Edit2, Eye, Mail, RefreshCw, Copy, CheckCircle, Clock, XCircle, Cloud, Hash, Calendar, Phone, MapPin, Briefcase, UserCheck, UserSquare, ChevronDown, ChevronLeft, ChevronRight, Loader2, Shield, LocateFixed, UserPlus, UploadCloud, FileSpreadsheet } from 'lucide-react';
 import { Employee, EmployeeStatus, UserRole, Invitation } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 import { loadModules } from 'esri-loader';
+import { read, utils } from 'xlsx';
 
 interface EmployeeListProps {
   employees: Employee[];
@@ -20,10 +21,11 @@ const SYSTEM_ROLES = [
 ];
 
 const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee }) => {
-  const { currentUser, showToast, positions, syncAzureUsers, invitations, inviteEmployee, acceptInvitation, revokeInvitation } = useAppContext();
+  const { currentUser, showToast, positions, syncAzureUsers, invitations, inviteEmployee, acceptInvitation, revokeInvitation, bulkAddEmployees } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -43,9 +45,16 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
 
   const mapDivRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Strict check for HR or Admin roles
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
+
+  const potentialManagers = useMemo(() => {
+      return employees.filter(e => 
+          (!editingEmployee || String(e.id) !== String(editingEmployee.id))
+      );
+  }, [employees, editingEmployee]);
 
   useEffect(() => {
     if (!showModal || !mapDivRef.current) return;
@@ -134,6 +143,70 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
     setShowModal(true);
   };
 
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json(worksheet) as any[];
+
+      const newEmployees: Employee[] = jsonData.map((row, index) => {
+         const now = new Date();
+         return {
+             id: Math.random().toString(36).substr(2, 9), 
+             employeeId: row['EmployeeID'] || `EMP-${Math.floor(Math.random()*10000)}`,
+             firstName: row['FirstName'] || row['First Name'] || 'Unknown',
+             lastName: row['LastName'] || row['Last Name'] || '',
+             email: row['Email'] || `user${index}${Math.random().toString(36).substr(2,4)}@company.com`,
+             role: row['Role'] || 'Employee',
+             position: row['Position'] || 'Staff',
+             department: row['Department'] || 'General',
+             joinDate: row['JoinDate'] || now.toISOString().split('T')[0],
+             status: EmployeeStatus.ACTIVE,
+             salary: row['Salary'] || 0,
+             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((row['FirstName'] || 'U') + ' ' + (row['LastName'] || ''))}&background=0D9488&color=fff`,
+             settings: {
+                notifications: { emailLeaves: true, emailAttendance: false, pushWeb: true, pushMobile: true, systemAlerts: true },
+                appConfig: { aiAssistant: true, azureSync: true, strictSso: false }
+             }
+         } as Employee;
+      });
+      
+      if (newEmployees.length > 0) {
+          await bulkAddEmployees(newEmployees);
+      } else {
+          showToast("No valid records found in file.", "warning");
+      }
+    } catch (err) {
+       console.error("Bulk Import Error:", err);
+       showToast("Import failed. Please check file format.", "error");
+    } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const downloadTemplate = () => {
+      const rows = [
+          ['FirstName', 'LastName', 'Email', 'Role', 'Position', 'Department', 'Salary', 'JoinDate', 'EmployeeID'],
+          ['John', 'Doe', 'john.doe@example.com', 'Employee', 'Software Engineer', 'IT', 85000, '2024-01-15', 'EMP-1001']
+      ];
+      const csvContent = rows.map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", "employee_import_template.csv");
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -179,20 +252,28 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
         <div className="flex flex-wrap gap-2">
             {isPowerUser && (
                 <>
+                  <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" onChange={handleBulkImport} className="hidden" />
+                  <button 
+                    onClick={downloadTemplate}
+                    className="flex items-center space-x-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition text-sm font-medium"
+                    title="Download Template CSV"
+                  >
+                      <FileSpreadsheet size={18} />
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImporting}
+                    className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg shadow-indigo-500/20 text-sm font-bold hover:bg-indigo-700 transition disabled:opacity-50"
+                  >
+                      {isImporting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
+                      <span>Import Excel</span>
+                  </button>
                   <button 
                     onClick={handleAddNew}
                     className="flex items-center space-x-2 bg-teal-600 text-white px-4 py-2 rounded-lg shadow-lg shadow-teal-500/20 text-sm font-bold hover:bg-teal-700 transition"
                   >
                       <Plus size={18} />
                       <span>Add Employee</span>
-                  </button>
-                  <button 
-                    onClick={async () => { setIsSyncing(true); await syncAzureUsers(); setIsSyncing(false); }} 
-                    disabled={isSyncing} 
-                    className="flex items-center space-x-2 bg-white border border-slate-300 dark:bg-slate-700 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg shadow-sm text-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition disabled:opacity-50"
-                  >
-                      <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-                      <span>Sync FROM Azure</span>
                   </button>
                 </>
             )}
@@ -303,6 +384,22 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onUpdateEmployee
                  {SYSTEM_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>
+          </div>
+
+          <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Reporting Manager</label>
+              <select 
+                  value={formData.managerId || ''} 
+                  onChange={(e) => setFormData({...formData, managerId: e.target.value})} 
+                  className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 bg-slate-50 border-slate-200 text-sm dark:text-white outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                 <option value="">No Manager (Top Level)</option>
+                 {potentialManagers.map(mgr => (
+                     <option key={mgr.id} value={String(mgr.id)}>
+                         {mgr.firstName} {mgr.lastName} ({mgr.position || mgr.role})
+                     </option>
+                 ))}
+              </select>
           </div>
 
           {!editingEmployee && (

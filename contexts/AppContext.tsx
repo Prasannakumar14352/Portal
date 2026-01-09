@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -91,6 +92,7 @@ interface AppContextType {
   acceptInvitation: (id: string) => Promise<void>;
   revokeInvitation: (id: string) => Promise<void>;
   addEmployee: (emp: Employee, syncToAzure?: boolean) => Promise<void>;
+  bulkAddEmployees: (emps: Employee[]) => Promise<void>;
   updateEmployee: (emp: Employee) => Promise<void>;
   updateUser: (id: string | number, data: Partial<Employee>) => Promise<void>; 
   bulkUpdateEmployees: (updates: { id: string | number, data: Partial<Employee> }[]) => Promise<void>;
@@ -631,6 +633,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     login, loginWithMicrosoft, logout, forgotPassword, refreshData, showToast, removeToast, toggleTheme,
     inviteEmployee, acceptInvitation, revokeInvitation: async (id: string) => { await db.deleteInvitation(id); await refreshData(); showToast("Invite revoked."); },
     addEmployee: async (emp: Employee) => { await db.addEmployee(emp); await refreshData(); showToast('Added.', 'success'); },
+    bulkAddEmployees: async (emps: Employee[]) => { 
+        setIsLoading(true);
+        // Process sequentially to be safe with mock IDs if they were sequential integers (though we use random strings mostly now)
+        for (const emp of emps) {
+            await db.addEmployee(emp);
+        }
+        await refreshData(); 
+        showToast(`Imported ${emps.length} employees.`, 'success'); 
+        setIsLoading(false);
+    },
     updateEmployee: async (emp: Employee) => { await db.updateEmployee(emp); await refreshData(); showToast('Updated.', 'success'); },
     updateUser: async (id: string | number, data: Partial<Employee>) => { const ex = employees.find(e => String(e.id) === String(id)); if(ex) { await db.updateEmployee({...ex, ...data}); await refreshData(); showToast('Sync complete.'); } },
     bulkUpdateEmployees: async (upds: any[]) => { for(const u of upds) { const ex = employees.find(e => String(e.id) === String(u.id)); if(ex) await db.updateEmployee({...ex, ...u.data}); } await refreshData(); },
