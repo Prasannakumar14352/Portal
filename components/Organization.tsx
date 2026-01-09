@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Project, Employee, Position, EmployeeStatus } from '../types';
@@ -5,7 +6,8 @@ import {
   Briefcase, Trash2, Edit2, Users, Plus, X, Network, MapPin, 
   Globe, Navigation, Map as MapIcon, ChevronDown, ChevronRight, 
   Calendar, Minus, Layout, Search, Locate, Target, UserPlus, 
-  RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare, Layers
+  RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare, Layers,
+  Mail, ChevronLeft, List, Grid
 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
@@ -42,7 +44,7 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
              </div>
              <div className="text-center w-full min-w-0">
                 <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate px-1">{node.firstName} {node.lastName}</h4>
-                <p className="text-[9px] text-teal-600 dark:text-teal-400 font-black uppercase tracking-wider mt-0.5 mb-1 truncate px-1">{node.position || 'Team Member'}</p>
+                <p className="text-[9px] text-teal-600 dark:text-teal-400 font-black uppercase tracking-wider mt-0.5 mb-1 truncate px-1">{node.position || node.jobTitle || 'Team Member'}</p>
              </div>
            </div>
         </div>
@@ -69,6 +71,10 @@ const Organization = () => {
   const [activeTab, setActiveTab] = useState<'projects' | 'directory' | 'positions' | 'chart'>('directory');
   
   const [directorySearch, setDirectorySearch] = useState('');
+  const [directoryView, setDirectoryView] = useState<'map' | 'list'>('list');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
   const [isImagery, setIsImagery] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
@@ -102,10 +108,17 @@ const Organization = () => {
       return employees.filter(e => 
           `${e.firstName} ${e.lastName}`.toLowerCase().includes(term) ||
           (e.position || '').toLowerCase().includes(term) ||
+          (e.jobTitle || '').toLowerCase().includes(term) ||
           (e.department || '').toLowerCase().includes(term) ||
           (e.email || '').toLowerCase().includes(term)
       );
   }, [employees, directorySearch]);
+
+  const paginatedEmployees = useMemo(() => {
+      return filteredDirectoryEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredDirectoryEmployees, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredDirectoryEmployees.length / itemsPerPage);
 
   // Handle Main Basemap Updates with defensive checks
   useEffect(() => {
@@ -133,7 +146,7 @@ const Organization = () => {
 
   // Main Map Hook
   useEffect(() => {
-    if (activeTab !== 'directory' || !mapContainerRef.current) return;
+    if (activeTab !== 'directory' || directoryView !== 'map' || !mapContainerRef.current) return;
 
     loadModules([
       "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", 
@@ -175,14 +188,14 @@ const Organization = () => {
             graphicsLayerRef.current = null;
         }
     };
-  }, [activeTab]);
+  }, [activeTab, directoryView]);
 
   // Sync Markers effect
   useEffect(() => {
-    if (activeTab === 'directory' && graphicsLayerRef.current) {
+    if (activeTab === 'directory' && directoryView === 'map' && graphicsLayerRef.current) {
         refreshMapMarkers(filteredDirectoryEmployees);
     }
-  }, [filteredDirectoryEmployees, activeTab]);
+  }, [filteredDirectoryEmployees, activeTab, directoryView]);
 
   // Edit Modal Map Hook
   useEffect(() => {
@@ -217,7 +230,7 @@ const Organization = () => {
               geometry: { type: "point", longitude: lon, latitude: lat, spatialReference: { wkid: 4326 } }, 
               symbol: { 
                   type: "simple-marker", 
-                  style: "circle",
+                  style: "circle", 
                   color: [13, 148, 136, 0.9], 
                   size: "14px", 
                   outline: { color: [255, 255, 255], width: 2 } 
@@ -268,7 +281,7 @@ const Organization = () => {
                   attributes: { 
                       id: emp.id, 
                       name: `${emp.firstName} ${emp.lastName}`,
-                      position: emp.position || 'Team Member',
+                      position: emp.position || emp.jobTitle || 'Team Member',
                       email: emp.email || 'N/A',
                       workLocation: emp.workLocation || 'Office',
                       avatar: avatarUrl
@@ -372,6 +385,10 @@ const Organization = () => {
       setShowAddModalQuick(true);
   };
 
+  const getInitials = (fname: string, lname: string) => {
+      return `${fname.charAt(0)}${lname.charAt(0)}`.toUpperCase();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in relative text-slate-800 dark:text-slate-200">
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -410,124 +427,219 @@ const Organization = () => {
 
        {activeTab === 'directory' && (
            <div className="space-y-4">
-               {/* Overlay Search/Stats */}
-               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[740px]">
-                   <div className="lg:col-span-4 flex flex-col gap-4 h-full">
-                       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                           <div className="relative">
-                               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <div className="flex justify-end mb-2">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                        <button 
+                            onClick={() => setDirectoryView('list')} 
+                            className={`p-2 rounded-lg transition-all ${directoryView === 'list' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
+                            title="List View"
+                        >
+                            <List size={18} />
+                        </button>
+                        <button 
+                            onClick={() => setDirectoryView('map')} 
+                            className={`p-2 rounded-lg transition-all ${directoryView === 'map' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
+                            title="Map View"
+                        >
+                            <Grid size={18} />
+                        </button>
+                    </div>
+                </div>
+
+               {directoryView === 'list' ? (
+                   <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                       <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+                           <h3 className="font-bold text-lg text-slate-800 dark:text-white">Team Members</h3>
+                           <div className="relative w-full sm:w-64">
+                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                <input 
                                     type="text" 
-                                    placeholder="Search directory..." 
-                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium shadow-inner"
+                                    placeholder="Search users..." 
+                                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium"
                                     value={directorySearch}
                                     onChange={e => setDirectorySearch(e.target.value)}
                                />
                            </div>
                        </div>
+                       
+                       <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                           {paginatedEmployees.map(emp => (
+                               <div key={emp.id} className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
+                                   <div className="flex items-center gap-4 w-full sm:w-auto">
+                                       <div className="w-10 h-10 rounded-full bg-teal-700 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm">
+                                           {getInitials(emp.firstName, emp.lastName)}
+                                       </div>
+                                       <div>
+                                           <h4 className="font-bold text-slate-800 dark:text-white">{emp.firstName} {emp.lastName}</h4>
+                                           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{emp.position || emp.jobTitle || 'Team Member'}</p>
+                                       </div>
+                                   </div>
+                                   <div className="text-slate-500 dark:text-slate-400 text-sm flex items-center gap-2 font-medium w-full sm:w-auto justify-start sm:justify-end">
+                                       <Mail size={16} className="text-slate-400" />
+                                       {emp.email}
+                                   </div>
+                               </div>
+                           ))}
+                           {paginatedEmployees.length === 0 && (
+                               <div className="p-12 text-center text-slate-400 italic">No employees found.</div>
+                           )}
+                       </div>
 
-                       <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                           <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building2 size={14} className="text-teal-600"/> Corporate Directory</h3>
-                               <div className="flex items-center gap-2">
-                                    {isPowerUser && (
-                                        <button 
-                                            onClick={openQuickAdd}
-                                            className="p-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition shadow-sm"
-                                            title="Quick Add Employee"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                    )}
-                                    <div className="bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-lg border border-teal-100 dark:border-teal-800 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase">
-                                        {filteredDirectoryEmployees.length} Total
-                                    </div>
+                       <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-slate-400 gap-4">
+                           <span>Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredDirectoryEmployees.length)} of {filteredDirectoryEmployees.length} members</span>
+                           <div className="flex items-center gap-1">
+                               <button 
+                                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                    disabled={currentPage === 1}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                               >
+                                   <ChevronLeft size={16} /> Previous
+                               </button>
+                               <div className="flex gap-1 px-2">
+                                   {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                    .map((p, i, arr) => (
+                                       <React.Fragment key={p}>
+                                           {i > 0 && arr[i-1] !== p - 1 && <span className="px-1 self-end pb-1">...</span>}
+                                           <button 
+                                                onClick={() => setCurrentPage(p)}
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${currentPage === p ? 'bg-teal-600 text-white shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600'}`}
+                                           >
+                                               {p}
+                                           </button>
+                                       </React.Fragment>
+                                   ))}
+                               </div>
+                               <button 
+                                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                               >
+                                   Next <ChevronRight size={16} />
+                               </button>
+                           </div>
+                       </div>
+                   </div>
+               ) : (
+                   /* Existing Map/Split View */
+                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[740px]">
+                       <div className="lg:col-span-4 flex flex-col gap-4 h-full">
+                           <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                               <div className="relative">
+                                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                   <input 
+                                        type="text" 
+                                        placeholder="Search directory..." 
+                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium shadow-inner"
+                                        value={directorySearch}
+                                        onChange={e => setDirectorySearch(e.target.value)}
+                                   />
                                </div>
                            </div>
-                           <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1.5">
-                               {filteredDirectoryEmployees.map(emp => (
-                                   <div 
-                                        key={emp.id} 
-                                        onClick={() => focusEmployeeOnMap(emp)}
-                                        className="w-full flex items-center text-left p-4 rounded-2xl hover:bg-teal-50/50 dark:hover:bg-teal-900/20 group border border-transparent hover:border-teal-100 dark:hover:border-teal-800 transition-all cursor-pointer"
-                                   >
-                                       <div className="flex items-center gap-4 flex-1 min-w-0">
-                                           <div className="relative">
-                                               <img src={emp.avatar} className="w-12 h-12 rounded-xl object-cover shadow-sm border border-white dark:border-slate-700 bg-slate-100" alt="" />
-                                               <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-500' : 'bg-amber-400'}`}></div>
-                                           </div>
-                                           <div className="min-w-0 flex-1">
-                                               <p className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm leading-tight">{emp.firstName} {emp.lastName}</p>
-                                               <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-tighter mt-1">{emp.position || 'Team Member'}</p>
-                                               <div className="flex items-center gap-1.5 mt-1.5 text-slate-400">
-                                                   <MapPin size={10} className="shrink-0" /><span className="text-[10px] font-bold truncate leading-none">{emp.workLocation || 'Not Set'}</span>
+
+                           <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                               <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building2 size={14} className="text-teal-600"/> Corporate Directory</h3>
+                                   <div className="flex items-center gap-2">
+                                        {isPowerUser && (
+                                            <button 
+                                                onClick={openQuickAdd}
+                                                className="p-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition shadow-sm"
+                                                title="Quick Add Employee"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                        )}
+                                        <div className="bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-lg border border-teal-100 dark:border-teal-800 text-teal-700 dark:text-teal-400 text-[10px] font-black uppercase">
+                                            {filteredDirectoryEmployees.length} Total
+                                        </div>
+                                   </div>
+                               </div>
+                               <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1.5">
+                                   {filteredDirectoryEmployees.map(emp => (
+                                       <div 
+                                            key={emp.id} 
+                                            onClick={() => focusEmployeeOnMap(emp)}
+                                            className="w-full flex items-center text-left p-4 rounded-2xl hover:bg-teal-50/50 dark:hover:bg-teal-900/20 group border border-transparent hover:border-teal-100 dark:hover:border-teal-800 transition-all cursor-pointer"
+                                       >
+                                           <div className="flex items-center gap-4 flex-1 min-w-0">
+                                               <div className="relative">
+                                                   <img src={emp.avatar} className="w-12 h-12 rounded-xl object-cover shadow-sm border border-white dark:border-slate-700 bg-slate-100" alt="" />
+                                                   <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 ${emp.status === EmployeeStatus.ACTIVE ? 'bg-emerald-500' : 'bg-amber-400'}`}></div>
+                                               </div>
+                                               <div className="min-w-0 flex-1">
+                                                   <p className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm leading-tight">{emp.firstName} {emp.lastName}</p>
+                                                   <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-tighter mt-1">{emp.position || emp.jobTitle || 'Team Member'}</p>
+                                                   <div className="flex items-center gap-1.5 mt-1.5 text-slate-400">
+                                                       <MapPin size={10} className="shrink-0" /><span className="text-[10px] font-bold truncate leading-none">{emp.workLocation || 'Not Set'}</span>
+                                                   </div>
                                                </div>
                                            </div>
+                                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                               {isPowerUser && (
+                                                   <button 
+                                                        onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp}); }} 
+                                                        className="p-2 text-slate-400 hover:text-teal-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm border border-transparent hover:border-slate-100 dark:hover:border-slate-600 transition-all"
+                                                        title="Edit Record"
+                                                   >
+                                                       <Edit2 size={14} />
+                                                   </button>
+                                               )}
+                                               <ChevronRight size={18} className="text-slate-300" />
+                                           </div>
                                        </div>
-                                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                                           {isPowerUser && (
-                                               <button 
-                                                    onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp}); }} 
-                                                    className="p-2 text-slate-400 hover:text-teal-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm border border-transparent hover:border-slate-100 dark:hover:border-slate-600 transition-all"
-                                                    title="Edit Record"
-                                               >
-                                                   <Edit2 size={14} />
-                                               </button>
-                                           )}
-                                           <ChevronRight size={18} className="text-slate-300" />
+                                   ))}
+                                   {filteredDirectoryEmployees.length === 0 && (
+                                       <div className="p-8 text-center text-slate-400">
+                                           <Users size={32} className="mx-auto mb-2 opacity-20" />
+                                           <p className="text-xs font-medium italic">No colleagues match your criteria.</p>
                                        </div>
-                                   </div>
-                               ))}
-                               {filteredDirectoryEmployees.length === 0 && (
-                                   <div className="p-8 text-center text-slate-400">
-                                       <Users size={32} className="mx-auto mb-2 opacity-20" />
-                                       <p className="text-xs font-medium italic">No colleagues match your criteria.</p>
-                                   </div>
-                               )}
-                           </div>
-                       </div>
-                   </div>
-
-                   <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
-                       <div ref={mapContainerRef} className="w-full h-full z-0 grayscale-[0.2] contrast-[1.1]"></div>
-                       
-                       {/* Custom Basemap Toggle Overlay - Moved slightly further from edge */}
-                       <div className="absolute top-4 left-16 z-10">
-                            <button 
-                                onClick={() => setIsImagery(!isImagery)}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xl transition-all duration-300 backdrop-blur-md font-black text-[10px] uppercase tracking-widest ${
-                                    isImagery 
-                                    ? 'bg-teal-600 border-teal-500 text-white' 
-                                    : 'bg-white/80 dark:bg-slate-900/80 border-white/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900'
-                                }`}
-                            >
-                                <Layers size={14} />
-                                <span>{isImagery ? 'Map View' : 'Imagery'}</span>
-                            </button>
-                       </div>
-
-                       {/* Floating UI Overlays - Moved to Bottom Right to clear User Dropdown */}
-                       <div className="absolute bottom-6 right-6 z-10 hidden sm:flex flex-col gap-3 pointer-events-none">
-                           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-xl pointer-events-auto">
-                               <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Globe size={12}/> Regional Sync</h4>
-                               <div className="flex items-center gap-3">
-                                   <div className="flex -space-x-2">
-                                       {employees.slice(0, 3).map((e, idx) => (
-                                           <img key={idx} src={e.avatar} className="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm" alt="" />
-                                       ))}
-                                   </div>
-                                   <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Active Map View</span>
+                                   )}
                                </div>
                            </div>
                        </div>
 
-                       <div className="absolute bottom-6 left-6 z-10 flex items-center gap-2 pointer-events-none">
-                           <div className="bg-teal-600 text-white px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-teal-500/40 flex items-center gap-2 pointer-events-auto">
-                               <Target size={14}/> <span>{employees.filter(e => e.location).length} Calibrated Points</span>
+                       <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
+                           <div ref={mapContainerRef} className="w-full h-full z-0 grayscale-[0.2] contrast-[1.1]"></div>
+                           
+                           {/* Custom Basemap Toggle Overlay - Moved slightly further from edge */}
+                           <div className="absolute top-4 left-16 z-10">
+                                <button 
+                                    onClick={() => setIsImagery(!isImagery)}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xl transition-all duration-300 backdrop-blur-md font-black text-[10px] uppercase tracking-widest ${
+                                        isImagery 
+                                        ? 'bg-teal-600 border-teal-500 text-white' 
+                                        : 'bg-white/80 dark:bg-slate-900/80 border-white/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900'
+                                    }`}
+                                >
+                                    <Layers size={14} />
+                                    <span>{isImagery ? 'Map View' : 'Imagery'}</span>
+                                </button>
+                           </div>
+
+                           {/* Floating UI Overlays - Moved to Bottom Right to clear User Dropdown */}
+                           <div className="absolute bottom-6 right-6 z-10 hidden sm:flex flex-col gap-3 pointer-events-none">
+                               <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-xl pointer-events-auto">
+                                   <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Globe size={12}/> Regional Sync</h4>
+                                   <div className="flex items-center gap-3">
+                                       <div className="flex -space-x-2">
+                                           {employees.slice(0, 3).map((e, idx) => (
+                                               <img key={idx} src={e.avatar} className="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 shadow-sm" alt="" />
+                                           ))}
+                                       </div>
+                                       <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Active Map View</span>
+                                   </div>
+                               </div>
+                           </div>
+
+                           <div className="absolute bottom-6 left-6 z-10 flex items-center gap-2 pointer-events-none">
+                               <div className="bg-teal-600 text-white px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-teal-500/40 flex items-center gap-2 pointer-events-auto">
+                                   <Target size={14}/> <span>{employees.filter(e => e.location).length} Calibrated Points</span>
+                               </div>
                            </div>
                        </div>
                    </div>
-               </div>
+               )}
            </div>
        )}
 
@@ -661,8 +773,6 @@ const Organization = () => {
                </div>
            </form>
        </DraggableModal>
-
-       {/* Other Modals (Project/Position) would similarly follow this high-end aesthetic */}
     </div>
   );
 };
