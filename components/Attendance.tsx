@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
 import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2 } from 'lucide-react';
@@ -330,13 +331,15 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       </div>
 
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-end">
-          <div className="space-y-1.5 flex-1 w-full">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
-              <div className="relative">
-                  <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-              </div>
-          </div>
+          {isHR && (
+            <div className="space-y-1.5 flex-1 w-full">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
+                <div className="relative">
+                    <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-[2] w-full">
               <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label><input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" /></div>
               <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> To Date</label><input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" /></div>

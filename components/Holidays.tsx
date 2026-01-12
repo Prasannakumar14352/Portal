@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter } from 'lucide-react';
+import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter, CheckCircle2 } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
 import DraggableModal from './DraggableModal';
 import { read, utils } from 'xlsx';
@@ -28,24 +29,42 @@ const isUpcoming = (dateStr: string) => {
 const HolidayCard: React.FC<{ holiday: Holiday, compact?: boolean, isHR: boolean, onDelete: (id: string | number) => void }> = ({ holiday, compact = false, isHR, onDelete }) => {
     const { day, month, dayName } = getDateParts(holiday.date);
     const upcoming = isUpcoming(holiday.date);
+    const isPast = !upcoming;
 
     return (
-      <div className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between hover:shadow-md transition group ${compact ? 'p-4' : 'p-5'}`}>
+      <div className={`
+        rounded-xl border flex items-center justify-between transition group relative overflow-hidden select-none
+        ${compact ? 'p-4' : 'p-5'}
+        ${isPast 
+            ? 'bg-slate-50 dark:bg-slate-900/20 border-slate-100 dark:border-slate-800 opacity-60 grayscale-[0.8]' 
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md'
+        }
+      `}>
           <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className={`flex flex-col items-center justify-center text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl flex-shrink-0 ${compact ? 'w-12 h-12' : 'w-16 h-16'}`}>
+              <div className={`
+                flex flex-col items-center justify-center rounded-xl flex-shrink-0 border
+                ${compact ? 'w-12 h-12' : 'w-16 h-16'}
+                ${isPast 
+                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700' 
+                    : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900'
+                }
+              `}>
                   <span className="text-[10px] font-bold tracking-wider">{month}</span>
                   <span className={`${compact ? 'text-lg' : 'text-2xl'} font-bold leading-none`}>{day}</span>
               </div>
               <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                      <h4 className={`${compact ? 'text-sm' : 'text-lg'} font-bold text-slate-800 dark:text-slate-100 truncate`}>{holiday.name}</h4>
+                      <h4 className={`${compact ? 'text-sm' : 'text-lg'} font-bold text-slate-800 dark:text-slate-100 truncate ${isPast ? 'line-through text-slate-500' : ''}`}>
+                          {holiday.name}
+                      </h4>
                       {upcoming && !compact && <span className="bg-slate-700 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold whitespace-nowrap">Upcoming</span>}
+                      {isPast && !compact && <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold whitespace-nowrap flex items-center gap-1"><CheckCircle2 size={10} /> Done</span>}
                   </div>
                   <p className="text-slate-500 dark:text-slate-400 text-xs font-medium truncate">{dayName} • {holiday.type} Holiday</p>
               </div>
           </div>
           {!compact && isHR && (
-              <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+              <div className={`flex gap-1 transition-opacity ${isPast ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'}`}>
                   <button onClick={() => onDelete(holiday.id)} className="p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 size={18} /></button>
               </div>
           )}
@@ -126,7 +145,6 @@ const Holidays = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Fix: addHoliday expects Omit<Holiday, 'id'>, ID is generated in AppContext
       addHoliday({
         ...newHoliday
       });
