@@ -26,51 +26,16 @@ const isUpcoming = (dateStr: string) => {
     return hDate >= today;
 };
 
-// Helper to map holiday names to images
-const getHolidayImage = (name: string) => {
-    const n = name.toLowerCase();
-    // Sankranthi / Pongal / Lohri
-    if (n.includes('sankranti') || n.includes('sankranthi') || n.includes('pongal') || n.includes('lohri')) {
-        return 'https://images.unsplash.com/photo-1610996886915-c220df44b491?q=80&w=1000&auto=format&fit=crop'; // Kites/Harvest
-    }
-    // Republic Day / Independence Day (India/Generic Flags)
-    if (n.includes('republic') || n.includes('independence')) {
-        return 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?q=80&w=1000&auto=format&fit=crop'; // Tricolor/Flag
-    }
-    // Diwali
-    if (n.includes('diwali') || n.includes('deepavali')) {
-        return 'https://images.unsplash.com/photo-1572917730623-a0e231575747?q=80&w=1000&auto=format&fit=crop'; // Diya/Lights
-    }
-    // Holi
-    if (n.includes('holi')) {
-        return 'https://images.unsplash.com/photo-1552861268-2a9674092b77?q=80&w=1000&auto=format&fit=crop'; // Colors
-    }
-    // Christmas
-    if (n.includes('christmas') || n.includes('xmas')) {
-        return 'https://images.unsplash.com/photo-1544980219-9430b06e6f98?q=80&w=1000&auto=format&fit=crop'; // Tree/Decor
-    }
-    // New Year
-    if (n.includes('new year')) {
-        return 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?q=80&w=1000&auto=format&fit=crop'; // Fireworks
-    }
-    // Eid
-    if (n.includes('eid') || n.includes('ramadan')) {
-        return 'https://images.unsplash.com/photo-1526829777977-9bd72120b608?q=80&w=1000&auto=format&fit=crop'; // Lantern/Moon
-    }
-    // Shivratri
-    if (n.includes('shivratri') || n.includes('shiva')) {
-        return 'https://images.unsplash.com/photo-1616745873428-21d72379ae20?q=80&w=1000&auto=format&fit=crop'; // Spiritual/Temple
-    }
-    // Gandhi Jayanti
-    if (n.includes('gandhi')) {
-        return 'https://images.unsplash.com/photo-1566938064504-a63443722953?q=80&w=1000&auto=format&fit=crop'; // Spinning Wheel/Peace
-    }
-    // Thanksgiving
-    if (n.includes('thanksgiving')) {
-        return 'https://images.unsplash.com/photo-1509456592530-5d38e33f3fdd?q=80&w=1000&auto=format&fit=crop'; // Pumpkin/Autumn
-    }
-    // Default Celebration
-    return 'https://images.unsplash.com/photo-1514565131-fce0801e5785?q=80&w=1000&auto=format&fit=crop'; 
+// Helper to generate dynamic holiday images based on name and date
+const getHolidayImage = (name: string, date: string) => {
+    // Construct a descriptive prompt for the AI
+    // We include 'festival', 'celebration', 'tradition' to ensure relevant imagery
+    const prompt = encodeURIComponent(`${name} holiday festival celebration tradition, realistic, high quality, 4k`);
+    // Use the date as a seed to ensure the image is consistent for the same holiday date, 
+    // preventing it from changing on every render/click
+    const seed = date.replace(/-/g, ''); 
+    
+    return `https://image.pollinations.ai/prompt/${prompt}?width=1080&height=720&nologo=true&seed=${seed}`;
 };
 
 interface HolidayCardProps { 
@@ -478,11 +443,14 @@ const Holidays = () => {
        <DraggableModal isOpen={!!viewHoliday} onClose={() => setViewHoliday(null)} title={viewHoliday?.name || 'Holiday'} width="max-w-lg">
             {viewHoliday && (
                 <div className="space-y-5">
-                    <div className="w-full h-56 rounded-2xl overflow-hidden shadow-lg relative bg-slate-100 dark:bg-slate-900 group">
+                    <div className="w-full h-64 rounded-2xl overflow-hidden shadow-lg relative bg-slate-100 dark:bg-slate-900 group">
                         <img 
-                            src={getHolidayImage(viewHoliday.name)} 
+                            src={getHolidayImage(viewHoliday.name, viewHoliday.date)} 
                             alt={viewHoliday.name} 
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1514565131-fce0801e5785?q=80&w=1000&auto=format&fit=crop';
+                            }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                         <div className="absolute bottom-4 left-5 text-white">
