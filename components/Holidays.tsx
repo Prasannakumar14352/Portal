@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter, CheckCircle2, MapPin } from 'lucide-react';
+import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter, CheckCircle2, MapPin, X } from 'lucide-react';
 import { UserRole, Holiday } from '../types';
 import DraggableModal from './DraggableModal';
 import { read, utils } from 'xlsx';
@@ -26,16 +26,89 @@ const isUpcoming = (dateStr: string) => {
     return hDate >= today;
 };
 
-// Helper to generate dynamic holiday images based on name and date
-const getHolidayImage = (name: string, date: string) => {
-    // Construct a descriptive prompt for the AI
-    // We include 'festival', 'celebration', 'tradition' to ensure relevant imagery
-    const prompt = encodeURIComponent(`${name} holiday festival celebration tradition, realistic, high quality, 4k`);
-    // Use the date as a seed to ensure the image is consistent for the same holiday date, 
-    // preventing it from changing on every render/click
-    const seed = date.replace(/-/g, ''); 
+// Helper to map holiday names to high-quality Unsplash images
+const getHolidayImage = (name: string) => {
+    const n = name.toLowerCase();
     
-    return `https://image.pollinations.ai/prompt/${prompt}?width=1080&height=720&nologo=true&seed=${seed}`;
+    // Sankranti / Pongal / Lohri
+    if (n.includes('sankranti') || n.includes('sankranthi') || n.includes('pongal') || n.includes('lohri') || n.includes('makar')) {
+        return 'https://images.unsplash.com/photo-1610996886915-c220df44b491?q=80&w=1080'; // Kite festival/Harvest
+    }
+    // Republic Day / Independence Day (India/Generic)
+    if (n.includes('republic') || n.includes('independence')) {
+        return 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?q=80&w=1080'; // Tricolor/Flag theme
+    }
+    // Diwali / Deepavali
+    if (n.includes('diwali') || n.includes('deepavali')) {
+        return 'https://images.unsplash.com/photo-1572917730623-a0e231575747?q=80&w=1080'; // Diya/Lights
+    }
+    // Holi
+    if (n.includes('holi')) {
+        return 'https://images.unsplash.com/photo-1552861268-2a9674092b77?q=80&w=1080'; // Colors
+    }
+    // Christmas / Xmas
+    if (n.includes('christmas') || n.includes('xmas')) {
+        return 'https://images.unsplash.com/photo-1544980219-9430b06e6f98?q=80&w=1080'; // Tree/Decor
+    }
+    // New Year
+    if (n.includes('new year')) {
+        return 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?q=80&w=1080'; // Fireworks
+    }
+    // Eid / Ramadan
+    if (n.includes('eid') || n.includes('ramadan') || n.includes('bakrid')) {
+        return 'https://images.unsplash.com/photo-1583225213567-27b4097463f8?q=80&w=1080'; // Lantern/Moon
+    }
+    // Shivratri
+    if (n.includes('shivratri') || n.includes('shiva') || n.includes('mahashivratri')) {
+        return 'https://images.unsplash.com/photo-1616745873428-21d72379ae20?q=80&w=1080'; // Spiritual/Temple
+    }
+    // Ganesh Chaturthi
+    if (n.includes('ganesh') || n.includes('vinayaka')) {
+        return 'https://images.unsplash.com/photo-1631024765955-467f4066922d?q=80&w=1080'; // Idol
+    }
+    // Ugadi / Gudi Padwa
+    if (n.includes('ugadi') || n.includes('gudi padwa')) {
+        return 'https://images.unsplash.com/photo-1617356262829-d6e6bd0c2920?q=80&w=1080'; // Traditional
+    }
+    // Onam
+    if (n.includes('onam')) {
+        return 'https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?q=80&w=1080'; // Flower rangoli
+    }
+    // Dussehra / Navratri / Durga Puja
+    if (n.includes('dussehra') || n.includes('dasara') || n.includes('navratri') || n.includes('durga')) {
+        return 'https://images.unsplash.com/photo-1570158867926-2d338f0c9766?q=80&w=1080'; // Festive
+    }
+    // Raksha Bandhan
+    if (n.includes('raksha bandhan') || n.includes('rakhi')) {
+        return 'https://images.unsplash.com/photo-1628151016005-728b7849e793?q=80&w=1080'; // Rakhi
+    }
+    // Thanksgiving
+    if (n.includes('thanksgiving')) {
+        return 'https://images.unsplash.com/photo-1509456592530-5d38e33f3fdd?q=80&w=1080'; // Autumn/Pumpkin
+    }
+    // Halloween
+    if (n.includes('halloween')) {
+        return 'https://images.unsplash.com/photo-1508361001413-7a9dca21d08a?q=80&w=1080'; // Pumpkins
+    }
+    // Valentine
+    if (n.includes('valentine')) {
+        return 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=1080'; // Hearts
+    }
+    // Easter
+    if (n.includes('easter')) {
+        return 'https://images.unsplash.com/photo-1521685969578-1d6399c4c36a?q=80&w=1080'; // Eggs
+    }
+    // Gandhi Jayanti
+    if (n.includes('gandhi')) {
+        return 'https://images.unsplash.com/photo-1566938064504-a63443722953?q=80&w=1080'; // Spinning Wheel
+    }
+    // Labor Day
+    if (n.includes('labor') || n.includes('labour') || n.includes('may day')) {
+        return 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=1080'; // Tools/Work
+    }
+
+    // Default Celebration Image (Party/Confetti)
+    return 'https://images.unsplash.com/photo-1530103862676-de3c9a59af57?q=80&w=1080'; 
 };
 
 interface HolidayCardProps { 
@@ -443,25 +516,25 @@ const Holidays = () => {
        <DraggableModal isOpen={!!viewHoliday} onClose={() => setViewHoliday(null)} title={viewHoliday?.name || 'Holiday'} width="max-w-lg">
             {viewHoliday && (
                 <div className="space-y-5">
-                    <div className="w-full h-64 rounded-2xl overflow-hidden shadow-lg relative bg-slate-100 dark:bg-slate-900 group">
+                    <div className="w-full h-72 rounded-2xl overflow-hidden shadow-xl relative bg-slate-100 dark:bg-slate-900 group">
                         <img 
-                            src={getHolidayImage(viewHoliday.name, viewHoliday.date)} 
+                            src={getHolidayImage(viewHoliday.name)} 
                             alt={viewHoliday.name} 
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                             onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1514565131-fce0801e5785?q=80&w=1000&auto=format&fit=crop';
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1530103862676-de3c9a59af57?q=80&w=1080';
                             }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                        <div className="absolute bottom-4 left-5 text-white">
-                            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1 flex items-center gap-1.5"><Calendar size={12}/> {new Date(viewHoliday.date).getFullYear()}</p>
-                            <h3 className="text-2xl font-bold leading-tight">{viewHoliday.name}</h3>
+                        <div className="absolute bottom-5 left-6 text-white">
+                            <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1.5 flex items-center gap-1.5"><Calendar size={12}/> {new Date(viewHoliday.date).getFullYear()}</p>
+                            <h3 className="text-3xl font-black leading-tight tracking-tight drop-shadow-sm">{viewHoliday.name}</h3>
                         </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                                 <CalendarDays size={20} />
                             </div>
                             <div>
@@ -471,8 +544,8 @@ const Holidays = () => {
                                 </p>
                             </div>
                         </div>
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
                                 <PartyPopper size={20} />
                             </div>
                             <div>
@@ -483,13 +556,13 @@ const Holidays = () => {
                     </div>
 
                     {isUpcoming(viewHoliday.date) ? (
-                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl text-center">
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl text-center">
                             <p className="text-emerald-700 dark:text-emerald-400 text-sm font-medium flex items-center justify-center gap-2">
                                 <Clock size={16} /> This holiday is upcoming. Plan ahead!
                             </p>
                         </div>
                     ) : (
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl text-center">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-center">
                             <p className="text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
                                 <CheckCircle2 size={16} /> This holiday has passed.
                             </p>
