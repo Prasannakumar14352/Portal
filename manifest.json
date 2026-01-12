@@ -1,0 +1,22 @@
+
+{
+  "name": "EmpowerCorp HR Portal",
+  "short_name": "EmpowerCorp",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f766e",
+  "description": "A modern Employee HR Portal.",
+  "icons": [
+    {
+      "src": "https://ui-avatars.com/api/?name=EC&background=0f766e&color=fff&size=192&rounded=true",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=EC&background=0f766e&color=fff&size=512&rounded=true",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -7,10 +7,10 @@ import { useAppContext } from '../contexts/AppContext';
 
 const SUGGESTED_PROMPTS = [
   "What is my leave balance?",
-  "Show me upcoming holidays",
+  "Draft a professional email", 
   "Who is in the Engineering department?",
-  "How many employees are active?",
-  "My attendance history"
+  "Explain Quantum Computing",
+  "Show me upcoming holidays"
 ];
 
 const HRAssistant: React.FC = () => {
@@ -20,7 +20,7 @@ const HRAssistant: React.FC = () => {
     {
       id: 'welcome',
       role: 'model',
-      text: `Hello ${currentUser?.name.split(' ')[0]}! I am your EmpowerCorp AI Assistant. I have full access to our organization's directory, leave policies, and holiday calendar. How can I help you today?`,
+      text: `Hello ${currentUser?.name.split(' ')[0]}! I am your AI Assistant. \n\nI can help you with:\n• **HR Queries:** Leave balances, holidays, colleague info.\n• **General Tasks:** Coding, writing emails, analysis, or general questions.\n\nHow can I help you today?`,
       timestamp: new Date()
     }
   ]);
@@ -107,8 +107,8 @@ const HRAssistant: React.FC = () => {
             <Sparkles size={20} className="text-teal-200" />
           </div>
           <div>
-            <h2 className="font-bold text-lg">EC HR Intelligence</h2>
-            <p className="text-teal-100 text-[10px] uppercase tracking-widest font-bold">Context Aware • Gemini 3</p>
+            <h2 className="font-bold text-lg">EC Intelligent Assistant</h2>
+            <p className="text-teal-100 text-[10px] uppercase tracking-widest font-bold">HR Context + General AI</p>
           </div>
         </div>
         <button 
@@ -117,7 +117,7 @@ const HRAssistant: React.FC = () => {
             setMessages([{
               id: Date.now().toString(),
               role: 'model',
-              text: 'Conversation reset. Ask me anything about employees, leaves, or holidays.',
+              text: 'Conversation reset. Ask me anything about HR or general topics.',
               timestamp: new Date()
             }]);
           }}
@@ -163,7 +163,7 @@ const HRAssistant: React.FC = () => {
                    {msg.role === 'model' && !msg.isError && (
                        <>
                         <span>•</span>
-                        <span className="flex items-center gap-0.5"><Sparkles size={8}/> Verified Context</span>
+                        <span className="flex items-center gap-0.5"><Sparkles size={8}/> Gemini 3</span>
                        </>
                    )}
                 </div>
@@ -181,7 +181,7 @@ const HRAssistant: React.FC = () => {
                  <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                  <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                  <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                 <span className="text-xs text-slate-400 ml-2 font-medium">Analyzing records...</span>
+                 <span className="text-xs text-slate-400 ml-2 font-medium">Thinking...</span>
                </div>
             </div>
           </div>
@@ -211,7 +211,7 @@ const HRAssistant: React.FC = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me about holidays, leaves, or colleagues..."
+            placeholder="Ask anything (HR data, Coding, Writing, General)..."
             className="flex-1 px-4 py-3.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all text-sm dark:text-white placeholder-slate-400"
           />
           <button 
@@ -223,8 +223,8 @@ const HRAssistant: React.FC = () => {
           </button>
         </form>
         <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 justify-center text-center uppercase tracking-widest font-bold">
-          <ShieldCheck size={12} className="shrink-0 text-teal-600" />
-          <span>Real-time Secure Data Integration Active</span>
+          <Sparkles size={12} className="shrink-0 text-teal-600" />
+          <span>Gemini 3 Pro Hybrid Intelligence</span>
         </div>
       </div>
     </div>

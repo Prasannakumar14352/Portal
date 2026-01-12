@@ -1,7 +1,8 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Clock, MessageSquareText, Building2, Timer, BarChart3, FileText, Coffee, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, Clock, MessageSquareText, Building2, Timer, BarChart3, FileText, Coffee, X, Download } from 'lucide-react';
 import { UserRole } from '../types';
+import { useAppContext } from '../contexts/AppContext';
 
 interface SidebarProps {
   currentView: string;
@@ -12,6 +13,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, isOpen = false, onClose }) => {
+  const { installApp, isInstallable } = useAppContext();
+
   const getMenuItems = () => {
     // Items visible to EVERYONE
     const commonItems = [
@@ -90,7 +93,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
         </ul>
       </nav>
       
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+         {isInstallable && (
+            <button 
+                onClick={installApp}
+                className="w-full flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 py-2.5 rounded-xl text-sm font-bold hover:bg-teal-50 dark:hover:bg-slate-700 hover:text-teal-700 dark:hover:text-white transition-all shadow-sm"
+            >
+                <Download size={16} />
+                <span>Install App</span>
+            </button>
+         )}
          <div className="text-xs text-slate-500 dark:text-slate-500 text-center">
             &copy; 2025 EmpowerCorp
          </div>

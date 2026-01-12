@@ -89,6 +89,10 @@ interface AppContextType {
 
   manualAddPayslip: (slip: Payslip) => Promise<void>;
   sendLeaveStatusEmail: (data: any) => Promise<void>;
+
+  // PWA Install
+  installApp: () => Promise<void>;
+  isInstallable: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -113,8 +117,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isMsalReady, setIsMsalReady] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // PWA Install Prompt Listener
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
     // Initialize MSAL
     const initMsal = async () => {
       try {
@@ -148,6 +160,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     refreshData();
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const refreshData = async () => {
@@ -199,6 +215,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
+
+  const installApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
   };
 
   const login = async (email: string, password?: string): Promise<boolean> => {
@@ -612,7 +637,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateLeaveType, deleteLeaveType, checkIn, checkOut, updateAttendanceRecord, 
       deleteAttendanceRecord, addTimeEntry, updateTimeEntry, deleteTimeEntry,
       markNotificationRead, markAllRead, notify, addHoliday, addHolidays, deleteHoliday, 
-      syncHolidayLogs, manualAddPayslip, sendLeaveStatusEmail
+      syncHolidayLogs, manualAddPayslip, sendLeaveStatusEmail,
+      installApp, isInstallable: !!deferredPrompt
     }}>
       {children}
     </AppContext.Provider>
