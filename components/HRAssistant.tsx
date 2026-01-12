@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, RefreshCw, Key } from 'lucide-react';
 import { getHRChatResponse, resetChatSession } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { useAppContext } from '../contexts/AppContext';
@@ -20,7 +20,7 @@ const HRAssistant: React.FC = () => {
     {
       id: 'welcome',
       role: 'model',
-      text: `Hello ${currentUser?.name.split(' ')[0]}! I am your AI Assistant. \n\nI can help you with:\n• **HR Queries:** Leave balances, holidays, colleague info.\n• **General Tasks:** Coding, writing emails, analysis, or general questions.\n\nHow can I help you today?`,
+      text: `Hello ${currentUser?.name.split(' ')[0]}! I am your AI Assistant (Gemini 3). \n\nI can help you with:\n• **HR Queries:** Leave balances, holidays, colleague info.\n• **General Tasks:** Coding, writing emails, analysis, or general questions.\n\nHow can I help you today?`,
       timestamp: new Date()
     }
   ]);
@@ -77,16 +77,28 @@ const HRAssistant: React.FC = () => {
       };
 
       setMessages(prev => [...prev, botMessage]);
-    } catch (error) {
-      // Error handling modified to be user-friendly without console logging
-      const errorMessage: ChatMessage = {
+    } catch (error: any) {
+      console.error("Gemini Error:", error);
+      let errorMessage = 'Sorry, I encountered an issue. Please try again later.';
+      
+      if (error.message === "MISSING_API_KEY") {
+          errorMessage = 'Configuration Error: API Key is missing. Please add "API_KEY" to your .env file.';
+      } else if (error.toString().includes('403') || error.message?.includes('403')) {
+          errorMessage = 'Access Denied (403). The provided API Key is invalid or does not have access to the "gemini-3-flash-preview" model.';
+      } else if (error.message?.includes('404')) {
+          errorMessage = 'Model Not Found (404). Gemini 3 Preview might not be available for your account yet.';
+      } else if (error.message?.includes('API key')) {
+          errorMessage = 'Invalid API Key. Please check your configuration.';
+      }
+
+      const msg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: 'Sorry, I encountered an issue. Please try again later.',
+        text: errorMessage,
         timestamp: new Date(),
         isError: true
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, msg]);
     } finally {
       setIsLoading(false);
     }
@@ -136,8 +148,8 @@ const HRAssistant: React.FC = () => {
           >
             <div className={`flex max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3`}>
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm
-                ${msg.role === 'user' ? 'bg-teal-600' : msg.isError ? 'bg-red-500' : 'bg-slate-700 dark:bg-slate-600'}`}>
-                {msg.role === 'user' ? <User size={18} className="text-white" /> : <Bot size={18} className="text-white" />}
+                ${msg.role === 'user' ? 'bg-teal-600' : msg.isError ? 'bg-red-100' : 'bg-slate-700 dark:bg-slate-600'}`}>
+                {msg.role === 'user' ? <User size={18} className="text-white" /> : msg.isError ? <AlertCircle size={18} className="text-red-600" /> : <Bot size={18} className="text-white" />}
               </div>
               
               <div className={`p-4 rounded-2xl shadow-sm border
@@ -148,7 +160,7 @@ const HRAssistant: React.FC = () => {
                     : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-tl-none'}`}>
                 
                 {msg.isError && (
-                    <div className="flex items-center space-x-2 mb-2 font-bold text-xs">
+                    <div className="flex items-center space-x-2 mb-2 font-bold text-xs uppercase tracking-wider">
                         <AlertCircle size={14} />
                         <span>System Error</span>
                     </div>
@@ -189,7 +201,7 @@ const HRAssistant: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompts Area - Only show when conversation is short */}
+      {/* Suggested Prompts Area */}
       {!isLoading && messages.length < 4 && (
         <div className="px-4 pb-2 bg-slate-50 dark:bg-slate-900/50 flex gap-2 overflow-x-auto scrollbar-hide">
             {SUGGESTED_PROMPTS.map((prompt, idx) => (
@@ -230,10 +242,5 @@ const HRAssistant: React.FC = () => {
     </div>
   );
 };
-
-// Internal icon not exported from lucide
-const ShieldCheck = ({size, className}: {size: number, className: string}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
-);
 
 export default HRAssistant;

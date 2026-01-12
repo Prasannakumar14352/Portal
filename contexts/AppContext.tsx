@@ -118,6 +118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isMsalReady, setIsMsalReady] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
     // PWA Install Prompt Listener
@@ -126,6 +127,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Check if running in standalone mode
+    const checkStandalone = () => {
+      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+      setIsStandalone(!!isStandaloneMode);
+    };
+    checkStandalone();
+    window.addEventListener('resize', checkStandalone);
 
     // Initialize MSAL
     const initMsal = async () => {
@@ -163,6 +172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('resize', checkStandalone);
     };
   }, []);
 
@@ -218,11 +228,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const installApp = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      // Manual fallback instructions
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if (isMac) {
+          showToast("To install: Click Share icon -> Add to Home Screen", "info");
+      } else {
+          showToast("To install: Click browser menu (⋮) -> Install App", "info");
+      }
     }
   };
 
@@ -638,7 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteAttendanceRecord, addTimeEntry, updateTimeEntry, deleteTimeEntry,
       markNotificationRead, markAllRead, notify, addHoliday, addHolidays, deleteHoliday, 
       syncHolidayLogs, manualAddPayslip, sendLeaveStatusEmail,
-      installApp, isInstallable: !!deferredPrompt
+      installApp, isInstallable: !isStandalone
     }}>
       {children}
     </AppContext.Provider>
