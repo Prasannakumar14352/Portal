@@ -615,7 +615,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                               </div>
                               <div className="mt-6 pt-4 border-t border-slate-50 dark:border-slate-700/50 flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                                   <span>ID: {member.employeeId}</span>
-                                  <span>{member.department}</span>
+                                  <span>{employees.find(e => String(e.id) === String(member.id))?.department || 'General'}</span>
                               </div>
                           </div>
                       );

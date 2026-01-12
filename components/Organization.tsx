@@ -186,7 +186,7 @@ const Organization = () => {
         graphicsLayerRef.current = graphicsLayer;
 
         view.when(() => {
-            view.ui.add(new Home({ view: view }), "top-left");
+            (view.ui as any).add(new Home({ view: view }));
             refreshMapMarkers(filteredDirectoryEmployees);
         }).catch((err: any) => console.error("Map initialization failed", err));
     }).catch(err => console.error("ArcGIS load failed:", err));
@@ -227,7 +227,7 @@ const Organization = () => {
         });
 
         view.when(() => {
-            view.ui.add(new Home({ view: view }), "top-left");
+            (view.ui as any).add(new Home({ view: view }));
         });
 
         const layer = new GraphicsLayer();
@@ -378,7 +378,7 @@ const Organization = () => {
             setEditingPosition(null);
             showToast("Position updated.", "success");
         } else {
-            await addPosition(positionForm);
+            await addPosition({ ...positionForm, id: Math.random().toString(36).substr(2, 9) });
             showToast("Position created.", "success");
         }
         setShowPositionModal(false);

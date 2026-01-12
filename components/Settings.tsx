@@ -4,6 +4,21 @@ import { Bell, Mail, Monitor, Shield, Eye, Database, Sparkles, Smartphone, Moon,
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, UserSettings } from '../types';
 
+const DEFAULT_SETTINGS: UserSettings = {
+  notifications: {
+    emailLeaves: true,
+    emailAttendance: false,
+    pushWeb: true,
+    pushMobile: false,
+    systemAlerts: true
+  },
+  appConfig: {
+    aiAssistant: true,
+    azureSync: false,
+    strictSso: false
+  }
+};
+
 const Settings = () => {
   const { theme, toggleTheme, currentUser, updateUser, showToast } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
@@ -13,15 +28,20 @@ const Settings = () => {
 
   // Load initial settings from user data
   useEffect(() => {
-    if (currentUser?.settings) {
-      setLocalSettings(JSON.parse(JSON.stringify(currentUser.settings)));
+    if (currentUser) {
+      if (currentUser.settings) {
+        setLocalSettings(JSON.parse(JSON.stringify(currentUser.settings)));
+      } else {
+        setLocalSettings(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
+      }
     }
   }, [currentUser]);
 
   // Determine if there are unsaved changes
   const isDirty = useMemo(() => {
-    if (!currentUser?.settings || !localSettings) return false;
-    return JSON.stringify(localSettings) !== JSON.stringify(currentUser.settings);
+    if (!localSettings) return false;
+    const current = currentUser?.settings || DEFAULT_SETTINGS;
+    return JSON.stringify(localSettings) !== JSON.stringify(current);
   }, [localSettings, currentUser]);
 
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
@@ -60,7 +80,7 @@ const Settings = () => {
     </div>
   );
 
-  if (!localSettings) return null;
+  if (!localSettings) return <div className="p-10 text-center text-slate-400">Loading settings...</div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">

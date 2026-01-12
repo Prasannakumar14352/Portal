@@ -86,7 +86,11 @@ export const mockEmployees: Employee[] = [
     workLocation: 'USA',
     phone: '+1 (555) 010-1010',
     jobTitle: 'Head of HR',
-    projectIds: []
+    projectIds: [],
+    settings: {
+        notifications: { emailLeaves: true, emailAttendance: true, pushWeb: true, pushMobile: true, systemAlerts: true },
+        appConfig: { aiAssistant: true, azureSync: true, strictSso: false }
+    }
   },
   {
     id: 2,
@@ -107,7 +111,11 @@ export const mockEmployees: Employee[] = [
     workLocation: 'WFH India',
     phone: '+1 (555) 020-2020',
     jobTitle: 'Frontend Developer',
-    projectIds: [1, 3]
+    projectIds: [1, 3],
+    settings: {
+        notifications: { emailLeaves: true, emailAttendance: false, pushWeb: true, pushMobile: true, systemAlerts: false },
+        appConfig: { aiAssistant: true, azureSync: false, strictSso: false }
+    }
   },
   {
     id: 3,
@@ -127,7 +135,11 @@ export const mockEmployees: Employee[] = [
     workLocation: 'Office HQ India',
     phone: '+1 (555) 030-3030',
     jobTitle: 'Engineering Manager',
-    projectIds: [1, 2]
+    projectIds: [1, 2],
+    settings: {
+        notifications: { emailLeaves: true, emailAttendance: true, pushWeb: true, pushMobile: false, systemAlerts: true },
+        appConfig: { aiAssistant: true, azureSync: false, strictSso: false }
+    }
   },
   {
     id: 4,
@@ -147,7 +159,11 @@ export const mockEmployees: Employee[] = [
     workLocation: 'UAE Office',
     phone: '+1 (555) 040-4040',
     jobTitle: 'Sales Lead',
-    projectIds: []
+    projectIds: [],
+    settings: {
+        notifications: { emailLeaves: true, emailAttendance: false, pushWeb: false, pushMobile: true, systemAlerts: true },
+        appConfig: { aiAssistant: false, azureSync: false, strictSso: false }
+    }
   }
 ];
 
