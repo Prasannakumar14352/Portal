@@ -21,6 +21,12 @@ export const msalConfig: Configuration = {
         loggerOptions: {
             loggerCallback: (level, message, containsPii) => {
                 if (containsPii) return;
+                
+                // Suppress "window closed" errors as they represent user cancellation
+                if (message.includes("window closed") || message.includes("user_cancelled")) {
+                    return;
+                }
+
                 switch (level) {
                     case LogLevel.Error:
                         console.error("[MSAL]", message);

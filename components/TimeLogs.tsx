@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import DraggableModal from './DraggableModal';
 
 const TimeLogs = () => {
-  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, users, showToast, syncHolidayLogs, holidays } = useAppContext();
+  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, employees, showToast, syncHolidayLogs, holidays } = useAppContext();
   
   // UI State
   const [showModal, setShowModal] = useState(false);
@@ -282,7 +282,7 @@ const TimeLogs = () => {
 
     const headers = ["Date", "Resource", "Category", "Project", "Task", "Time", "Description", "Status", "Billable"];
     const rows = visibleEntries.map(e => {
-        const user = users.find(u => String(u.id) === String(e.userId));
+        const user = employees.find(u => String(u.id) === String(e.userId));
         const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
         const totalHours = ((e.durationMinutes + (e.extraMinutes || 0)) / 60).toFixed(2);
         const category = user?.department || 'Product Development';
@@ -335,7 +335,7 @@ const TimeLogs = () => {
 
     let grandTotalMinutes = 0;
     visibleEntries.forEach(e => {
-        const user = users.find(u => String(u.id) === String(e.userId));
+        const user = employees.find(u => String(u.id) === String(e.userId));
         const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
         const totalMins = e.durationMinutes + (e.extraMinutes || 0);
         grandTotalMinutes += totalMins;
@@ -426,7 +426,7 @@ const TimeLogs = () => {
     doc.text(rangeStr, 148, 28, { align: 'center' });
 
     const tableData = visibleEntries.map(e => {
-        const user = users.find(u => String(u.id) === String(e.userId));
+        const user = employees.find(u => String(u.id) === String(e.userId));
         const resourceName = user ? `${user.firstName}${user.lastName?.charAt(0) || ''}` : 'Unknown';
         return [
             e.date,
@@ -595,7 +595,7 @@ const TimeLogs = () => {
                       {/* Project Detail Rows */}
                       {expandedProjects[pid] && entries.map(e => {
                         const { day, monthYear } = getDayNameAndDate(e.date);
-                        const user = users.find(u => String(u.id) === String(e.userId));
+                        const user = employees.find(u => String(u.id) === String(e.userId));
                         const isHolidayLog = e.task === 'Public Holiday';
                         return (
                           <tr key={e.id} className={`hover:bg-slate-50/50 transition-colors group ${isHolidayLog ? 'bg-emerald-50/20 dark:bg-emerald-900/5' : 'bg-white dark:bg-slate-800'}`}>

@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck
+  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -115,7 +116,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [approvalComment, setApprovalComment] = useState('');
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types'>('requests');
+  const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'team'>('requests');
   const [isEditingId, setIsEditingId] = useState<string | number | null>(null);
   const [editingTypeId, setEditingTypeId] = useState<string | number | null>(null);
 
@@ -140,12 +141,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     return users.filter(u => String(u.id) !== String(currentUser?.id));
   }, [users, currentUser]);
 
-  const userBalances = useMemo(() => {
-    if (!currentUser) return [];
-    
+  const getBalancesForUser = (userId: string | number) => {
     return leaveTypes.map(type => {
       const approvedLeaves = leaves.filter(l => 
-        String(l.userId) === String(currentUser.id) && 
+        String(l.userId) === String(userId) && 
         l.type === type.name && 
         l.status === LeaveStatusEnum.APPROVED
       );
@@ -169,7 +168,17 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         remaining: Math.max(0, type.days - usedDays)
       };
     });
+  };
+
+  const userBalances = useMemo(() => {
+    if (!currentUser) return [];
+    return getBalancesForUser(currentUser.id);
   }, [leaveTypes, leaves, currentUser]);
+
+  const teamMembers = useMemo(() => {
+      if (!currentUser) return [];
+      return users.filter(u => String(u.managerId) === String(currentUser.id));
+  }, [users, currentUser]);
 
   const handleOpenCreate = () => {
     setIsEditingId(null);
@@ -382,7 +391,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         </div>
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto">
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-            {['requests', 'balances', 'types'].map(tab => (
+            {['requests', 'balances', 'types', ...(teamMembers.length > 0 || isHR ? ['team'] : [])].map(tab => (
                 <button key={tab} onClick={() => setViewMode(tab as any)} className={`px-4 py-1.5 rounded-md text-sm transition capitalize ${viewMode === tab ? 'bg-white dark:bg-slate-700 shadow text-teal-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>
                   {tab}
                 </button>
@@ -564,6 +573,55 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 ))}
             </div>
         </div>
+      )}
+
+      {viewMode === 'team' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teamMembers.length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400">
+                      <Users className="w-16 h-16 mb-4 opacity-20" />
+                      <p className="text-lg font-medium">No direct reports found.</p>
+                      <p className="text-sm opacity-60">Team members assigned to you will appear here.</p>
+                  </div>
+              ) : (
+                  teamMembers.map(member => {
+                      const balances = getBalancesForUser(member.id);
+                      return (
+                          <div key={member.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col">
+                              <div className="flex items-center gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-slate-700">
+                                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-100 dark:border-slate-700">
+                                      <img src={member.avatar} className="w-full h-full object-cover" alt="" />
+                                  </div>
+                                  <div>
+                                      <h4 className="font-bold text-slate-800 dark:text-white">{member.name}</h4>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-tight">{member.position}</p>
+                                  </div>
+                              </div>
+                              <div className="space-y-4 flex-1">
+                                  {balances.slice(0, 3).map(bal => (
+                                      <div key={bal.id}>
+                                          <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider mb-1.5">
+                                              <span className="text-slate-600 dark:text-slate-300">{bal.name}</span>
+                                              <span className={bal.remaining < 3 ? 'text-rose-500' : 'text-teal-600'}>{bal.remaining} Left</span>
+                                          </div>
+                                          <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                              <div 
+                                                  className={`h-full rounded-full ${bal.remaining < 3 ? 'bg-rose-500' : 'bg-teal-500'}`} 
+                                                  style={{ width: `${Math.min(100, (bal.used / bal.days) * 100)}%` }}
+                                              ></div>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                              <div className="mt-6 pt-4 border-t border-slate-50 dark:border-slate-700/50 flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                  <span>ID: {member.employeeId}</span>
+                                  <span>{member.department}</span>
+                              </div>
+                          </div>
+                      );
+                  })
+              )}
+          </div>
       )}
 
       {/* Leave Request Modal */}

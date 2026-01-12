@@ -116,23 +116,21 @@ interface HolidayCardProps {
     compact?: boolean; 
     isHR: boolean; 
     onDelete: (id: string | number) => void;
-    onClick: (holiday: Holiday) => void;
 }
 
-const HolidayCard: React.FC<HolidayCardProps> = ({ holiday, compact = false, isHR, onDelete, onClick }) => {
+const HolidayCard: React.FC<HolidayCardProps> = ({ holiday, compact = false, isHR, onDelete }) => {
     const { day, month, dayName } = getDateParts(holiday.date);
     const upcoming = isUpcoming(holiday.date);
     const isPast = !upcoming;
 
     return (
       <div 
-        onClick={() => onClick(holiday)}
         className={`
-        rounded-xl border flex items-center justify-between transition-all group relative overflow-hidden select-none cursor-pointer
+        rounded-xl border flex items-center justify-between transition-all group relative overflow-hidden select-none
         ${compact ? 'p-4' : 'p-5'}
         ${isPast 
-            ? 'bg-slate-50 dark:bg-slate-900/20 border-slate-100 dark:border-slate-800 opacity-60 grayscale-[0.8] hover:opacity-100 hover:grayscale-0' 
-            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-teal-200 dark:hover:border-teal-700 hover:-translate-y-0.5'
+            ? 'bg-slate-50 dark:bg-slate-900/20 border-slate-100 dark:border-slate-800 opacity-60 grayscale-[0.8]' 
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm'
         }
       `}>
           <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -364,7 +362,6 @@ const Holidays = () => {
                                         holiday={holiday} 
                                         isHR={isHR} 
                                         onDelete={deleteHoliday} 
-                                        onClick={(h) => setViewHoliday(h)}
                                     />
                                 ))}
                             </div>
@@ -379,8 +376,7 @@ const Holidays = () => {
                {/* Next Holiday Card */}
                {nextHoliday && (
                  <div 
-                    onClick={() => setViewHoliday(nextHoliday)}
-                    className="bg-emerald-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group cursor-pointer hover:shadow-xl transition-all hover:scale-[1.02]"
+                    className="bg-emerald-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group"
                  >
                     <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
                     <div className="relative z-10">
@@ -512,7 +508,7 @@ const Holidays = () => {
             </form>
        </DraggableModal>
 
-       {/* View Holiday Image Modal */}
+       {/* View Holiday Image Modal - Retained but hidden by state logic */}
        <DraggableModal isOpen={!!viewHoliday} onClose={() => setViewHoliday(null)} title={viewHoliday?.name || 'Holiday'} width="max-w-lg">
             {viewHoliday && (
                 <div className="space-y-5">

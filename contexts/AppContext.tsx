@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   User, Employee, Department, Project, LeaveRequest, LeaveTypeConfig, 
@@ -6,7 +7,7 @@ import {
 } from '../types';
 import { db } from '../services/db';
 import { msalConfig, loginRequest } from '../services/authConfig';
-import { PublicClientApplication, InteractionRequiredAuthError } from "@azure/msal-browser";
+import { PublicClientApplication, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { microsoftGraphService } from '../services/microsoftGraphService';
 import { emailService } from '../services/emailService';
 
@@ -264,8 +265,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const response = await msalInstance.loginPopup(request);
           await handleMsalResponse(response);
           return true;
-      } catch (error) {
-          console.error(error);
+      } catch (error: any) {
+          if (error instanceof BrowserAuthError && (error.errorCode === "user_cancelled" || error.message?.includes("window closed"))) {
+             // User cancelled, just log info
+             console.log("MSAL Login: User cancelled or closed window.");
+          } else {
+             console.error("MSAL Login Error:", error);
+          }
           return false;
       }
   };

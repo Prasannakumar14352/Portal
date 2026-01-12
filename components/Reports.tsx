@@ -20,7 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const Reports = () => {
-  const { timeEntries, projects, users, attendance, currentUser, showToast } = useAppContext();
+  const { timeEntries, projects, employees, attendance, currentUser, showToast } = useAppContext();
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [filterPeriod, setFilterPeriod] = useState('This Month');
   const [filterProject, setFilterProject] = useState('All');
@@ -42,7 +42,7 @@ const Reports = () => {
 
   // --- Data Aggregation Helpers ---
 
-  // 0. Base Data Filtering (Role Based)
+  // 0. Base Data Filtering (Role Based) - Used for Dashboard/Time Logs (Personalized)
   const reportTimeEntries = useMemo(() => {
       if (isPowerUser) return timeEntries;
       return timeEntries.filter(t => String(t.userId) === String(currentUser?.id));
@@ -128,44 +128,65 @@ const Reports = () => {
       });
   }, [reportTimeEntries, projects, projectTimeAllocation]);
 
-  // 5. Team Member Contributions (Total Hours - Simple Bar) - FILTERED BY PROJECT
+  // 5. Team Member Contributions - GLOBAL SCOPE (Shows ALL employees including HRs/Managers with 0 logs)
   const teamContributionData = useMemo(() => {
     const contrib: Record<string, number> = {};
-    let entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+    
+    // Initialize all employees with 0
+    employees.forEach(emp => {
+        const name = `${emp.firstName} ${emp.lastName}`;
+        contrib[name] = 0;
+    });
 
+    // Determine entries to process based on filter
+    let entriesToUse = timeEntries;
     if (filterProject !== 'All') {
         entriesToUse = entriesToUse.filter(e => String(e.projectId) === filterProject);
     }
 
+    // Add actual hours
     entriesToUse.forEach(e => {
-        const user = users.find(u => String(u.id) === String(e.userId));
-        const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
-        
-        contrib[name] = (contrib[name] || 0) + e.durationMinutes + (e.extraMinutes || 0);
+        const user = employees.find(u => String(u.id) === String(e.userId));
+        if (user) {
+            const name = `${user.firstName} ${user.lastName}`;
+            contrib[name] = (contrib[name] || 0) + e.durationMinutes + (e.extraMinutes || 0);
+        }
     });
+
     return Object.keys(contrib).map(name => ({
         name,
         hours: parseFloat((contrib[name] / 60).toFixed(1))
     })).sort((a, b) => b.hours - a.hours);
-  }, [timeEntries, reportTimeEntries, users, isPowerUser, filterProject]);
+  }, [timeEntries, employees, filterProject]);
 
-  // 6. User Workload (Tasks Assigned vs Completed) - FILTERED BY PROJECT & STACKED
+  // 6. User Workload - GLOBAL SCOPE (Shows ALL employees including HRs/Managers)
   const userWorkloadData = useMemo(() => {
       const load: Record<string, { allTasks: Set<string>, approvedTasks: Set<string> }> = {};
-      let entriesToUse = isPowerUser ? timeEntries : reportTimeEntries;
+      
+      // Initialize all employees
+      employees.forEach(emp => {
+          const name = `${emp.firstName} ${emp.lastName}`;
+          load[name] = { allTasks: new Set(), approvedTasks: new Set() };
+      });
 
+      // Filter entries
+      let entriesToUse = timeEntries;
       if (filterProject !== 'All') {
           entriesToUse = entriesToUse.filter(e => String(e.projectId) === filterProject);
       }
 
+      // Aggregate tasks
       entriesToUse.forEach(e => {
-          const user = users.find(u => String(u.id) === String(e.userId));
-          const name = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
-          if (!load[name]) load[name] = { allTasks: new Set(), approvedTasks: new Set() };
-          
-          load[name].allTasks.add(e.task);
-          if (e.status === 'Approved') {
-              load[name].approvedTasks.add(e.task);
+          const user = employees.find(u => String(u.id) === String(e.userId));
+          if (user) {
+              const name = `${user.firstName} ${user.lastName}`;
+              // Fallback just in case user wasn't in original employees list
+              if (!load[name]) load[name] = { allTasks: new Set(), approvedTasks: new Set() };
+              
+              load[name].allTasks.add(e.task);
+              if (e.status === 'Approved') {
+                  load[name].approvedTasks.add(e.task);
+              }
           }
       });
 
@@ -180,8 +201,9 @@ const Reports = () => {
               total
           };
       }).sort((a, b) => b.total - a.total);
-  }, [timeEntries, reportTimeEntries, users, isPowerUser, filterProject]);
+  }, [timeEntries, employees, filterProject]);
 
+  // Personalized Billable Data (Dashboard)
   const billableData = useMemo(() => {
       let billable = 0;
       let nonBillable = 0;
@@ -195,6 +217,28 @@ const Reports = () => {
           { name: 'Non-Billable', value: parseFloat((nonBillable / 60).toFixed(1)) }
       ];
   }, [reportTimeEntries]);
+
+  // GLOBAL Billable Data (Team Performance Tab)
+  const teamBillableData = useMemo(() => {
+      let billable = 0;
+      let nonBillable = 0;
+      // Global scope for Team tab
+      let entriesToUse = timeEntries;
+      
+      if (filterProject !== 'All') {
+          entriesToUse = entriesToUse.filter(e => String(e.projectId) === filterProject);
+      }
+
+      entriesToUse.forEach(e => {
+          const total = e.durationMinutes + (e.extraMinutes || 0);
+          if (e.isBillable) billable += total;
+          else nonBillable += total;
+      });
+      return [
+          { name: 'Billable', value: parseFloat((billable / 60).toFixed(1)) },
+          { name: 'Non-Billable', value: parseFloat((nonBillable / 60).toFixed(1)) }
+      ];
+  }, [timeEntries, filterProject]);
 
   // 7. Attendance Status Distribution
   const attendanceStatusData = useMemo(() => {
@@ -227,7 +271,7 @@ const Reports = () => {
             dataToExport = reportTimeEntries.map(t => ({ 
                 Date: t.date, 
                 Project: projects.find(p => String(p.id) === String(t.projectId))?.name || 'N/A', 
-                User: users.find(u => String(u.id) === String(t.userId))?.firstName || 'Unknown', 
+                User: employees.find(u => String(u.id) === String(t.userId))?.firstName || 'Unknown', 
                 Task: t.task,
                 NormalHours: (t.durationMinutes/60).toFixed(2),
                 ExtraHours: ((t.extraMinutes || 0)/60).toFixed(2),
@@ -451,14 +495,14 @@ const Reports = () => {
                 {/* 3. Billable vs Non-billable - Pie Chart */}
                 <div id="chart-team-billable" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                        <DollarSign size={18} className="text-emerald-500" /> Billable vs Non-billable
+                        <DollarSign size={18} className="text-emerald-500" /> Billable vs Non-billable (Global)
                     </h3>
-                    <p className="text-xs text-slate-500 mb-4">Time tracking distribution by billable status.</p>
+                    <p className="text-xs text-slate-500 mb-4">Time tracking distribution by billable status for all projects.</p>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
-                                    data={billableData}
+                                    data={teamBillableData}
                                     cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
                                     label={({name, percent}) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
                                 >

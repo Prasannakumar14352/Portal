@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, LogOut, ChevronDown, User as UserIcon, Info, AlertTriangle, CheckCircle, XCircle, Menu, Moon, Sun } from 'lucide-react';
+import { Bell, LogOut, ChevronDown, User as UserIcon, Info, AlertTriangle, CheckCircle, XCircle, Menu, Moon, Sun, Settings } from 'lucide-react';
 import { User } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -167,6 +168,18 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
                 <UserIcon size={16} />
                 <span>My Profile</span>
               </button>
+              
+              <button 
+                onClick={() => {
+                  onChangeView('settings');
+                  setShowProfile(false);
+                }}
+                className="w-full text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-3"
+              >
+                <Settings size={16} />
+                <span>Notification Settings</span>
+              </button>
+
               <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
               <button 
                 onClick={onLogout}

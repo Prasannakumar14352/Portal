@@ -1,9 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, AlertCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { getHRChatResponse, resetChatSession } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { useAppContext } from '../contexts/AppContext';
+
+const SUGGESTED_PROMPTS = [
+  "What is my leave balance?",
+  "Show me upcoming holidays",
+  "Who is in the Engineering department?",
+  "How many employees are active?",
+  "My attendance history"
+];
 
 const HRAssistant: React.FC = () => {
   const { currentUser, employees, leaves, leaveTypes, holidays, attendance } = useAppContext();
@@ -35,14 +43,11 @@ const HRAssistant: React.FC = () => {
     };
   }, []);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
+  const processMessage = async (text: string) => {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      text: input,
+      text: text,
       timestamp: new Date()
     };
 
@@ -73,11 +78,11 @@ const HRAssistant: React.FC = () => {
 
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error("AI Error:", error);
+      // Error handling modified to be user-friendly without console logging
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: 'Sorry, I encountered an issue connecting to my brain. Please check your API configuration and try again.',
+        text: 'Sorry, I encountered an issue. Please try again later.',
         timestamp: new Date(),
         isError: true
       };
@@ -85,6 +90,12 @@ const HRAssistant: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    await processMessage(input);
   };
 
   return (
@@ -177,6 +188,21 @@ const HRAssistant: React.FC = () => {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Suggested Prompts Area - Only show when conversation is short */}
+      {!isLoading && messages.length < 4 && (
+        <div className="px-4 pb-2 bg-slate-50 dark:bg-slate-900/50 flex gap-2 overflow-x-auto scrollbar-hide">
+            {SUGGESTED_PROMPTS.map((prompt, idx) => (
+                <button 
+                    key={idx} 
+                    onClick={() => processMessage(prompt)}
+                    className="flex-shrink-0 bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-400 border border-teal-100 dark:border-slate-700 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                >
+                    {prompt}
+                </button>
+            ))}
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
