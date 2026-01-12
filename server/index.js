@@ -139,35 +139,8 @@ const filterBodyByColumns = async (tableName, data) => {
 };
 
 const registerStandardRoutes = (endpoint, table) => {
-    // GET ALL
-    apiRouter.get(`/${endpoint}`, async (req, res) => {
-        if (!pool) return res.status(503).json({ error: "Database not connected" });
-        try {
-            const result = await pool.request().query(`SELECT * FROM ${table}`);
-            res.json(result.recordset);
-        } catch (err) { res.status(500).json({ error: err.message }); }
-    });
-
-    // POST NEW
-    apiRouter.post(`/${endpoint}`, async (req, res) => {
-        if (!pool) return res.status(503).json({ error: "Database not connected" });
-        try {
-            const data = await filterBodyByColumns(table, req.body);
-            const request = pool.request();
-            const columns = Object.keys(data);
-            columns.forEach(col => {
-                let val = data[col];
-                if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
-                request.input(col, val);
-            });
-            const colList = columns.map(c => `[${c}]`).join(', ');
-            const paramList = columns.map(c => `@${c}`).join(', ');
-            const query = `INSERT INTO ${table} (${colList}) VALUES (${paramList})`;
-            await request.query(query);
-            res.json({ success: true });
-        } catch (err) { res.status(500).json({ error: err.message }); }
-    });
-
+    // IMPORTANT: Register specific paths like /bulk BEFORE generic paths like /:id to avoid route conflicts
+    
     // POST BULK
     apiRouter.post(`/${endpoint}/bulk`, async (req, res) => {
         if (!pool) return res.status(503).json({ error: "Database not connected" });
@@ -209,12 +182,39 @@ const registerStandardRoutes = (endpoint, table) => {
             await transaction.commit();
             res.json({ success: true, count: items.length });
         } catch (err) {
-            // Check if transaction is active before rolling back
-            // mssql transaction logic can be tricky, check _begun flag or just try/catch rollback
             try { await transaction.rollback(); } catch(e) { /* ignore if already rolled back */ }
             console.error("Bulk Insert Error:", err);
             res.status(500).json({ error: err.message }); 
         }
+    });
+
+    // GET ALL
+    apiRouter.get(`/${endpoint}`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
+        try {
+            const result = await pool.request().query(`SELECT * FROM ${table}`);
+            res.json(result.recordset);
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    // POST NEW
+    apiRouter.post(`/${endpoint}`, async (req, res) => {
+        if (!pool) return res.status(503).json({ error: "Database not connected" });
+        try {
+            const data = await filterBodyByColumns(table, req.body);
+            const request = pool.request();
+            const columns = Object.keys(data);
+            columns.forEach(col => {
+                let val = data[col];
+                if (Array.isArray(val) || (typeof val === 'object' && val !== null)) val = JSON.stringify(val);
+                request.input(col, val);
+            });
+            const colList = columns.map(c => `[${c}]`).join(', ');
+            const paramList = columns.map(c => `@${c}`).join(', ');
+            const query = `INSERT INTO ${table} (${colList}) VALUES (${paramList})`;
+            await request.query(query);
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
     // PUT UPDATE
@@ -265,7 +265,10 @@ const entities = [
     { route: 'invitations', table: 'invitations' }
 ];
 
-entities.forEach(e => registerStandardRoutes(e.route, e.table));
+entities.forEach(e => {
+    registerStandardRoutes(e.route, e.table);
+    console.log(`Registered routes for /api/${e.route}`);
+});
 
 // Special Routes
 apiRouter.put('/notifications/:id/read', async (req, res) => {
