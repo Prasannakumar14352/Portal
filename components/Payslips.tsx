@@ -139,32 +139,63 @@ const Payslips = () => {
               if (!zipEntry.dir && (zipEntry.name.endsWith('.pdf') || zipEntry.name.endsWith('.PDF'))) {
                   filePromises.push((async () => {
                       const normalizedName = zipEntry.name;
-                      
-                      // 1. Validation: Check if filename contains a month that mismatches selected month
-                      // Expects format like "Month Of Jan-2024" or just "Jan-2024"
-                      const dateMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})/i);
-                      if (dateMatch) {
-                          const fileMonthStr = dateMatch[1].toLowerCase();
-                          const fileYear = dateMatch[2];
-                          const fileMonthNum = monthMap[fileMonthStr];
+                      let matchedEmployee;
+                      let fileDateKey: string | null = null;
+
+                      // 1. Strict Parsing: Try to extract Month, Year, and Name from specific format
+                      // Format: IST Salary Slip Month Of [Mmm-YYYY]_[FirstName] [LastName].pdf
+                      const strictMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})[_\s](.+?)\.pdf$/i);
+
+                      if (strictMatch) {
+                          const fileMonthStr = strictMatch[1].toLowerCase();
+                          const fileYear = strictMatch[2];
+                          const namePart = strictMatch[3].trim().toLowerCase();
                           
+                          const fileMonthNum = monthMap[fileMonthStr];
                           if (fileMonthNum) {
-                              const fileDateKey = `${fileYear}-${fileMonthNum}`;
-                              if (fileDateKey !== month) {
-                                  mismatchCount++;
-                                  console.warn(`Skipping ${normalizedName}: Month mismatch (${fileDateKey} vs selected ${month})`);
-                                  return;
+                              fileDateKey = `${fileYear}-${fileMonthNum}`;
+                          }
+
+                          // Attempt precise name match first
+                          matchedEmployee = employees.find(emp => {
+                              const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
+                              // Match "First Last" OR "First" (if only first provided)
+                              return fullName === namePart || 
+                                     namePart.includes(fullName) || 
+                                     (namePart.includes(emp.firstName.toLowerCase()) && namePart.includes(emp.lastName.toLowerCase()));
+                          });
+                      }
+
+                      // 2. Loose Parsing Fallback: If name not found by strict pattern
+                      if (!matchedEmployee) {
+                          const normalizedNameLower = normalizedName.toLowerCase();
+                          matchedEmployee = employees.find(emp => {
+                              const fname = emp.firstName.toLowerCase();
+                              const lname = emp.lastName.toLowerCase();
+                              // Simple inclusion check
+                              return normalizedNameLower.includes(fname) && normalizedNameLower.includes(lname);
+                          });
+                      }
+
+                      // 3. Date Validation Fallback: If date not extracted by strict pattern
+                      if (!fileDateKey) {
+                          const dateMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})/i);
+                          if (dateMatch) {
+                              const fileMonthStr = dateMatch[1].toLowerCase();
+                              const fileYear = dateMatch[2];
+                              const fileMonthNum = monthMap[fileMonthStr];
+                              if (fileMonthNum) {
+                                  fileDateKey = `${fileYear}-${fileMonthNum}`;
                               }
                           }
                       }
 
-                      // 2. Matching Logic
-                      const normalizedNameLower = normalizedName.toLowerCase();
-                      const matchedEmployee = employees.find(emp => {
-                          const fname = emp.firstName.toLowerCase();
-                          const lname = emp.lastName.toLowerCase();
-                          return normalizedNameLower.includes(fname) && normalizedNameLower.includes(lname);
-                      });
+                      // Check Mismatch
+                      if (fileDateKey && fileDateKey !== month) {
+                          mismatchCount++;
+                          console.warn(`Skipping ${normalizedName}: Month mismatch (${fileDateKey} vs selected ${month})`);
+                          return;
+                      }
 
                       if (matchedEmployee) {
                           const exists = payslips.some(p => String(p.userId) === String(matchedEmployee.id) && p.month === month);
