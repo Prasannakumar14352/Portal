@@ -10,9 +10,9 @@ import DraggableModal from './DraggableModal';
 // Handle ES Module import structure
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
 
-// Use a reliable, major-version specific worker URL from cdnjs
+// Use the worker from esm.sh to ensure version compatibility with the main library
 if (pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
 }
 
 const Payslips = () => {
