@@ -14,12 +14,13 @@ const WORK_LOCATIONS = [
 ];
 
 const Profile = () => {
-  const { currentUser, updateUser, showToast } = useAppContext();
+  const { currentUser, updateUser, showToast, employees } = useAppContext();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     phone: '',
     email: '',
     jobTitle: '',
@@ -41,8 +42,17 @@ const Profile = () => {
   const markerRef = useRef<any>(null);
 
   const initializeFormData = (user: User) => {
+    // Attempt to find the specific employee record to get discrete first/last names
+    const employeeRecord = employees.find(e => String(e.id) === String(user.id));
+    
+    // Fallback splitting if employee record not found (though it should be for valid users)
+    const nameParts = (user.name || '').split(' ');
+    const fallbackFirst = nameParts[0] || '';
+    const fallbackLast = nameParts.slice(1).join(' ') || '';
+
     setFormData({
-      name: user.name || '',
+      firstName: employeeRecord ? employeeRecord.firstName : fallbackFirst,
+      lastName: employeeRecord ? employeeRecord.lastName : fallbackLast,
       email: user.email || '',
       phone: user.phone || '',
       jobTitle: user.jobTitle || '',
@@ -65,7 +75,7 @@ const Profile = () => {
       setProfileUser(currentUser);
       initializeFormData(currentUser);
     }
-  }, [currentUser]);
+  }, [currentUser, employees]);
 
   // Relaxed permissions: Users can edit their own profiles
   const canEditAnyField = isEditMode;
@@ -84,7 +94,7 @@ const Profile = () => {
     try {
         const updates: Partial<User> = {
             ...profileUser,
-            name: formData.name,
+            name: `${formData.firstName} ${formData.lastName}`,
             phone: formData.phone,
             jobTitle: formData.jobTitle,
             position: formData.position,
@@ -138,7 +148,7 @@ const Profile = () => {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 flex flex-col items-center text-center">
             <div className="relative group mb-6"><div className={`w-32 h-32 rounded-full border-4 ${isEditMode ? 'border-teal-500/50 scale-105' : 'border-white dark:border-slate-900'} shadow-2xl overflow-hidden bg-slate-100 dark:bg-slate-700`}><img src={formData.avatar} alt="" className="w-full h-full object-cover" /></div>{isEditMode && (<button onClick={() => fileInputRef.current?.click()} className="absolute bottom-1 right-1 bg-teal-600 text-white p-2.5 rounded-full shadow-lg transition-transform z-10"><Camera size={18} /></button>)}<input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} /></div>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-white leading-tight mb-1">{formData.name}</h3><p className="text-teal-600 dark:text-teal-400 font-bold text-xs uppercase tracking-widest mb-4">{formData.position || 'Team Member'}</p>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white leading-tight mb-1">{formData.firstName} {formData.lastName}</h3><p className="text-teal-600 dark:text-teal-400 font-bold text-xs uppercase tracking-widest mb-4">{formData.position || 'Team Member'}</p>
             <div className="w-full space-y-4 pt-6 border-t border-slate-100 dark:border-slate-700 text-left"><div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Mail size={16} /><span className="text-sm font-medium truncate">{formData.email}</span></div><div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Hash size={16} /><span className="text-sm font-medium">EMP ID: {profileUser?.employeeId}</span></div></div>
           </div>
         </div>
@@ -147,8 +157,10 @@ const Profile = () => {
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
                 <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600"><UserIcon size={20} /></div><h3 className="text-xl font-bold text-slate-800 dark:text-white">Profile Detail</h3></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputField label="Name" icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} disabled={!canEditAnyField} />
+                  <InputField label="First Name" icon={UserIcon} value={formData.firstName} onChange={(v: string) => setFormData({...formData, firstName: v})} disabled={!canEditAnyField} />
+                  <InputField label="Last Name" icon={UserIcon} value={formData.lastName} onChange={(v: string) => setFormData({...formData, lastName: v})} disabled={!canEditAnyField} />
                   <InputField label="Phone" icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} disabled={!canEditAnyField} />
+                  <InputField label="Email" icon={Mail} value={formData.email} onChange={() => {}} disabled={true} />
                 </div>
             </div>
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
