@@ -42,35 +42,82 @@ const Payslips = () => {
     try {
         const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
         const pdf = await loadingTask.promise;
-        let fullText = '';
         
         // Scan first page mostly sufficient for Net Pay
         const page = await pdf.getPage(1);
         const textContent = await page.getTextContent();
         const items = textContent.items as any[];
         
-        // Basic join
-        fullText = items.map(item => item.str).join(' ');
-        
-        // Log for debugging
-        console.log("PDF Text Content:", fullText);
+        // Strategy 1: Iterate items to find label and subsequent number (Reading Order)
+        // This handles cases where "Net Pay" is a separate item from the value
+        for (let i = 0; i < items.length; i++) {
+            const itemStr = items[i].str;
+            const str = itemStr.trim().toLowerCase();
+            
+            // Keywords that indicate Net Pay
+            if (str.includes('net pay') || str.includes('net salary') || str.includes('take home') || str.includes('net payable') || str.includes('rounded total')) {
+                
+                // 1. Check if the number is in the SAME line/item (e.g. "Net Pay: 50,000")
+                // Regex to find a number at the end of the string or separated by space/colon
+                const sameLineMatch = itemStr.match(/[\d,]+\.?\d{0,2}/g);
+                if (sameLineMatch) {
+                     // Get the last number found in the string, usually the total
+                     const candidate = sameLineMatch[sameLineMatch.length - 1];
+                     const val = parseFloat(candidate.replace(/,/g, ''));
+                     if (!isNaN(val) && val > 0) {
+                         // Determine currency
+                         let currency = '₹';
+                         if (itemStr.toUpperCase().includes('USD') || itemStr.includes('$')) currency = '$';
+                         else if (itemStr.toUpperCase().includes('EUR') || itemStr.includes('€')) currency = '€';
+                         
+                         return { amount: val, currency };
+                     }
+                }
 
-        // Enhanced Regex Patterns
-        // Matches: "Net Pay", "Net Payable", "Total Net Pay", "Rounded Total", "Net Salary", "Take Home"
-        // Followed by optional chars (colon, spaces, currency codes)
-        // Then capturing the number
+                // 2. Look ahead for the next number in subsequent items
+                for (let j = 1; j <= 6; j++) { // Check next 6 items to be safe
+                    if (i + j >= items.length) break;
+                    
+                    const nextStr = items[i + j].str.trim();
+                    if (!nextStr) continue; // Skip empty items
+
+                    // Clean string to just numbers and dots
+                    const cleanStr = nextStr.replace(/,/g, '').replace(/[^0-9.]/g, ''); 
+                    
+                    // Check if it is a valid number
+                    if (cleanStr && !isNaN(parseFloat(cleanStr))) {
+                        const amount = parseFloat(cleanStr);
+                        
+                        // Determine currency from context (label or value item)
+                        let currency = '₹'; // Default
+                        const combinedContext = (itemStr + nextStr).toUpperCase();
+                        
+                        if (combinedContext.includes('$') || combinedContext.includes('USD')) currency = '$';
+                        else if (combinedContext.includes('€') || combinedContext.includes('EUR')) currency = '€';
+                        else if (combinedContext.includes('£') || combinedContext.includes('GBP')) currency = '£';
+                        
+                        if (amount > 0) {
+                            return { amount, currency };
+                        }
+                    }
+                }
+            }
+        }
+
+        // Strategy 2: Fallback to full text regex (Legacy)
+        const fullText = items.map(item => item.str).join(' ');
+        console.log("PDF Full Text (Fallback Search):", fullText);
+
         const patterns = [
             /(?:Net\s*Pay(?:able)?|Net\s*Salary|Total\s*Pay|Take\s*Home)[^0-9\n]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i,
             /Rounded\s*Total[^0-9\n]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i,
-            /Total\s*Deduction.*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i // Fallback if needed, though risky
+            /Total\s*Deduction.*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i 
         ];
 
         for (const regex of patterns) {
             const match = fullText.match(regex);
-            // Ensure match[2] exists and isn't just a year like "2024" if simpler regex used
             if (match && match[2]) {
                 let currency = match[1] || '₹'; 
-                
                 if (match[1]) {
                     const c = match[1].toUpperCase().replace('.', '');
                     if (c === 'RS' || c === 'INR') currency = '₹';
