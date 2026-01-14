@@ -48,6 +48,6 @@ export const msalConfig: Configuration = {
 
 export const loginRequest: PopupRequest = {
     // Added User.ReadWrite.All for provisioning capabilities
-    scopes: ["User.Read", "User.Read.All", "User.ReadWrite.All"],
-    prompt: "select_account"
+    scopes: ["User.Read", "User.Read.All", "User.ReadWrite.All"]
+    // Removed prompt: "select_account" to allow auto-selection via loginHint
 };
