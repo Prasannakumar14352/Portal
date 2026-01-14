@@ -12,7 +12,10 @@ const pdfjs = (pdfjsLib as any).default || pdfjsLib;
 
 // Use the worker from esm.sh to ensure version compatibility with the main library
 if (pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+  // Dynamically use the library's version to fetch the matching worker
+  // This prevents mismatch errors when the library version updates (e.g. via ^4.0.379 resolving to 4.10.38)
+  const workerVersion = pdfjs.version || '4.10.38';
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@${workerVersion}/build/pdf.worker.min.mjs`;
 }
 
 const Payslips = () => {
