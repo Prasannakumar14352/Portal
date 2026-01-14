@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react';
+import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle } from 'lucide-react';
 import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -16,7 +16,7 @@ if (pdfjs.GlobalWorkerOptions) {
 }
 
 const Payslips = () => {
-  const { payslips, currentUser, employees, showToast, manualAddPayslip, updatePayslip } = useAppContext();
+  const { payslips, currentUser, employees, showToast, manualAddPayslip, updatePayslip, deletePayslip } = useAppContext();
   const [month, setMonth] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +29,10 @@ const Payslips = () => {
   // Edit Amount State
   const [editingSlip, setEditingSlip] = useState<Payslip | null>(null);
   const [editAmount, setEditAmount] = useState<string>('');
+
+  // Delete State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [payslipToDelete, setPayslipToDelete] = useState<Payslip | null>(null);
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const currentYear = new Date().getFullYear();
@@ -229,6 +233,20 @@ const Payslips = () => {
       showToast("Payslip amount corrected", "success");
   };
 
+  const handleDeleteClick = (slip: Payslip) => {
+      setPayslipToDelete(slip);
+      setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+      if (payslipToDelete) {
+          await deletePayslip(payslipToDelete.id);
+          setShowDeleteConfirm(false);
+          setPayslipToDelete(null);
+          showToast("Payslip deleted successfully", "success");
+      }
+  };
+
   // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
     let filtered = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
@@ -371,6 +389,15 @@ const Payslips = () => {
                                         <Download size={18} />
                                         <span className="hidden sm:inline">Download</span>
                                     </button>
+                                    {isHR && (
+                                        <button 
+                                            onClick={() => handleDeleteClick(slip)}
+                                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:text-slate-400 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-600 transition"
+                                            title="Delete Payslip"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -470,6 +497,31 @@ const Payslips = () => {
                     </button>
                 </div>
             </form>
+        </DraggableModal>
+
+        {/* Delete Confirmation Modal */}
+        <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Delete" width="max-w-sm">
+            <div className="text-center py-4">
+                <AlertTriangle size={48} className="mx-auto text-red-500 mb-4" />
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Are you sure?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                    This will permanently delete the payslip for <strong>{payslipToDelete?.userName}</strong> ({payslipToDelete?.month}). This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                    <button 
+                        onClick={() => setShowDeleteConfirm(false)} 
+                        className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 font-bold rounded-xl text-xs uppercase"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={confirmDelete} 
+                        className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl text-xs uppercase shadow-lg shadow-red-500/20 hover:bg-red-700"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
         </DraggableModal>
     </div>
   );

@@ -195,6 +195,10 @@ const mockDb = {
         if(idx !== -1) store.payslips[idx] = payslip;
         return Promise.resolve(payslip);
     },
+    deletePayslip: async (id: string) => {
+        store.payslips = store.payslips.filter(p => String(p.id) !== String(id));
+        return Promise.resolve();
+    },
     getInvitations: async (): Promise<Invitation[]> => Promise.resolve([...store.invitations]),
     addInvitation: async (invite: Invitation) => { store.invitations.push(invite); return Promise.resolve(invite); },
     deleteInvitation: async (id: string) => {
@@ -263,6 +267,7 @@ const apiDb = {
   getPayslips: () => api.get('/payslips'),
   addPayslip: (payslip: Payslip) => api.post('/payslips', payslip),
   updatePayslip: (payslip: Payslip) => api.put(`/payslips/${payslip.id}`, payslip),
+  deletePayslip: (id: string) => api.delete(`/payslips/${id}`),
 
   getInvitations: () => api.get('/invitations'),
   addInvitation: (invite: Invitation) => api.post('/invitations', invite),
