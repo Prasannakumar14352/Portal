@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react';
 import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
+import DraggableModal from './DraggableModal';
 
 // Handle ES Module import structure
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
@@ -15,7 +16,7 @@ if (pdfjs.GlobalWorkerOptions) {
 }
 
 const Payslips = () => {
-  const { payslips, currentUser, employees, showToast, manualAddPayslip } = useAppContext();
+  const { payslips, currentUser, employees, showToast, manualAddPayslip, updatePayslip } = useAppContext();
   const [month, setMonth] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +26,11 @@ const Payslips = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  const isHR = currentUser?.role === UserRole.HR;
+  // Edit Amount State
+  const [editingSlip, setEditingSlip] = useState<Payslip | null>(null);
+  const [editAmount, setEditAmount] = useState<string>('');
+
+  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const currentYear = new Date().getFullYear();
 
   // Helper to extract text from PDF ArrayBuffer
@@ -35,30 +40,49 @@ const Payslips = () => {
         const pdf = await loadingTask.promise;
         let fullText = '';
         
+        // Scan first page mostly sufficient for Net Pay
         const page = await pdf.getPage(1);
         const textContent = await page.getTextContent();
         const items = textContent.items as any[];
-        fullText = items.map(item => item.str).join(' ');
-
-        // Regex looks for "Net Pay" followed by optional currency symbol/code and then the amount
-        const regex = /(?:Net\s*Pay(?:able)?|Total\s*Pay)[^0-9]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i;
-        const match = fullText.match(regex);
         
-        if (match && match[2]) {
-            let currency = match[1] || '₹'; 
-            
-            // Normalize common text codes to symbols
-            if (match[1]) {
-                const c = match[1].toUpperCase().replace('.', '');
-                if (c === 'RS' || c === 'INR') currency = '₹';
-                else if (c === 'USD') currency = '$';
-                else if (c === 'EUR') currency = '€';
-                else if (c === 'GBP') currency = '£';
-            }
+        // Basic join
+        fullText = items.map(item => item.str).join(' ');
+        
+        // Log for debugging
+        console.log("PDF Text Content:", fullText);
 
-            const amountStr = match[2].replace(/,/g, '');
-            return { amount: parseFloat(amountStr), currency: currency };
+        // Enhanced Regex Patterns
+        // Matches: "Net Pay", "Net Payable", "Total Net Pay", "Rounded Total", "Net Salary", "Take Home"
+        // Followed by optional chars (colon, spaces, currency codes)
+        // Then capturing the number
+        const patterns = [
+            /(?:Net\s*Pay(?:able)?|Net\s*Salary|Total\s*Pay|Take\s*Home)[^0-9\n]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i,
+            /Rounded\s*Total[^0-9\n]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i,
+            /Total\s*Deduction.*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i // Fallback if needed, though risky
+        ];
+
+        for (const regex of patterns) {
+            const match = fullText.match(regex);
+            // Ensure match[2] exists and isn't just a year like "2024" if simpler regex used
+            if (match && match[2]) {
+                let currency = match[1] || '₹'; 
+                
+                if (match[1]) {
+                    const c = match[1].toUpperCase().replace('.', '');
+                    if (c === 'RS' || c === 'INR') currency = '₹';
+                    else if (c === 'USD') currency = '$';
+                    else if (c === 'EUR') currency = '€';
+                    else if (c === 'GBP') currency = '£';
+                }
+
+                const amountStr = match[2].replace(/,/g, '');
+                const amount = parseFloat(amountStr);
+                if (!isNaN(amount) && amount > 0) {
+                    return { amount, currency };
+                }
+            }
         }
+        
         return null;
     } catch (e) {
         console.error("PDF Parsing Error:", e);
@@ -187,6 +211,24 @@ const Payslips = () => {
     }
   };
 
+  const openEditAmount = (slip: Payslip) => {
+      setEditingSlip(slip);
+      setEditAmount(slip.amount.toString());
+  };
+
+  const saveEditedAmount = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingSlip) return;
+      const amount = parseFloat(editAmount);
+      if (isNaN(amount) || amount < 0) {
+          showToast("Please enter a valid amount", "error");
+          return;
+      }
+      await updatePayslip({ ...editingSlip, amount });
+      setEditingSlip(null);
+      showToast("Payslip amount corrected", "success");
+  };
+
   // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
     let filtered = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
@@ -297,9 +339,18 @@ const Payslips = () => {
                             </div>
                             
                             <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                                <div className="text-right mr-2">
-                                    <span className="block font-bold text-slate-800 dark:text-slate-100 text-lg">
+                                <div className="text-right mr-2 group relative">
+                                    <span className="block font-bold text-slate-800 dark:text-slate-100 text-lg flex items-center gap-2 justify-end">
                                         {slip.currency || '₹'}{slip.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        {isHR && (
+                                            <button 
+                                                onClick={() => openEditAmount(slip)} 
+                                                className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 transition-opacity"
+                                                title="Correct Amount"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                        )}
                                     </span>
                                     <span className="inline-block text-[10px] uppercase tracking-wide font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
                                         {slip.status}
@@ -393,6 +444,33 @@ const Payslips = () => {
                 </div>
             </div>
         )}
+
+        {/* Edit Amount Modal */}
+        <DraggableModal isOpen={!!editingSlip} onClose={() => setEditingSlip(null)} title="Correct Payslip Amount" width="max-w-sm">
+            <form onSubmit={saveEditedAmount} className="space-y-4">
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800 flex gap-2">
+                    <Info className="text-amber-600 shrink-0 mt-0.5" size={16} />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">Manual override. Updating this value does not change the PDF file itself, only the system record.</p>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Net Payable Amount</label>
+                    <input 
+                        type="number" 
+                        step="0.01"
+                        required
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                    />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setEditingSlip(null)} className="px-4 py-2 text-sm text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancel</button>
+                    <button type="submit" className="px-4 py-2 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 flex items-center gap-2">
+                        <Save size={16} /> Save
+                    </button>
+                </div>
+            </form>
+        </DraggableModal>
     </div>
   );
 };

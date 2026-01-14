@@ -88,6 +88,7 @@ interface AppContextType {
   syncHolidayLogs: (year: string) => Promise<void>;
 
   manualAddPayslip: (slip: Payslip) => Promise<void>;
+  updatePayslip: (slip: Payslip) => Promise<void>;
   sendLeaveStatusEmail: (data: any) => Promise<void>;
 
   // PWA Install
@@ -639,6 +640,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setPayslips(prev => [...prev, slip]);
   };
 
+  const updatePayslip = async (slip: Payslip) => {
+      await db.updatePayslip(slip);
+      setPayslips(prev => prev.map(p => String(p.id) === String(slip.id) ? slip : p));
+  };
+
   const sendLeaveStatusEmail = async (data: any) => {
       // Backend handles email
       console.log("Sending email", data);
@@ -656,7 +662,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateLeaveType, deleteLeaveType, checkIn, checkOut, updateAttendanceRecord, 
       deleteAttendanceRecord, addTimeEntry, updateTimeEntry, deleteTimeEntry,
       markNotificationRead, markAllRead, notify, addHoliday, addHolidays, deleteHoliday, 
-      syncHolidayLogs, manualAddPayslip, sendLeaveStatusEmail,
+      syncHolidayLogs, manualAddPayslip, updatePayslip, sendLeaveStatusEmail,
       installApp, isInstallable: !isStandalone
     }}>
       {children}
