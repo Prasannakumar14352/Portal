@@ -325,9 +325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    if (isMsalReady) {
-        msalInstance.logoutPopup().catch(console.error); // Optional Azure logout
-    }
+    // Removed msalInstance.logoutPopup() call to prevent logging out of Microsoft account entirely
     showToast('Logged out successfully', 'info');
   };
 
