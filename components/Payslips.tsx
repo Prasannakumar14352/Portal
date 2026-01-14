@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch } from 'lucide-react';
@@ -125,17 +124,46 @@ const Payslips = () => {
           let importedCount = 0;
           let skippedCount = 0;
           let parsedAmounts = 0;
+          let mismatchCount = 0;
 
           const filePromises: Promise<void>[] = [];
           
+          const monthMap: Record<string, string> = {
+              'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+              'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+              'january': '01', 'february': '02', 'march': '03', 'april': '04', 'june': '06',
+              'july': '07', 'august': '08', 'september': '09', 'october': '10', 'november': '11', 'december': '12'
+          };
+
           contents.forEach((relativePath, zipEntry) => {
               if (!zipEntry.dir && (zipEntry.name.endsWith('.pdf') || zipEntry.name.endsWith('.PDF'))) {
                   filePromises.push((async () => {
-                      const normalizedName = zipEntry.name.toLowerCase();
+                      const normalizedName = zipEntry.name;
+                      
+                      // 1. Validation: Check if filename contains a month that mismatches selected month
+                      // Expects format like "Month Of Jan-2024" or just "Jan-2024"
+                      const dateMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})/i);
+                      if (dateMatch) {
+                          const fileMonthStr = dateMatch[1].toLowerCase();
+                          const fileYear = dateMatch[2];
+                          const fileMonthNum = monthMap[fileMonthStr];
+                          
+                          if (fileMonthNum) {
+                              const fileDateKey = `${fileYear}-${fileMonthNum}`;
+                              if (fileDateKey !== month) {
+                                  mismatchCount++;
+                                  console.warn(`Skipping ${normalizedName}: Month mismatch (${fileDateKey} vs selected ${month})`);
+                                  return;
+                              }
+                          }
+                      }
+
+                      // 2. Matching Logic
+                      const normalizedNameLower = normalizedName.toLowerCase();
                       const matchedEmployee = employees.find(emp => {
                           const fname = emp.firstName.toLowerCase();
                           const lname = emp.lastName.toLowerCase();
-                          return normalizedName.includes(fname) && normalizedName.includes(lname);
+                          return normalizedNameLower.includes(fname) && normalizedNameLower.includes(lname);
                       });
 
                       if (matchedEmployee) {
@@ -180,13 +208,17 @@ const Payslips = () => {
 
           await Promise.all(filePromises);
           
+          if (mismatchCount > 0) {
+             showToast(`Skipped ${mismatchCount} files that did not match the selected month (${month}).`, "error");
+          }
+
           if (importedCount > 0) {
              let msg = `Successfully imported ${importedCount} payslips.`;
              if (parsedAmounts > 0) msg += ` Extracted Net Pay from ${parsedAmounts} files.`;
              showToast(msg, "success");
-          } else if (skippedCount > 0) {
+          } else if (skippedCount > 0 && mismatchCount === 0) {
              showToast(`No new payslips. ${skippedCount} duplicates found.`, "info");
-          } else {
+          } else if (importedCount === 0 && mismatchCount === 0) {
              showToast("No matching employee payslips found in the ZIP.", "warning");
           }
 
