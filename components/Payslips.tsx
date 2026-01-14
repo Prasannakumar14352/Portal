@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle } from 'lucide-react';
+import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -41,6 +41,12 @@ const Payslips = () => {
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const currentYear = new Date().getFullYear();
 
+  // Helper for ID comparison robustness
+  const isOwner = (slipUserId: string | number, currentUserId?: string | number) => {
+      if (!currentUserId || !slipUserId) return false;
+      return String(slipUserId) === String(currentUserId);
+  };
+
   // Helper to extract text from PDF ArrayBuffer
   const extractNetPay = async (arrayBuffer: ArrayBuffer): Promise<{ amount: number, currency: string } | null> => {
     try {
@@ -53,47 +59,32 @@ const Payslips = () => {
         const items = textContent.items as any[];
         
         // Strategy 1: Iterate items to find label and subsequent number (Reading Order)
-        // This handles cases where "Net Pay" is a separate item from the value
         for (let i = 0; i < items.length; i++) {
             const itemStr = items[i].str;
             const str = itemStr.trim().toLowerCase();
             
-            // Keywords that indicate Net Pay
             if (str.includes('net pay') || str.includes('net salary') || str.includes('take home') || str.includes('net payable') || str.includes('rounded total')) {
-                
-                // 1. Check if the number is in the SAME line/item (e.g. "Net Pay: 50,000")
-                // Regex to find a number at the end of the string or separated by space/colon
                 const sameLineMatch = itemStr.match(/[\d,]+\.?\d{0,2}/g);
                 if (sameLineMatch) {
-                     // Get the last number found in the string, usually the total
                      const candidate = sameLineMatch[sameLineMatch.length - 1];
                      const val = parseFloat(candidate.replace(/,/g, ''));
                      if (!isNaN(val) && val > 0) {
-                         // Determine currency
                          let currency = '₹';
                          if (itemStr.toUpperCase().includes('USD') || itemStr.includes('$')) currency = '$';
                          else if (itemStr.toUpperCase().includes('EUR') || itemStr.includes('€')) currency = '€';
-                         
                          return { amount: val, currency };
                      }
                 }
 
-                // 2. Look ahead for the next number in subsequent items
-                for (let j = 1; j <= 6; j++) { // Check next 6 items to be safe
+                for (let j = 1; j <= 6; j++) { 
                     if (i + j >= items.length) break;
-                    
                     const nextStr = items[i + j].str.trim();
-                    if (!nextStr) continue; // Skip empty items
+                    if (!nextStr) continue; 
 
-                    // Clean string to just numbers and dots
                     const cleanStr = nextStr.replace(/,/g, '').replace(/[^0-9.]/g, ''); 
-                    
-                    // Check if it is a valid number
                     if (cleanStr && !isNaN(parseFloat(cleanStr))) {
                         const amount = parseFloat(cleanStr);
-                        
-                        // Determine currency from context (label or value item)
-                        let currency = '₹'; // Default
+                        let currency = '₹'; 
                         const combinedContext = (itemStr + nextStr).toUpperCase();
                         
                         if (combinedContext.includes('$') || combinedContext.includes('USD')) currency = '$';
@@ -108,36 +99,6 @@ const Payslips = () => {
             }
         }
 
-        // Strategy 2: Fallback to full text regex (Legacy)
-        const fullText = items.map(item => item.str).join(' ');
-        console.log("PDF Full Text (Fallback Search):", fullText);
-
-        const patterns = [
-            /(?:Net\s*Pay(?:able)?|Net\s*Salary|Total\s*Pay|Take\s*Home)[^0-9\n]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i,
-            /Rounded\s*Total[^0-9\n]*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i,
-            /Total\s*Deduction.*?([$₹€£]|Rs\.?|INR|USD|EUR|GBP)?\s*?([\d,]+\.?\d{0,2})/i 
-        ];
-
-        for (const regex of patterns) {
-            const match = fullText.match(regex);
-            if (match && match[2]) {
-                let currency = match[1] || '₹'; 
-                if (match[1]) {
-                    const c = match[1].toUpperCase().replace('.', '');
-                    if (c === 'RS' || c === 'INR') currency = '₹';
-                    else if (c === 'USD') currency = '$';
-                    else if (c === 'EUR') currency = '€';
-                    else if (c === 'GBP') currency = '£';
-                }
-
-                const amountStr = match[2].replace(/,/g, '');
-                const amount = parseFloat(amountStr);
-                if (!isNaN(amount) && amount > 0) {
-                    return { amount, currency };
-                }
-            }
-        }
-        
         return null;
     } catch (e) {
         console.error("PDF Parsing Error:", e);
@@ -169,7 +130,6 @@ const Payslips = () => {
               if (!zipEntry.dir && (zipEntry.name.endsWith('.pdf') || zipEntry.name.endsWith('.PDF'))) {
                   filePromises.push((async () => {
                       const normalizedName = zipEntry.name.toLowerCase();
-                      
                       const matchedEmployee = employees.find(emp => {
                           const fname = emp.firstName.toLowerCase();
                           const lname = emp.lastName.toLowerCase();
@@ -177,11 +137,10 @@ const Payslips = () => {
                       });
 
                       if (matchedEmployee) {
-                          const exists = payslips.some(p => p.userId === matchedEmployee.id && p.month === month);
+                          const exists = payslips.some(p => String(p.userId) === String(matchedEmployee.id) && p.month === month);
                           
                           if (!exists) {
                               const arrayBuffer = await zipEntry.async("arraybuffer");
-                              
                               const extractedData = await extractNetPay(arrayBuffer);
                               const netPay = extractedData ? extractedData.amount : null;
                               const currency = extractedData ? extractedData.currency : '₹';
@@ -231,10 +190,7 @@ const Payslips = () => {
 
       } catch (err: any) {
           console.error(err);
-          const msg = err.name === 'QuotaExceededError' 
-            ? "Storage quota exceeded. Some files could not be saved." 
-            : "Failed to process ZIP file.";
-          showToast(msg, "error");
+          showToast("Failed to process ZIP file.", "error");
       } finally {
           setIsProcessing(false);
           if(fileInputRef.current) fileInputRef.current.value = ''; 
@@ -300,7 +256,7 @@ const Payslips = () => {
 
   // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
-    let filtered = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
+    let filtered = isHR ? payslips : payslips.filter(p => isOwner(p.userId, currentUser?.id));
     
     if (searchTerm) {
         filtered = filtered.filter(p => 
@@ -318,7 +274,9 @@ const Payslips = () => {
   );
 
   const summaryStats = useMemo(() => {
-      const userSlips = isHR ? payslips : payslips.filter(p => p.userId === currentUser?.id);
+      // Robust calculation for current user only
+      const userSlips = payslips.filter(p => isOwner(p.userId, currentUser?.id));
+      
       const totalCount = userSlips.length;
       const totalAmount = userSlips.reduce((sum, p) => sum + p.amount, 0);
       const thisYearAmount = userSlips.reduce((sum, p) => {
@@ -331,7 +289,7 @@ const Payslips = () => {
       const displayCurrency = userSlips.length > 0 ? (userSlips[0].currency || '₹') : '₹';
 
       return { totalCount, totalAmount, thisYearAmount, thisYearCount, displayCurrency };
-  }, [payslips, currentUser, isHR, currentYear]);
+  }, [payslips, currentUser, currentYear]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -403,7 +361,11 @@ const Payslips = () => {
             
             <div className="p-6">
                 <div className="space-y-3">
-                    {paginatedPayslips.map(slip => (
+                    {paginatedPayslips.map(slip => {
+                        // Strict Visibility Check with Helper
+                        const isOwn = isOwner(slip.userId, currentUser?.id);
+                        
+                        return (
                         <div key={slip.id} className="flex flex-col sm:flex-row items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:shadow-sm transition-all gap-4 bg-slate-50/30 dark:bg-slate-800/50">
                             <div className="flex items-center gap-4 w-full sm:w-auto">
                                 <div className="w-12 h-12 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
@@ -419,15 +381,18 @@ const Payslips = () => {
                             <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
                                 <div className="text-right mr-2 group relative">
                                     <span className="block font-bold text-slate-800 dark:text-slate-100 text-lg flex items-center gap-2 justify-end">
-                                        {showValues ? (
+                                        {showValues && isOwn ? (
                                             <>
                                                 {slip.currency || '₹'}{slip.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </>
                                         ) : (
-                                            <span className="text-slate-400 dark:text-slate-500 tracking-widest text-sm">••••••</span>
+                                            <span className="text-slate-400 dark:text-slate-500 tracking-widest text-sm flex items-center gap-1.5">
+                                                {showValues && !isOwn ? <Lock size={12} className="text-slate-400" /> : null}
+                                                ••••••
+                                            </span>
                                         )}
                                         
-                                        {isHR && showValues && (
+                                        {isHR && showValues && isOwn && (
                                             <button 
                                                 onClick={() => openEditAmount(slip)} 
                                                 className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 transition-opacity"
@@ -468,7 +433,7 @@ const Payslips = () => {
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    )})}
                     {paginatedPayslips.length === 0 && (
                         <div className="text-center py-10 text-slate-500 dark:text-slate-400">No payslips found.</div>
                     )}
@@ -513,31 +478,29 @@ const Payslips = () => {
             </div>
         </div>
 
-        {!isHR && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">Earnings Summary</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Payslips</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{summaryStats.totalCount}</p>
-                    </div>
-                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">This Year ({currentYear})</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-                            {showValues ? `${summaryStats.displayCurrency}${summaryStats.thisYearAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">{summaryStats.thisYearCount} payslips</p>
-                    </div>
-                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Earnings</p>
-                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                            {showValues ? `${summaryStats.displayCurrency}${summaryStats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">All time</p>
-                    </div>
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">My Earnings Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Payslips</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{summaryStats.totalCount}</p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">This Year ({currentYear})</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
+                        {showValues ? `${summaryStats.displayCurrency}${summaryStats.thisYearAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">{summaryStats.thisYearCount} payslips</p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Earnings</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                        {showValues ? `${summaryStats.displayCurrency}${summaryStats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">All time</p>
                 </div>
             </div>
-        )}
+        </div>
 
         {/* Edit Amount Modal */}
         <DraggableModal isOpen={!!editingSlip} onClose={() => setEditingSlip(null)} title="Correct Payslip Amount" width="max-w-sm">
