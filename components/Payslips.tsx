@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch } from 'lucide-react';
 import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -24,11 +24,14 @@ const Payslips = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
+  
   // View State
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [showValues, setShowValues] = useState(false); // Hidden by default for privacy
+  // Default showValues to TRUE if not HR (Employees see their own data by default), FALSE for HR (Privacy by default)
+  const [showValues, setShowValues] = useState(!isHR); 
 
   // Edit Amount State
   const [editingSlip, setEditingSlip] = useState<Payslip | null>(null);
@@ -38,13 +41,12 @@ const Payslips = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [payslipToDelete, setPayslipToDelete] = useState<Payslip | null>(null);
 
-  const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const currentYear = new Date().getFullYear();
 
   // Helper for ID comparison robustness
   const isOwner = (slipUserId: string | number, currentUserId?: string | number) => {
       if (!currentUserId || !slipUserId) return false;
-      return String(slipUserId) === String(currentUserId);
+      return String(slipUserId).trim() === String(currentUserId).trim();
   };
 
   // Helper to extract text from PDF ArrayBuffer
@@ -256,6 +258,8 @@ const Payslips = () => {
 
   // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
+    // If HR/Admin, show all. If Employee, show ONLY their own.
+    // This filter is CRITICAL: Employees should never see the full list in 'filtered'.
     let filtered = isHR ? payslips : payslips.filter(p => isOwner(p.userId, currentUser?.id));
     
     if (searchTerm) {
@@ -341,7 +345,7 @@ const Payslips = () => {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button 
                         onClick={() => setShowValues(!showValues)}
-                        className="p-2 text-slate-500 hover:text-teal-600 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg transition-colors flex-shrink-0"
+                        className={`p-2 rounded-lg transition-colors flex-shrink-0 border ${showValues ? 'bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-900/30 dark:border-teal-800' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-600 hover:text-teal-600'}`}
                         title={showValues ? "Hide Amounts" : "Show Amounts"}
                     >
                         {showValues ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -381,12 +385,14 @@ const Payslips = () => {
                             <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
                                 <div className="text-right mr-2 group relative">
                                     <span className="block font-bold text-slate-800 dark:text-slate-100 text-lg flex items-center gap-2 justify-end">
+                                        {/* Logic: Show value ONLY if (GlobalToggle is ON) AND (User Owns this slip) */}
                                         {showValues && isOwn ? (
                                             <>
                                                 {slip.currency || '₹'}{slip.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </>
                                         ) : (
                                             <span className="text-slate-400 dark:text-slate-500 tracking-widest text-sm flex items-center gap-1.5">
+                                                {/* Show Lock icon if toggle is ON but user is NOT owner (e.g. HR viewing others) */}
                                                 {showValues && !isOwn ? <Lock size={12} className="text-slate-400" /> : null}
                                                 ••••••
                                             </span>
@@ -412,7 +418,7 @@ const Payslips = () => {
                                         className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 transition"
                                         title="View PDF"
                                     >
-                                        <Eye size={18} />
+                                        <FileSearch size={18} />
                                     </button>
                                     <button 
                                         onClick={() => handleDownload(slip)}
