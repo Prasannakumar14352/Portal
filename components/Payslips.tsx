@@ -125,6 +125,7 @@ const Payslips = () => {
           let skippedCount = 0;
           let parsedAmounts = 0;
           let mismatchCount = 0;
+          let errorCount = 0;
 
           const filePromises: Promise<void>[] = [];
           
@@ -138,100 +139,105 @@ const Payslips = () => {
           contents.forEach((relativePath, zipEntry) => {
               if (!zipEntry.dir && (zipEntry.name.endsWith('.pdf') || zipEntry.name.endsWith('.PDF'))) {
                   filePromises.push((async () => {
-                      const normalizedName = zipEntry.name;
-                      let matchedEmployee;
-                      let fileDateKey: string | null = null;
+                      try {
+                          const normalizedName = zipEntry.name;
+                          let matchedEmployee;
+                          let fileDateKey: string | null = null;
 
-                      // 1. Strict Parsing: Try to extract Month, Year, and Name from specific format
-                      // Format: IST Salary Slip Month Of [Mmm-YYYY]_[FirstName] [LastName].pdf
-                      const strictMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})[_\s](.+?)\.pdf$/i);
+                          // 1. Strict Parsing: Try to extract Month, Year, and Name from specific format
+                          // Format: IST Salary Slip Month Of [Mmm-YYYY]_[FirstName] [LastName].pdf
+                          const strictMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})[_\s](.+?)\.pdf$/i);
 
-                      if (strictMatch) {
-                          const fileMonthStr = strictMatch[1].toLowerCase();
-                          const fileYear = strictMatch[2];
-                          const namePart = strictMatch[3].trim().toLowerCase();
-                          
-                          const fileMonthNum = monthMap[fileMonthStr];
-                          if (fileMonthNum) {
-                              fileDateKey = `${fileYear}-${fileMonthNum}`;
-                          }
-
-                          // Attempt precise name match first
-                          matchedEmployee = employees.find(emp => {
-                              const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
-                              // Match "First Last" OR "First" (if only first provided)
-                              return fullName === namePart || 
-                                     namePart.includes(fullName) || 
-                                     (namePart.includes(emp.firstName.toLowerCase()) && namePart.includes(emp.lastName.toLowerCase()));
-                          });
-                      }
-
-                      // 2. Loose Parsing Fallback: If name not found by strict pattern
-                      if (!matchedEmployee) {
-                          const normalizedNameLower = normalizedName.toLowerCase();
-                          matchedEmployee = employees.find(emp => {
-                              const fname = emp.firstName.toLowerCase();
-                              const lname = emp.lastName.toLowerCase();
-                              // Simple inclusion check
-                              return normalizedNameLower.includes(fname) && normalizedNameLower.includes(lname);
-                          });
-                      }
-
-                      // 3. Date Validation Fallback: If date not extracted by strict pattern
-                      if (!fileDateKey) {
-                          const dateMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})/i);
-                          if (dateMatch) {
-                              const fileMonthStr = dateMatch[1].toLowerCase();
-                              const fileYear = dateMatch[2];
+                          if (strictMatch) {
+                              const fileMonthStr = strictMatch[1].toLowerCase();
+                              const fileYear = strictMatch[2];
+                              const namePart = strictMatch[3].trim().toLowerCase();
+                              
                               const fileMonthNum = monthMap[fileMonthStr];
                               if (fileMonthNum) {
                                   fileDateKey = `${fileYear}-${fileMonthNum}`;
                               }
-                          }
-                      }
 
-                      // Check Mismatch
-                      if (fileDateKey && fileDateKey !== month) {
-                          mismatchCount++;
-                          console.warn(`Skipping ${normalizedName}: Month mismatch (${fileDateKey} vs selected ${month})`);
-                          return;
-                      }
-
-                      if (matchedEmployee) {
-                          const exists = payslips.some(p => String(p.userId) === String(matchedEmployee.id) && p.month === month);
-                          
-                          if (!exists) {
-                              const arrayBuffer = await zipEntry.async("arraybuffer");
-                              const extractedData = await extractNetPay(arrayBuffer);
-                              const netPay = extractedData ? extractedData.amount : null;
-                              const currency = extractedData ? extractedData.currency : '₹';
-
-                              if (netPay !== null) parsedAmounts++;
-
-                              let dataUrl = undefined;
-                              try {
-                                const base64String = await zipEntry.async("base64");
-                                dataUrl = `data:application/pdf;base64,${base64String}`;
-                              } catch(e) {
-                                console.warn("File too large to store in memory/storage", zipEntry.name);
-                              }
-
-                              await manualAddPayslip({
-                                  id: `pay-imp-${Math.random().toString(36).substr(2,9)}`,
-                                  userId: matchedEmployee.id,
-                                  userName: `${matchedEmployee.firstName} ${matchedEmployee.lastName}`,
-                                  month: month,
-                                  amount: netPay !== null ? netPay : (matchedEmployee.salary ? (matchedEmployee.salary / 12) : 0),
-                                  currency: currency,
-                                  status: 'Paid',
-                                  generatedDate: new Date().toISOString(),
-                                  fileData: dataUrl,
-                                  fileName: zipEntry.name
+                              // Attempt precise name match first
+                              matchedEmployee = employees.find(emp => {
+                                  const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
+                                  // Match "First Last" OR "First" (if only first provided)
+                                  return fullName === namePart || 
+                                         namePart.includes(fullName) || 
+                                         (namePart.includes(emp.firstName.toLowerCase()) && namePart.includes(emp.lastName.toLowerCase()));
                               });
-                              importedCount++;
-                          } else {
-                              skippedCount++;
                           }
+
+                          // 2. Loose Parsing Fallback: If name not found by strict pattern
+                          if (!matchedEmployee) {
+                              const normalizedNameLower = normalizedName.toLowerCase();
+                              matchedEmployee = employees.find(emp => {
+                                  const fname = emp.firstName.toLowerCase();
+                                  const lname = emp.lastName.toLowerCase();
+                                  // Simple inclusion check
+                                  return normalizedNameLower.includes(fname) && normalizedNameLower.includes(lname);
+                              });
+                          }
+
+                          // 3. Date Validation Fallback: If date not extracted by strict pattern
+                          if (!fileDateKey) {
+                              const dateMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})/i);
+                              if (dateMatch) {
+                                  const fileMonthStr = dateMatch[1].toLowerCase();
+                                  const fileYear = dateMatch[2];
+                                  const fileMonthNum = monthMap[fileMonthStr];
+                                  if (fileMonthNum) {
+                                      fileDateKey = `${fileYear}-${fileMonthNum}`;
+                                  }
+                              }
+                          }
+
+                          // Check Mismatch - if file is for a different month, SKIP IT but continue loop
+                          if (fileDateKey && fileDateKey !== month) {
+                              mismatchCount++;
+                              console.warn(`Skipping ${normalizedName}: Month mismatch (${fileDateKey} vs selected ${month})`);
+                              return;
+                          }
+
+                          if (matchedEmployee) {
+                              const exists = payslips.some(p => String(p.userId) === String(matchedEmployee.id) && p.month === month);
+                              
+                              if (!exists) {
+                                  const arrayBuffer = await zipEntry.async("arraybuffer");
+                                  const extractedData = await extractNetPay(arrayBuffer);
+                                  const netPay = extractedData ? extractedData.amount : null;
+                                  const currency = extractedData ? extractedData.currency : '₹';
+
+                                  if (netPay !== null) parsedAmounts++;
+
+                                  let dataUrl = undefined;
+                                  try {
+                                    const base64String = await zipEntry.async("base64");
+                                    dataUrl = `data:application/pdf;base64,${base64String}`;
+                                  } catch(e) {
+                                    console.warn("File too large to store in memory/storage", zipEntry.name);
+                                  }
+
+                                  await manualAddPayslip({
+                                      id: `pay-imp-${Math.random().toString(36).substr(2,9)}`,
+                                      userId: matchedEmployee.id,
+                                      userName: `${matchedEmployee.firstName} ${matchedEmployee.lastName}`,
+                                      month: month,
+                                      amount: netPay !== null ? netPay : (matchedEmployee.salary ? (matchedEmployee.salary / 12) : 0),
+                                      currency: currency,
+                                      status: 'Paid',
+                                      generatedDate: new Date().toISOString(),
+                                      fileData: dataUrl,
+                                      fileName: zipEntry.name
+                                  });
+                                  importedCount++;
+                              } else {
+                                  skippedCount++;
+                              }
+                          }
+                      } catch (err) {
+                          console.error(`Error processing file ${zipEntry.name}:`, err);
+                          errorCount++;
                       }
                   })());
               }
@@ -240,16 +246,20 @@ const Payslips = () => {
           await Promise.all(filePromises);
           
           if (mismatchCount > 0) {
-             showToast(`Skipped ${mismatchCount} files that did not match the selected month (${month}).`, "error");
+             showToast(`Skipped ${mismatchCount} files that did not match the selected month (${month}).`, "warning");
+          }
+          
+          if (errorCount > 0) {
+             showToast(`Failed to process ${errorCount} files due to errors.`, "error");
           }
 
           if (importedCount > 0) {
              let msg = `Successfully imported ${importedCount} payslips.`;
              if (parsedAmounts > 0) msg += ` Extracted Net Pay from ${parsedAmounts} files.`;
              showToast(msg, "success");
-          } else if (skippedCount > 0 && mismatchCount === 0) {
+          } else if (skippedCount > 0 && mismatchCount === 0 && errorCount === 0) {
              showToast(`No new payslips. ${skippedCount} duplicates found.`, "info");
-          } else if (importedCount === 0 && mismatchCount === 0) {
+          } else if (importedCount === 0 && mismatchCount === 0 && errorCount === 0) {
              showToast("No matching employee payslips found in the ZIP.", "warning");
           }
 
