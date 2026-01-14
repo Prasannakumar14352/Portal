@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch } from 'lucide-react';
+import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch, UserCheck, Users } from 'lucide-react';
 import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -31,6 +31,8 @@ const Payslips = () => {
   const [itemsPerPage, setItemsPerPage] = useState(5);
   // Default showValues to TRUE if not HR (Employees see their own data by default), FALSE for HR (Privacy by default)
   const [showValues, setShowValues] = useState(!isHR); 
+  // HR Specific: Toggle between All records and Personal records
+  const [showMyPayslipsOnly, setShowMyPayslipsOnly] = useState(false);
 
   // Edit Amount State
   const [editingSlip, setEditingSlip] = useState<Payslip | null>(null);
@@ -331,18 +333,32 @@ const Payslips = () => {
 
   // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
-    // If HR/Admin, show all. If Employee, show ONLY their own.
-    // This filter is CRITICAL: Employees should never see the full list in 'filtered'.
-    let filtered = isHR ? payslips : payslips.filter(p => isOwner(p.userId, currentUser?.id));
+    let filtered = payslips;
+
+    // 1. Permission & Scope Filtering
+    if (!isHR) {
+        // Standard employee: can ONLY see their own
+        filtered = filtered.filter(p => isOwner(p.userId, currentUser?.id));
+    } else {
+        // HR/Admin: Can toggle scope
+        if (showMyPayslipsOnly) {
+            filtered = filtered.filter(p => isOwner(p.userId, currentUser?.id));
+        }
+        // If not toggled, 'filtered' remains all payslips (default HR view)
+    }
     
+    // 2. Search & Text Filtering
     if (searchTerm) {
+        const lowerTerm = searchTerm.toLowerCase();
         filtered = filtered.filter(p => 
-            p.month.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            (isHR && p.userName.toLowerCase().includes(searchTerm.toLowerCase()))
+            p.month.toLowerCase().includes(lowerTerm) || 
+            p.userName.toLowerCase().includes(lowerTerm) ||
+            (p.fileName || '').toLowerCase().includes(lowerTerm)
         );
     }
+    
     return filtered.sort((a, b) => new Date(b.generatedDate).getTime() - new Date(a.generatedDate).getTime());
-  }, [payslips, currentUser, isHR, searchTerm]);
+  }, [payslips, currentUser, isHR, searchTerm, showMyPayslipsOnly]);
 
   const totalPages = Math.ceil(visiblePayslips.length / itemsPerPage);
   const paginatedPayslips = visiblePayslips.slice(
@@ -414,7 +430,28 @@ const Payslips = () => {
 
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">All Payslips</h3>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                        {showMyPayslipsOnly ? 'My Personal Payslips' : 'All Employee Payslips'}
+                    </h3>
+                    {isHR && (
+                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                            <button 
+                                onClick={() => { setShowMyPayslipsOnly(false); setCurrentPage(1); }}
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${!showMyPayslipsOnly ? 'bg-white dark:bg-slate-600 shadow text-teal-600 dark:text-teal-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                            >
+                                <Users size={14} /> All Staff
+                            </button>
+                            <button 
+                                onClick={() => { setShowMyPayslipsOnly(true); setCurrentPage(1); }}
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${showMyPayslipsOnly ? 'bg-white dark:bg-slate-600 shadow text-teal-600 dark:text-teal-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                            >
+                                <UserCheck size={14} /> My Slips
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button 
                         onClick={() => setShowValues(!showValues)}
@@ -427,7 +464,7 @@ const Payslips = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input 
                             type="text" 
-                            placeholder="Search payslips..." 
+                            placeholder="Search employee or month..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-transparent dark:text-slate-200"
@@ -451,7 +488,7 @@ const Payslips = () => {
                                 <div>
                                     <h4 className="font-bold text-slate-800 dark:text-slate-100">{slip.month}</h4>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Generated on {new Date(slip.generatedDate).toLocaleDateString()}</p>
-                                    {isHR && <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">{slip.userName}</p>}
+                                    {(isHR && !showMyPayslipsOnly) && <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">{slip.userName}</p>}
                                 </div>
                             </div>
                             
@@ -514,7 +551,7 @@ const Payslips = () => {
                         </div>
                     )})}
                     {paginatedPayslips.length === 0 && (
-                        <div className="text-center py-10 text-slate-500 dark:text-slate-400">No payslips found.</div>
+                        <div className="text-center py-10 text-slate-500 dark:text-slate-400">No payslips found matching criteria.</div>
                     )}
                 </div>
 
