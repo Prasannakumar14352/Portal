@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, Project, Employee, Position, EmployeeStatus } from '../types';
@@ -7,7 +6,7 @@ import {
   Globe, Navigation, Map as MapIcon, ChevronDown, ChevronRight, 
   Calendar, Minus, Layout, Search, Locate, Target, UserPlus, 
   RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare, Layers,
-  Mail, ChevronLeft, List, Grid
+  Mail, ChevronLeft, List, Grid, CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
@@ -35,32 +34,49 @@ const OrgChartNode: React.FC<{ node: TreeNode }> = ({ node }) => {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   return (
-    <li className="flex flex-col items-center">
-      <div className="flex flex-col items-center relative pb-6">
-        <div className="org-node-card group bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-teal-500/50 transition-all w-40 relative z-10">
-           <div className="flex flex-col items-center">
-             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-50 dark:border-slate-700 mb-2 shadow-sm bg-slate-100">
+    <li className="flex flex-col items-center px-4">
+      <div className="flex flex-col items-center relative pb-8">
+        <div className="org-node-card group bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-teal-500/50 transition-all w-48 relative z-10 cursor-pointer">
+           <div className="flex flex-col items-center gap-2">
+             <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-slate-50 dark:border-slate-700 shadow-sm bg-slate-100">
                 <img src={node.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(node.firstName)}+${encodeURIComponent(node.lastName)}`} className="w-full h-full object-cover" alt="" />
              </div>
              <div className="text-center w-full min-w-0">
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate px-1">{node.firstName} {node.lastName}</h4>
-                <p className="text-[9px] text-teal-600 dark:text-teal-400 font-black uppercase tracking-wider mt-0.5 mb-1 truncate px-1">{node.position || node.jobTitle || 'Team Member'}</p>
+                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{node.firstName} {node.lastName}</h4>
+                <p className="text-[10px] text-teal-600 dark:text-teal-400 font-black uppercase tracking-wider mt-0.5 truncate">{node.position || node.jobTitle || 'Team Member'}</p>
+                {node.department && <p className="text-[10px] text-slate-400 mt-1 truncate">{node.department}</p>}
              </div>
            </div>
         </div>
+        {/* Connector Line Vertical */}
         {hasChildren && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
-            <div className="w-px h-3 bg-slate-300 dark:bg-slate-600 mb-0.5"></div>
-            <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className={`flex items-center justify-center w-5 h-5 rounded-full border bg-white dark:bg-slate-700 shadow-sm transition-colors ${expanded ? 'border-teal-500 text-teal-600' : 'border-slate-300 text-slate-400'}`}>
-              {expanded ? <Minus size={10} strokeWidth={4} /> : <Plus size={10} strokeWidth={4} />}
+          <>
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-px h-8 bg-slate-300 dark:bg-slate-600"></div>
+            <button 
+                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} 
+                className={`absolute -bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-6 h-6 rounded-full border bg-white dark:bg-slate-700 shadow-md transition-colors ${expanded ? 'border-teal-500 text-teal-600' : 'border-slate-300 text-slate-400'}`}
+            >
+              {expanded ? <Minus size={12} strokeWidth={3} /> : <Plus size={12} strokeWidth={3} />}
             </button>
-          </div>
+          </>
         )}
       </div>
       {hasChildren && expanded && (
-        <ul className="flex flex-row gap-6 pt-2">
-          {node.children.map(child => <OrgChartNode key={child.id} node={child} />)}
-        </ul>
+        <div className="relative pt-4">
+            {/* Horizontal Connector Line */}
+            {node.children.length > 1 && (
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[calc(100%-4rem)] h-px bg-slate-300 dark:bg-slate-600"></div>
+            )}
+            <ul className="flex flex-row justify-center gap-4">
+            {node.children.map((child, idx) => (
+                <div key={child.id} className="relative flex flex-col items-center">
+                    {/* Vertical connector from horizontal line to child */}
+                    <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 absolute -top-4 left-1/2 -translate-x-1/2"></div>
+                    <OrgChartNode node={child} />
+                </div>
+            ))}
+            </ul>
+        </div>
       )}
     </li>
   );
@@ -84,7 +100,7 @@ const Organization = () => {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
   const [showPositionModal, setShowPositionModal] = useState(false);
-  const [showAddModalQuick, setShowAddModalQuick] = useState(false); // Quick add from sidebar
+  const [showAddModalQuick, setShowAddModalQuick] = useState(false); 
   
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -130,7 +146,7 @@ const Organization = () => {
 
   const totalPages = Math.ceil(filteredDirectoryEmployees.length / itemsPerPage);
 
-  // Handle Main Basemap Updates with defensive checks
+  // Handle Main Basemap Updates
   useEffect(() => {
     const view = viewInstanceRef.current;
     if (!view || !view.map) return;
@@ -142,7 +158,7 @@ const Organization = () => {
     }
   }, [theme, isImagery]);
 
-  // Handle Edit Modal Basemap Updates with defensive checks
+  // Handle Edit Modal Basemap Updates
   useEffect(() => {
     const view = editMapViewRef.current;
     if (!view || !view.map) return;
@@ -411,7 +427,7 @@ const Organization = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in relative text-slate-800 dark:text-slate-200">
+    <div className="space-y-6 animate-fade-in relative text-slate-800 dark:text-slate-200 pb-16">
        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
             <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Organization</h2>
@@ -545,10 +561,10 @@ const Organization = () => {
                        </div>
                    </div>
                ) : (
-                   /* Existing Map/Split View */
-                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[740px]">
-                       <div className="lg:col-span-4 flex flex-col gap-4 h-full">
-                           <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                   /* Map View - Responsive Grid with auto height handling on mobile to prevent overlap */
+                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto lg:h-[740px]">
+                       <div className="lg:col-span-4 flex flex-col gap-4 h-[500px] lg:h-full">
+                           <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm shrink-0">
                                <div className="relative">
                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                    <input 
@@ -561,8 +577,8 @@ const Organization = () => {
                                </div>
                            </div>
 
-                           <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                               <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                           <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm min-h-0">
+                               <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building2 size={14} className="text-teal-600"/> Corporate Directory</h3>
                                    <div className="flex items-center gap-2">
                                         {isPowerUser && (
@@ -613,20 +629,14 @@ const Organization = () => {
                                            </div>
                                        </div>
                                    ))}
-                                   {filteredDirectoryEmployees.length === 0 && (
-                                       <div className="p-8 text-center text-slate-400">
-                                           <Users size={32} className="mx-auto mb-2 opacity-20" />
-                                           <p className="text-xs font-medium italic">No colleagues match your criteria.</p>
-                                       </div>
-                                   )}
                                </div>
                            </div>
                        </div>
 
-                       <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl shadow-slate-200/50 dark:shadow-black/50">
+                       <div className="lg:col-span-8 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-2xl shadow-slate-200/50 dark:shadow-black/50 h-[500px] lg:h-full">
                            <div ref={mapContainerRef} className="w-full h-full z-0 grayscale-[0.2] contrast-[1.1]"></div>
                            
-                           {/* Custom Basemap Toggle Overlay - Moved slightly further from edge */}
+                           {/* Custom Basemap Toggle Overlay */}
                            <div className="absolute top-4 left-16 z-10">
                                 <button 
                                     onClick={() => setIsImagery(!isImagery)}
@@ -641,7 +651,7 @@ const Organization = () => {
                                 </button>
                            </div>
 
-                           {/* Floating UI Overlays - Moved to Bottom Right to clear User Dropdown */}
+                           {/* Floating UI Overlays */}
                            <div className="absolute bottom-6 right-6 z-10 hidden sm:flex flex-col gap-3 pointer-events-none">
                                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-xl pointer-events-auto">
                                    <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Globe size={12}/> Regional Sync</h4>
@@ -667,17 +677,86 @@ const Organization = () => {
            </div>
        )}
 
-       {/* ... Projects, Positions, Chart tabs remain unchanged ... */}
-       {/* ... Modals ... */}
-       {/* MODALS PRESERVED AND STYLE-ALIGNED */}
+       {activeTab === 'projects' && (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {projects.map(proj => (
+                   <div key={proj.id} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-all hover:border-teal-500/50 flex flex-col h-full">
+                       <div className="flex justify-between items-start mb-4">
+                           <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400">
+                               <Layout size={24} />
+                           </div>
+                           <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${proj.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                               {proj.status}
+                           </span>
+                       </div>
+                       <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2 line-clamp-1">{proj.name}</h3>
+                       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 flex-1 line-clamp-3 leading-relaxed">{proj.description}</p>
+                       
+                       <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-700">
+                           <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                               <Clock size={14} />
+                               <span>{proj.dueDate || 'No Deadline'}</span>
+                           </div>
+                           {isPowerUser && (
+                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                   <button onClick={() => { setEditingProject(proj); setProjectForm(proj as any); setShowProjectModal(true); }} className="p-2 text-slate-400 hover:text-blue-600 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-blue-50 transition-colors"><Edit2 size={14} /></button>
+                                   <button onClick={() => { if(window.confirm('Delete project?')) deleteProject(proj.id); }} className="p-2 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
+                               </div>
+                           )}
+                       </div>
+                   </div>
+               ))}
+               {isPowerUser && (
+                   <button onClick={() => setShowProjectModal(true)} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-slate-400 hover:text-teal-600 hover:border-teal-200 hover:bg-teal-50/30 transition-all group min-h-[250px]">
+                       <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full mb-3 group-hover:bg-white shadow-sm transition-colors">
+                           <Plus size={32} />
+                       </div>
+                       <span className="font-bold text-sm">Launch New Project</span>
+                   </button>
+               )}
+           </div>
+       )}
+
+       {activeTab === 'positions' && (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {positions.map(pos => (
+                   <div key={pos.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col relative group">
+                       <div className="flex items-center gap-3 mb-4">
+                           <div className="p-2.5 bg-purple-50 dark:bg-purple-900/30 rounded-xl text-purple-600 dark:text-purple-400">
+                               <Briefcase size={20} />
+                           </div>
+                           <h3 className="font-bold text-slate-800 dark:text-white">{pos.title}</h3>
+                       </div>
+                       <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-4 flex-1">{pos.description}</p>
+                       <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
+                           <span>Role ID: {pos.id}</span>
+                       </div>
+                       {isPowerUser && (
+                           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
+                               <button onClick={() => { setEditingPosition(pos); setPositionForm(pos); setShowPositionModal(true); }} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"><Edit2 size={14} /></button>
+                               <button onClick={() => deletePosition(pos.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={14} /></button>
+                           </div>
+                       )}
+                   </div>
+               ))}
+           </div>
+       )}
+
+       {activeTab === 'chart' && (
+            <div className="overflow-x-auto pb-12 pt-8 cursor-grab active:cursor-grabbing bg-slate-50 dark:bg-slate-900/30 rounded-3xl border border-slate-200 dark:border-slate-700 min-h-[600px] flex justify-center items-start shadow-inner">
+                <ul className="flex flex-row gap-12 pt-4 min-w-max px-8">
+                    {tree.map(node => <OrgChartNode key={node.id} node={node} />)}
+                </ul>
+            </div>
+       )}
+
+       {/* MODALS */}
        <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Workforce Administration" width="max-w-7xl">
            <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />
        </DraggableModal>
 
        <DraggableModal isOpen={!!editingEmployee || showAddModalQuick} onClose={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} title={editingEmployee ? "Modify Employee Profile" : "Add New Employee"} width="max-w-3xl">
-           {/* ... Form Content ... */}
            <form onSubmit={handleUpdateEmployee} className="space-y-8">
-               {/* ... Input Fields ... */}
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</label><input required type="text" value={employeeFormData?.firstName || ''} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-inner" /></div>
                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Last Name</label><input required type="text" value={employeeFormData?.lastName || ''} onChange={e => setEmployeeFormData({...employeeFormData, lastName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-inner" /></div>
@@ -741,6 +820,37 @@ const Organization = () => {
                    <button type="button" onClick={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">ABORT CHANGES</button>
                    <button type="submit" disabled={isProcessing} className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/30 hover:bg-teal-700 transition flex items-center gap-2 active:scale-95">{isProcessing ? <Loader2 size={16} className="animate-spin" /> : editingEmployee ? 'COMMIT UPDATES' : 'CREATE RECORD'}</button>
                </div>
+           </form>
+       </DraggableModal>
+
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title="Create New Project" width="max-w-lg">
+           <form onSubmit={handleCreateProject} className="space-y-6">
+                <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Name</label>
+                    <input required type="text" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-inner" placeholder="e.g. Website Redesign" />
+                </div>
+                <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Description</label>
+                    <textarea required rows={3} value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-inner" placeholder="Brief objectives..." />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Status</label>
+                        <select value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="Active">Active</option>
+                            <option value="On Hold">On Hold</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Due Date</label>
+                        <input type="date" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-teal-500 shadow-inner" />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
+                    <button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">Cancel</button>
+                    <button type="submit" disabled={isProcessing} className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/30 hover:bg-teal-700 transition active:scale-95">{isProcessing ? <Loader2 size={16} className="animate-spin" /> : 'Launch Project'}</button>
+                </div>
            </form>
        </DraggableModal>
 

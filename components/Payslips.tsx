@@ -373,7 +373,9 @@ const Payslips = () => {
       const totalCount = userSlips.length;
       const totalAmount = userSlips.reduce((sum, p) => sum + p.amount, 0);
       const thisYearAmount = userSlips.reduce((sum, p) => {
-          if (p.month.includes(currentYear.toString())) {
+          // Robust date check for "This Year"
+          const slipYear = p.month.split(/[- ]/)[0]; // Handles YYYY-MM or YYYY Month
+          if (slipYear === currentYear.toString() || p.month.includes(currentYear.toString())) {
               return sum + p.amount;
           }
           return sum;
@@ -383,6 +385,9 @@ const Payslips = () => {
 
       return { totalCount, totalAmount, thisYearAmount, thisYearCount, displayCurrency };
   }, [payslips, currentUser, currentYear]);
+
+  // Only show the personal earnings summary if user is non-HR OR explicitly viewing their own slips
+  const showSummary = !isHR || showMyPayslipsOnly;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -460,16 +465,18 @@ const Payslips = () => {
                     >
                         {showValues ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
-                    <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Search employee or month..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-transparent dark:text-slate-200"
-                        />
-                    </div>
+                    {isHR && (
+                        <div className="relative w-full sm:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input 
+                                type="text" 
+                                placeholder="Search employee or month..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-transparent dark:text-slate-200"
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
             
@@ -594,29 +601,31 @@ const Payslips = () => {
             </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">My Earnings Summary</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Payslips</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{summaryStats.totalCount}</p>
-                </div>
-                <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">This Year ({currentYear})</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-                        {showValues ? `${summaryStats.displayCurrency}${summaryStats.thisYearAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">{summaryStats.thisYearCount} payslips</p>
-                </div>
-                <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Earnings</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                        {showValues ? `${summaryStats.displayCurrency}${summaryStats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">All time</p>
+        {showSummary && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">My Earnings Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Payslips</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{summaryStats.totalCount}</p>
+                    </div>
+                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">This Year ({currentYear})</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
+                            {showValues ? `${summaryStats.displayCurrency}${summaryStats.thisYearAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">{summaryStats.thisYearCount} payslips</p>
+                    </div>
+                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Earnings</p>
+                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                            {showValues ? `${summaryStats.displayCurrency}${summaryStats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">All time</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        )}
 
         {/* Edit Amount Modal */}
         <DraggableModal isOpen={!!editingSlip} onClose={() => setEditingSlip(null)} title="Correct Payslip Amount" width="max-w-sm">

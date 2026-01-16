@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
 import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2 } from 'lucide-react';
@@ -341,8 +340,40 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-[2] w-full">
-              <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label><input type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" /></div>
-              <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> To Date</label><input type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" /></div>
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label>
+                  <input 
+                    type="date" 
+                    value={filterStartDate} 
+                    onChange={e => { 
+                        const newStartDate = e.target.value;
+                        if (newStartDate > filterEndDate) {
+                             showToast("From date cannot be later than To date.", "warning");
+                             return;
+                        }
+                        setFilterStartDate(newStartDate); 
+                        setCurrentPage(1); 
+                    }} 
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
+                  />
+              </div>
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> To Date</label>
+                  <input 
+                    type="date" 
+                    value={filterEndDate} 
+                    onChange={e => { 
+                        const newEndDate = e.target.value;
+                        if (newEndDate < filterStartDate) {
+                            showToast("End date cannot be earlier than From date.", "warning");
+                            return; 
+                        }
+                        setFilterEndDate(newEndDate); 
+                        setCurrentPage(1); 
+                    }} 
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
+                  />
+              </div>
           </div>
           <button onClick={() => { setFilterStartDate(formatDateISO(firstDayOfMonth)); setFilterEndDate(formatDateISO(today)); setEmployeeSearch(''); }} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg shrink-0 h-[42px]"><RotateCcw size={14} /> Reset</button>
       </div>
