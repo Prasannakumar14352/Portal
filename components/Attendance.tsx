@@ -211,7 +211,17 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const handleRetroSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingRecord) return;
-    const coutISO = new Date(`${retroForm.date}T${retroForm.time}:00`).toISOString();
+
+    // Validation: End Date/Time must be >= Start Date/Time
+    const checkOutDate = new Date(`${retroForm.date}T${retroForm.time}:00`);
+    const checkInDate = new Date(pendingRecord.checkInTime!); 
+
+    if (checkOutDate < checkInDate) {
+        showToast("Check-out date/time cannot be earlier than check-in date/time.", "error");
+        return;
+    }
+
+    const coutISO = checkOutDate.toISOString();
     await updateAttendanceRecord({ 
       ...pendingRecord, 
       checkOut: formatTime12(new Date(coutISO)), 
@@ -241,7 +251,20 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       e.preventDefault();
       if (!editingRecord) return;
       const cinISO = new Date(`${editForm.checkInDate}T${editForm.checkInTime}:00`).toISOString();
-      const coutISO = editForm.checkOutTime ? new Date(`${editForm.checkOutDate}T${editForm.checkOutTime}:00`).toISOString() : "";
+      
+      let coutISO = "";
+      if (editForm.checkOutDate && editForm.checkOutTime) {
+          const outDt = new Date(`${editForm.checkOutDate}T${editForm.checkOutTime}:00`);
+          const inDt = new Date(cinISO);
+          
+          // Validation: End Date/Time must be >= Start Date/Time
+          if (outDt < inDt) {
+              showToast("End date/time cannot be earlier than start date/time.", "error");
+              return;
+          }
+          coutISO = outDt.toISOString();
+      }
+
       await updateAttendanceRecord({ 
         ...editingRecord, 
         date: editForm.checkInDate,
@@ -254,17 +277,16 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   };
 
   const filteredRecords = useMemo(() => {
+    // VISIBILITY CHANGE: Allow everyone to see all records, not just HR
     let filtered = [...records];
-    if (!isHR && currentUser) {
-      filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
-    }
+    
     if (employeeSearch) {
         filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(employeeSearch.toLowerCase()));
     }
     if (filterStartDate) filtered = filtered.filter(r => r.date >= filterStartDate);
     if (filterEndDate) filtered = filtered.filter(r => r.date <= filterEndDate);
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [records, isHR, currentUser, filterStartDate, filterEndDate, employeeSearch]);
+  }, [records, filterStartDate, filterEndDate, employeeSearch]); // Removed 'isHR' and 'currentUser' dependency for filtering scope
 
   const paginatedRecords = useMemo(() => {
     return filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -330,15 +352,15 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       </div>
 
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-end">
-          {isHR && (
-            <div className="space-y-1.5 flex-1 w-full">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
-                <div className="relative">
-                    <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                </div>
-            </div>
-          )}
+          {/* Enable search for everyone since they can see all records */}
+          <div className="space-y-1.5 flex-1 w-full">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
+              <div className="relative">
+                  <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              </div>
+          </div>
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-[2] w-full">
               <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label>
@@ -404,6 +426,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </td>
                   <td className="px-6 py-5">{formatSessionString(record)}</td>
                   <td className="px-6 py-5"><div className="font-mono text-sm font-black text-slate-800 dark:text-teal-400 flex items-center gap-2"><Clock size={14} className="text-slate-300" /> {calculateDuration(record)}</div></td>
+                  {/* Actions column remains visible ONLY to HR to prevent unauthorized edits */}
                   {isHR && (
                     <td className="px-8 py-5">
                         <div className="flex justify-center gap-2">
