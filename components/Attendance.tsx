@@ -322,8 +322,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   };
 
   const filteredRecords = useMemo(() => {
-    // VISIBILITY CHANGE: Allow everyone to see all records, not just HR
     let filtered = [...records];
+    
+    // Privacy Filter: Non-HR users see ONLY their own records
+    if (!isHR && currentUser) {
+        filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
+    }
     
     if (employeeSearch) {
         filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(employeeSearch.toLowerCase()));
@@ -350,7 +354,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     }
 
     return filtered;
-  }, [records, filterStartDate, filterEndDate, employeeSearch, filterLocation, filterStatus, sortConfig]); 
+  }, [records, filterStartDate, filterEndDate, employeeSearch, filterLocation, filterStatus, sortConfig, isHR, currentUser]); 
 
   const paginatedRecords = useMemo(() => {
     return filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -416,14 +420,16 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       </div>
 
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col xl:flex-row gap-4 items-end">
-          {/* Enable search for everyone since they can see all records */}
-          <div className="space-y-1.5 flex-1 w-full xl:w-auto">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
-              <div className="relative">
-                  <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-              </div>
-          </div>
+          {/* Only Show Search for HR */}
+          {isHR && (
+            <div className="space-y-1.5 flex-1 w-full xl:w-auto">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
+                <div className="relative">
+                    <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                </div>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-[2] w-full">
               <div className="space-y-1.5">
