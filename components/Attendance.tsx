@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
-import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2 } from 'lucide-react';
+import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -38,6 +38,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const [filterStartDate, setFilterStartDate] = useState(formatDateISO(firstDayOfMonth));
   const [filterEndDate, setFilterEndDate] = useState(formatDateISO(today));
+
+  // New Filters
+  const [filterLocation, setFilterLocation] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: 'checkIn' | 'duration'; direction: 'asc' | 'desc' } | null>(null);
 
   const [showEarlyReasonModal, setShowEarlyReasonModal] = useState(false);
   const [showTimeLogModal, setShowTimeLogModal] = useState(false);
@@ -93,6 +100,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   }, [records, currentUser]);
 
+  const uniqueLocations = useMemo(() => {
+      const locs = new Set(records.map(r => r.workLocation).filter(Boolean));
+      return Array.from(locs).sort();
+  }, [records]);
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -116,6 +128,20 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       if (!start) return 0;
       const diffMs = currentTime.getTime() - start.getTime();
       return Math.max(0, Math.floor(diffMs / 60000));
+  };
+
+  const getDurationMs = (record: AttendanceRecord) => {
+    const start = record.checkInTime ? new Date(record.checkInTime) : null;
+    let end = record.checkOutTime ? new Date(record.checkOutTime) : null;
+    
+    // For sorting, we only calculate dynamic duration for the *current user's* active session.
+    // For others, an active session counts as 0 or undefined for sorting purposes to keep it stable.
+    if (start && !end && String(record.employeeId) === String(currentUser?.id)) {
+        end = currentTime;
+    }
+    
+    if (!start || !end) return -1; // Treat undefined/incomplete durations as smallest
+    return end.getTime() - start.getTime();
   };
 
   // --- Checkout Sequence Logic ---
@@ -276,6 +302,25 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       setShowEditModal(false);
   };
 
+  const handleSort = (key: 'checkIn' | 'duration') => {
+      setSortConfig(current => {
+          if (current?.key === key) {
+              return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+          }
+          return { key, direction: 'desc' };
+      });
+  };
+
+  const handleResetFilters = () => {
+      setFilterStartDate(formatDateISO(firstDayOfMonth));
+      setFilterEndDate(formatDateISO(today));
+      setEmployeeSearch('');
+      setFilterLocation('All');
+      setFilterStatus('All');
+      setSortConfig(null);
+      setCurrentPage(1);
+  };
+
   const filteredRecords = useMemo(() => {
     // VISIBILITY CHANGE: Allow everyone to see all records, not just HR
     let filtered = [...records];
@@ -285,8 +330,27 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     }
     if (filterStartDate) filtered = filtered.filter(r => r.date >= filterStartDate);
     if (filterEndDate) filtered = filtered.filter(r => r.date <= filterEndDate);
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [records, filterStartDate, filterEndDate, employeeSearch]); // Removed 'isHR' and 'currentUser' dependency for filtering scope
+    if (filterLocation !== 'All') filtered = filtered.filter(r => r.workLocation === filterLocation);
+    if (filterStatus !== 'All') filtered = filtered.filter(r => r.status === filterStatus);
+
+    if (sortConfig) {
+        filtered.sort((a, b) => {
+            let valA, valB;
+            if (sortConfig.key === 'checkIn') {
+                valA = new Date(a.checkInTime || a.date).getTime();
+                valB = new Date(b.checkInTime || b.date).getTime();
+            } else {
+                valA = getDurationMs(a);
+                valB = getDurationMs(b);
+            }
+            return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        });
+    } else {
+        filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+
+    return filtered;
+  }, [records, filterStartDate, filterEndDate, employeeSearch, filterLocation, filterStatus, sortConfig]); 
 
   const paginatedRecords = useMemo(() => {
     return filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -351,9 +415,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
          </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-end">
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col xl:flex-row gap-4 items-end">
           {/* Enable search for everyone since they can see all records */}
-          <div className="space-y-1.5 flex-1 w-full">
+          <div className="space-y-1.5 flex-1 w-full xl:w-auto">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
               <div className="relative">
                   <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
@@ -361,7 +425,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-[2] w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-[2] w-full">
               <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label>
                   <input 
@@ -396,8 +460,32 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                     className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
                   />
               </div>
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><MapPin size={12} /> Work Location</label>
+                  <select 
+                    value={filterLocation} 
+                    onChange={e => { setFilterLocation(e.target.value); setCurrentPage(1); }} 
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                  >
+                      <option value="All">All Locations</option>
+                      {uniqueLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                  </select>
+              </div>
+              <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Filter size={12} /> Status</label>
+                  <select 
+                    value={filterStatus} 
+                    onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }} 
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
+                  >
+                      <option value="All">All Status</option>
+                      <option value="Present">Present</option>
+                      <option value="Absent">Absent</option>
+                      <option value="Late">Late</option>
+                  </select>
+              </div>
           </div>
-          <button onClick={() => { setFilterStartDate(formatDateISO(firstDayOfMonth)); setFilterEndDate(formatDateISO(today)); setEmployeeSearch(''); }} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg shrink-0 h-[42px]"><RotateCcw size={14} /> Reset</button>
+          <button onClick={handleResetFilters} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg shrink-0 h-[42px]"><RotateCcw size={14} /> Reset</button>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -407,8 +495,16 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-500 text-[10px] uppercase tracking-[0.15em] font-black border-b border-slate-200 dark:border-slate-700">
                 <th className="px-8 py-5">Employee Detail</th>
                 <th className="px-6 py-5">Punch Date</th>
-                <th className="px-6 py-5">Shift Session</th>
-                <th className="px-6 py-5">Duration</th>
+                <th className="px-6 py-5">
+                    <button onClick={() => handleSort('checkIn')} className="flex items-center gap-2 hover:text-teal-600 transition-colors uppercase tracking-[0.15em]">
+                        Shift Session <ArrowUpDown size={12} className={sortConfig?.key === 'checkIn' ? 'text-teal-600' : 'text-slate-300'} />
+                    </button>
+                </th>
+                <th className="px-6 py-5">
+                    <button onClick={() => handleSort('duration')} className="flex items-center gap-2 hover:text-teal-600 transition-colors uppercase tracking-[0.15em]">
+                        Duration <ArrowUpDown size={12} className={sortConfig?.key === 'duration' ? 'text-teal-600' : 'text-slate-300'} />
+                    </button>
+                </th>
                 {isHR && <th className="px-8 py-5 text-center">Actions</th>}
               </tr>
             </thead>

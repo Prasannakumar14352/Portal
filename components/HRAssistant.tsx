@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, RefreshCw, Key } from 'lucide-react';
 import { getHRChatResponse, resetChatSession } from '../services/geminiService';
@@ -78,7 +77,7 @@ const HRAssistant: React.FC = () => {
 
       setMessages(prev => [...prev, botMessage]);
     } catch (error: any) {
-      console.error("Gemini Error:", error);
+      // Error handling: Display user-friendly message instead of logging to console
       let errorMessage = 'Sorry, I encountered an issue. Please try again later.';
       
       if (error.message === "MISSING_API_KEY") {
