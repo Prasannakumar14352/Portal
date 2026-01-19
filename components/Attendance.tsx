@@ -36,8 +36,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   // Date Filtering State
   const today = new Date();
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const [filterStartDate, setFilterStartDate] = useState(formatDateISO(firstDayOfMonth));
-  const [filterEndDate, setFilterEndDate] = useState(formatDateISO(today));
+  const [startDate, setStartDate] = useState(formatDateISO(firstDayOfMonth));
+  const [endDate, setEndDate] = useState(formatDateISO(today));
 
   // New Filters
   const [filterLocation, setFilterLocation] = useState('All');
@@ -312,8 +312,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   };
 
   const handleResetFilters = () => {
-      setFilterStartDate(formatDateISO(firstDayOfMonth));
-      setFilterEndDate(formatDateISO(today));
+      setStartDate(formatDateISO(firstDayOfMonth));
+      setEndDate(formatDateISO(today));
       setEmployeeSearch('');
       setFilterLocation('All');
       setFilterStatus('All');
@@ -332,8 +332,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     if (employeeSearch) {
         filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(employeeSearch.toLowerCase()));
     }
-    if (filterStartDate) filtered = filtered.filter(r => r.date >= filterStartDate);
-    if (filterEndDate) filtered = filtered.filter(r => r.date <= filterEndDate);
+    if (startDate) filtered = filtered.filter(r => r.date >= startDate);
+    if (endDate) filtered = filtered.filter(r => r.date <= endDate);
     if (filterLocation !== 'All') filtered = filtered.filter(r => r.workLocation === filterLocation);
     if (filterStatus !== 'All') filtered = filtered.filter(r => r.status === filterStatus);
 
@@ -354,7 +354,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     }
 
     return filtered;
-  }, [records, filterStartDate, filterEndDate, employeeSearch, filterLocation, filterStatus, sortConfig, isHR, currentUser]); 
+  }, [records, startDate, endDate, employeeSearch, filterLocation, filterStatus, sortConfig, isHR, currentUser]); 
 
   const paginatedRecords = useMemo(() => {
     return filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -436,14 +436,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label>
                   <input 
                     type="date" 
-                    value={filterStartDate} 
+                    value={startDate} 
                     onChange={e => { 
                         const newStartDate = e.target.value;
-                        if (newStartDate > filterEndDate) {
+                        if (newStartDate > endDate) {
                              showToast("From date cannot be later than To date.", "warning");
                              return;
                         }
-                        setFilterStartDate(newStartDate); 
+                        setStartDate(newStartDate); 
                         setCurrentPage(1); 
                     }} 
                     className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
@@ -453,14 +453,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> To Date</label>
                   <input 
                     type="date" 
-                    value={filterEndDate} 
+                    value={endDate} 
                     onChange={e => { 
                         const newEndDate = e.target.value;
-                        if (newEndDate < filterStartDate) {
+                        if (newEndDate < startDate) {
                             showToast("End date cannot be earlier than From date.", "warning");
                             return; 
                         }
-                        setFilterEndDate(newEndDate); 
+                        setEndDate(newEndDate); 
                         setCurrentPage(1); 
                     }} 
                     className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
