@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick
+  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick, Search
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -118,6 +118,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'team'>('requests');
   const [isEditingId, setIsEditingId] = useState<string | number | null>(null);
   const [editingTypeId, setEditingTypeId] = useState<string | number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [formData, setFormData] = useState({
     type: '', startDate: '', endDate: '', durationType: 'Full Day' as LeaveDurationType, reason: '', notifyUserIds: [] as (string|number)[], approverId: '', isUrgent: false
@@ -128,6 +129,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   });
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
+  const isManager = currentUser?.role === UserRole.MANAGER;
+  const canSearch = isHR || isManager;
 
   const availableManagers = useMemo(() => {
     return users.filter(u => {
@@ -139,6 +142,43 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const otherEmployees = useMemo(() => {
     return users.filter(u => String(u.id) !== String(currentUser?.id));
   }, [users, currentUser]);
+
+  const filteredLeaves = useMemo(() => {
+    let data = leaves;
+
+    // Role-based visibility filtering
+    if (currentUser) {
+        const currentIdStr = String(currentUser.id);
+        
+        if (currentUser.role === UserRole.EMPLOYEE) {
+            // Employees see ONLY their own requests
+            data = data.filter(l => String(l.userId) === currentIdStr);
+        } else if (currentUser.role === UserRole.MANAGER) {
+            // Managers see:
+            // 1. Their own requests
+            // 2. Requests where they are the approver
+            // 3. Requests from their direct reports (optional but good UX)
+            data = data.filter(l => {
+                const isOwn = String(l.userId) === currentIdStr;
+                const isApprover = String(l.approverId) === currentIdStr;
+                const requester = users.find(u => String(u.id) === String(l.userId));
+                const isDirectReport = requester?.managerId === currentIdStr;
+                
+                return isOwn || isApprover || isDirectReport;
+            });
+        }
+        // HR and Admin see all records by default
+    }
+
+    if (!searchQuery.trim()) return data;
+    
+    const query = searchQuery.toLowerCase();
+    return data.filter(leave => 
+        leave.userName.toLowerCase().includes(query) ||
+        leave.status.toLowerCase().includes(query) ||
+        leave.type.toLowerCase().includes(query)
+    );
+  }, [leaves, searchQuery, currentUser, users]);
 
   const getBalancesForUser = (userId: string | number) => {
     return leaveTypes.map(type => {
@@ -419,70 +459,93 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       </div>
 
       {viewMode === 'requests' && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
-                  <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Actions</th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {leaves.map(leave => {
-                      // Robust ID comparison using trim and toString to avoid numeric/string mismatches
-                      const currentUserIdStr = String(currentUser?.id || '').trim();
-                      const leaveUserIdStr = String(leave.userId || '').trim();
-                      const leaveApproverIdStr = String(leave.approverId || '').trim();
+        <div className="space-y-4">
+            {canSearch && (
+                <div className="flex justify-end">
+                    <div className="relative w-full max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search by name, type or status..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
+                        />
+                    </div>
+                </div>
+            )}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
+                      <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Actions</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                      {filteredLeaves.map(leave => {
+                          // Robust ID comparison using trim and toString to avoid numeric/string mismatches
+                          const currentUserIdStr = String(currentUser?.id || '').trim();
+                          const leaveUserIdStr = String(leave.userId || '').trim();
+                          const leaveApproverIdStr = String(leave.approverId || '').trim();
 
-                      const isDesignatedApprover = leaveApproverIdStr === currentUserIdStr;
-                      const isOwnRequest = leaveUserIdStr === currentUserIdStr;
-                      
-                      // Sequential Visibility Logic:
-                      // 1. Manager level: Show if user is the assigned approver for this request
-                      const isPendingManagerLevel = leave.status === LeaveStatusEnum.PENDING_MANAGER;
-                      const canManagerAction = isDesignatedApprover && isPendingManagerLevel;
-                      
-                      // 2. HR level: Show if user has HR/Admin role AND manager has already approved
-                      const isPendingHRLevel = leave.status === LeaveStatusEnum.PENDING_HR;
-                      const canHRAction = isHR && isPendingHRLevel;
+                          const isDesignatedApprover = leaveApproverIdStr === currentUserIdStr;
+                          const isOwnRequest = leaveUserIdStr === currentUserIdStr;
+                          
+                          // Sequential Visibility Logic:
+                          // 1. Manager level: Show if user is the assigned approver for this request
+                          const isPendingManagerLevel = leave.status === LeaveStatusEnum.PENDING_MANAGER;
+                          const canManagerAction = isDesignatedApprover && isPendingManagerLevel;
+                          
+                          // 2. HR level: Show if user has HR/Admin role AND manager has already approved
+                          const isPendingHRLevel = leave.status === LeaveStatusEnum.PENDING_HR;
+                          const canHRAction = isHR && isPendingHRLevel;
 
-                      // Final Permission check
-                      const canApprove = (canManagerAction || canHRAction) && !isOwnRequest;
-                      const canEditDelete = isOwnRequest && isPendingManagerLevel;
+                          // Final Permission check
+                          const canApprove = (canManagerAction || canHRAction) && !isOwnRequest;
+                          const canEditDelete = isOwnRequest && isPendingManagerLevel;
 
-                      return (
-                        <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                                <span className="font-bold text-slate-700 dark:text-slate-200">{leave.userName}</span>
-                                {isOwnRequest && <span className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">My Req</span>}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 font-bold text-teal-600 dark:text-teal-400 text-xs uppercase">
-                            {leave.type}
-                            {leave.durationType === 'Half Day' && <span className="ml-2 bg-amber-100 text-amber-700 text-[8px] px-1.5 py-0.5 rounded uppercase">Half Day</span>}
-                          </td>
-                          <td className="px-6 py-4 font-mono text-[10px] text-slate-500">{leave.startDate} {leave.durationType !== 'Half Day' ? `to ${leave.endDate}` : ''}</td>
-                          <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
-                          <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                  {canApprove && (
-                                      <>
-                                          <button onClick={() => openApproveDialog(leave)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors" title="Approve"><CheckCircle2 size={16}/></button>
-                                          <button onClick={() => openRejectDialog(leave)} className="p-2 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-100 transition-colors" title="Reject"><XCircle size={16}/></button>
-                                      </>
-                                  )}
-                                  {canEditDelete && (
-                                      <>
-                                          <button onClick={() => handleEditClick(leave)} className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-100"><Edit2 size={16}/></button>
-                                          <button onClick={() => handleDeleteTrigger(leave)} className="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg border border-slate-100 hover:bg-slate-100"><Trash2 size={16}/></button>
-                                      </>
-                                  )}
-                              </div>
-                          </td>
-                        </tr>
-                      );
-                  })}
-                </tbody>
-              </table>
+                          return (
+                            <tr key={leave.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors text-sm">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="font-bold text-slate-700 dark:text-slate-200">{leave.userName}</span>
+                                    {isOwnRequest && <span className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">My Req</span>}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 font-bold text-teal-600 dark:text-teal-400 text-xs uppercase">
+                                {leave.type}
+                                {leave.durationType === 'Half Day' && <span className="ml-2 bg-amber-100 text-amber-700 text-[8px] px-1.5 py-0.5 rounded uppercase">Half Day</span>}
+                              </td>
+                              <td className="px-6 py-4 font-mono text-[10px] text-slate-500">{leave.startDate} {leave.durationType !== 'Half Day' ? `to ${leave.endDate}` : ''}</td>
+                              <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
+                              <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end gap-2">
+                                      {canApprove && (
+                                          <>
+                                              <button onClick={() => openApproveDialog(leave)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors" title="Approve"><CheckCircle2 size={16}/></button>
+                                              <button onClick={() => openRejectDialog(leave)} className="p-2 bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-100 transition-colors" title="Reject"><XCircle size={16}/></button>
+                                          </>
+                                      )}
+                                      {canEditDelete && (
+                                          <>
+                                              <button onClick={() => handleEditClick(leave)} className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-100"><Edit2 size={16}/></button>
+                                              <button onClick={() => handleDeleteTrigger(leave)} className="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg border border-slate-100 hover:bg-slate-100"><Trash2 size={16}/></button>
+                                          </>
+                                      )}
+                                  </div>
+                              </td>
+                            </tr>
+                          );
+                      })}
+                      {filteredLeaves.length === 0 && (
+                          <tr>
+                              <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm italic">
+                                  No leave requests found {searchQuery ? `matching "${searchQuery}"` : ''}
+                              </td>
+                          </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
             </div>
         </div>
       )}

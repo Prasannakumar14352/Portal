@@ -1,7 +1,7 @@
-
 import React, { useMemo } from 'react';
 import { 
-  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer
+  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { Users, UserCheck, CalendarOff, TrendingUp } from 'lucide-react';
 import { Employee, EmployeeStatus, LeaveRequest, LeaveStatus, Department } from '../types';
@@ -12,7 +12,7 @@ interface DashboardProps {
   departments: Department[];
 }
 
-const COLORS = ['#0f766e', '#f59e0b', '#ef4444']; 
+const COLORS = ['#0f766e', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899']; 
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string | number, icon: any, color: string, subtext?: string }) => (
   <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
@@ -65,6 +65,18 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves }) => {
     { name: 'On Leave', value: onLeaveEmployees },
     { name: 'Inactive', value: totalEmployees - activeEmployees - onLeaveEmployees }
   ];
+
+  const departmentData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    employees.forEach(e => {
+        const dept = e.department || 'General';
+        counts[dept] = (counts[dept] || 0) + 1;
+    });
+    return Object.entries(counts)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5); // Top 5
+  }, [employees]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -135,9 +147,26 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves }) => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-center items-center">
-            <TrendingUp size={48} className="text-teal-600 mb-4 opacity-20" />
-            <p className="text-slate-400 font-medium text-center">Organizational growth metrics and performance indicators will appear here as the period progresses.</p>
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Department Structure</h3>
+            <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={departmentData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 11, fill: '#64748b'}} interval={0} />
+                        <Tooltip 
+                            cursor={{fill: 'transparent'}} 
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Bar dataKey="value" fill="#0d9488" radius={[0, 4, 4, 0]} barSize={20} name="Staff Count">
+                            {departmentData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
         </div>
       </div>
     </div>
