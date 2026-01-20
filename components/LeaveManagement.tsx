@@ -1,8 +1,7 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users
+  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -203,6 +202,20 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       isUrgent: !!leave.isUrgent
     });
     setShowModal(true);
+  };
+
+  const handleTypeClick = (type: LeaveTypeConfig) => {
+      if (!type.isActive) {
+          showToast("This leave category is currently inactive.", "warning");
+          return;
+      }
+      setIsEditingId(null);
+      setFormData({ 
+        type: type.name, 
+        startDate: '', endDate: '', durationType: 'Full Day', reason: '', notifyUserIds: [], 
+        approverId: String(currentUser?.managerId || ''), isUrgent: false
+      });
+      setShowModal(true);
   };
 
   const handleAddType = () => {
@@ -477,7 +490,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       {viewMode === 'types' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {leaveTypes.map(type => (
-            <div key={type.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col hover:shadow-md transition-shadow group">
+            <div 
+                key={type.id} 
+                onClick={() => handleTypeClick(type)}
+                className={`bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col hover:shadow-md transition-all group cursor-pointer hover:border-teal-500/30 ${!type.isActive ? 'opacity-70' : ''}`}
+            >
                 <div className="flex justify-between items-start mb-4">
                     <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center text-teal-600 border border-teal-100 dark:border-teal-800">
                         <Layers size={24} />
@@ -495,11 +512,15 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 italic flex-grow">
                     {type.description || 'No specific description provided for this leave category.'}
                 </p>
+                
+                <div className="mt-4 flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <MousePointerClick size={14} /> <span>Click to Apply</span>
+                </div>
 
                 {isHR && (
-                  <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-slate-50 dark:border-slate-700">
-                      <button onClick={() => handleEditType(type)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Edit Configuration"><Edit2 size={16}/></button>
-                      <button onClick={() => { if(window.confirm(`Permanently delete ${type.name}?`)) deleteLeaveType(type.id); }} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Remove Category"><Trash2 size={16}/></button>
+                  <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-50 dark:border-slate-700 relative z-10">
+                      <button onClick={(e) => { e.stopPropagation(); handleEditType(type); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Edit Configuration"><Edit2 size={16}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); if(window.confirm(`Permanently delete ${type.name}?`)) deleteLeaveType(type.id); }} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Remove Category"><Trash2 size={16}/></button>
                   </div>
                 )}
             </div>
