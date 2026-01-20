@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { Download, CheckCircle2, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch, UserCheck, Users } from 'lucide-react';
+import { Download, CheckCircle2, Check, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch, UserCheck, Users } from 'lucide-react';
 import { UserRole, Payslip } from '../types';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -525,9 +525,20 @@ const Payslips = () => {
                                             </button>
                                         )}
                                     </span>
-                                    <span className="inline-block text-[10px] uppercase tracking-wide font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
-                                        {slip.status}
-                                    </span>
+                                    {slip.status === 'Paid' ? (
+                                        <div className="flex justify-end mt-1">
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
+                                                <div className="bg-emerald-500 rounded-full p-[1px]">
+                                                    <Check size={10} className="text-white" strokeWidth={3} />
+                                                </div>
+                                                <span className="text-[10px] uppercase tracking-wide font-bold text-emerald-700 dark:text-emerald-400">Paid</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="inline-block text-[10px] uppercase tracking-wide font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-800">
+                                            {slip.status}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="flex gap-2">
                                     <button 

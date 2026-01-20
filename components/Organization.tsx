@@ -6,7 +6,7 @@ import {
   Globe, Navigation, Map as MapIcon, ChevronDown, ChevronRight, 
   Calendar, Minus, Layout, Search, Locate, Target, UserPlus, 
   RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare, Layers,
-  Mail, ChevronLeft, List, Grid, CheckCircle2, AlertCircle, Clock, Activity, BarChart3, ArrowLeft, UserCheck, UserMinus
+  Mail, ChevronLeft, List, Grid, CheckCircle2, AlertCircle, Clock, Activity, BarChart3, ArrowLeft, UserCheck, UserMinus, Filter
 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
@@ -169,6 +169,8 @@ const Organization = () => {
   // Projects State
   const [projectView, setProjectView] = useState<'card' | 'list'>('card');
   const [projectSearch, setProjectSearch] = useState('');
+  const [projectStatusFilter, setProjectStatusFilter] = useState('All');
+  const [projectEmployeeFilter, setProjectEmployeeFilter] = useState('All');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectDetailTab, setProjectDetailTab] = useState<'tasks' | 'team' | 'logs'>('tasks');
 
@@ -231,12 +233,37 @@ const Organization = () => {
 
   const filteredProjects = useMemo(() => {
       const term = projectSearch.toLowerCase();
-      return projects.filter(p => 
+      let visible = projects;
+
+      // 1. Existing View Restriction for Non-Admin/HR
+      if (!isPowerUser && currentUser) {
+          const empRecord = employees.find(e => String(e.id) === String(currentUser.id));
+          const myProjectIds = Array.isArray(empRecord?.projectIds) ? empRecord!.projectIds.map(String) : [];
+          visible = visible.filter(p => myProjectIds.includes(String(p.id)));
+      }
+
+      // 2. Status Filter
+      if (projectStatusFilter !== 'All') {
+          visible = visible.filter(p => p.status === projectStatusFilter);
+      }
+
+      // 3. Employee Filter
+      if (projectEmployeeFilter !== 'All') {
+          const targetEmp = employees.find(e => String(e.id) === projectEmployeeFilter);
+          if (targetEmp && Array.isArray(targetEmp.projectIds)) {
+              const targetProjectIds = targetEmp.projectIds.map(String);
+              visible = visible.filter(p => targetProjectIds.includes(String(p.id)));
+          } else {
+              visible = [];
+          }
+      }
+
+      return visible.filter(p => 
           p.name.toLowerCase().includes(term) ||
           (p.description || '').toLowerCase().includes(term) ||
           p.status.toLowerCase().includes(term)
       );
-  }, [projects, projectSearch]);
+  }, [projects, projectSearch, isPowerUser, currentUser, employees, projectStatusFilter, projectEmployeeFilter]);
 
   const totalPages = Math.ceil(filteredDirectoryEmployees.length / itemsPerPage);
 
@@ -263,7 +290,8 @@ const Organization = () => {
       
       // Add explicitly assigned
       employees.forEach(emp => {
-          if (emp.projectIds?.some(pid => String(pid) === String(selectedProject.id))) {
+          // Robust check for array to prevent crash
+          if (Array.isArray(emp.projectIds) && emp.projectIds.some(pid => String(pid) === String(selectedProject.id))) {
               teamIds.add(String(emp.id));
           }
       });
@@ -913,32 +941,69 @@ const Organization = () => {
        {activeTab === 'projects' && !selectedProject && (
            <div className="space-y-6">
                {/* Controls Header */}
-               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="relative w-full sm:w-72">
+               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div className="relative w-full lg:w-64">
                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                        <input 
                            type="text" 
                            placeholder="Search projects..." 
                            value={projectSearch}
                            onChange={(e) => setProjectSearch(e.target.value)}
-                           className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all font-medium dark:text-white"
+                           className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all font-medium dark:text-white shadow-sm"
                        />
                    </div>
-                   <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                       <button 
-                           onClick={() => setProjectView('card')} 
-                           className={`p-2 rounded-lg transition-all ${projectView === 'card' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
-                           title="Card View"
-                       >
-                           <Grid size={18} />
-                       </button>
-                       <button 
-                           onClick={() => setProjectView('list')} 
-                           className={`p-2 rounded-lg transition-all ${projectView === 'list' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
-                           title="List View"
-                       >
-                           <List size={18} />
-                       </button>
+                   
+                   <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                       {/* Status Filter */}
+                       <div className="relative w-full sm:w-40">
+                           <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                           <select 
+                               value={projectStatusFilter}
+                               onChange={(e) => setProjectStatusFilter(e.target.value)}
+                               className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none appearance-none font-medium text-slate-600 dark:text-slate-300 shadow-sm cursor-pointer"
+                           >
+                               <option value="All">All Status</option>
+                               <option value="Active">Active</option>
+                               <option value="On Hold">On Hold</option>
+                               <option value="Completed">Completed</option>
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                       </div>
+
+                       {/* Employee Filter */}
+                       <div className="relative w-full sm:w-48">
+                           <UserSquare className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                           <select 
+                               value={projectEmployeeFilter}
+                               onChange={(e) => setProjectEmployeeFilter(e.target.value)}
+                               className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none appearance-none font-medium text-slate-600 dark:text-slate-300 shadow-sm cursor-pointer"
+                           >
+                               <option value="All">All Employees</option>
+                               {employees
+                                   .sort((a, b) => a.firstName.localeCompare(b.firstName))
+                                   .map(emp => (
+                                       <option key={emp.id} value={String(emp.id)}>{emp.firstName} {emp.lastName}</option>
+                               ))}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                       </div>
+
+                       <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
+                           <button 
+                               onClick={() => setProjectView('card')} 
+                               className={`p-2 rounded-lg transition-all ${projectView === 'card' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
+                               title="Card View"
+                           >
+                               <Grid size={18} />
+                           </button>
+                           <button 
+                               onClick={() => setProjectView('list')} 
+                               className={`p-2 rounded-lg transition-all ${projectView === 'list' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
+                               title="List View"
+                           >
+                               <List size={18} />
+                           </button>
+                       </div>
                    </div>
                </div>
 
