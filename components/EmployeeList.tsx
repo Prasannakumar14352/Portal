@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Employee, EmployeeStatus, UserRole } from '../types';
 import { Edit2, Trash2, Search, UploadCloud, Plus, UserPlus, FileSpreadsheet, X, Download, Save, Loader2 } from 'lucide-react';
@@ -19,8 +18,9 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State for Add Employee Modal
+  // State for Add/Edit Employee Modal
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [newEmployee, setNewEmployee] = useState<Partial<Employee>>({
       firstName: '', lastName: '', email: '', role: 'Employee', position: '', department: '', salary: 0, 
       joinDate: new Date().toISOString().split('T')[0], status: EmployeeStatus.ACTIVE
@@ -98,50 +98,64 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
       const ws = utils.json_to_sheet(template);
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, "Template");
-      // Note: In browser environment without file-saver, this just logs for now or handles via basic method if available
-      // For this implementation, we assume xlsx handles download or user implements it.
-      // Since `writeFile` is from `xlsx` which we imported as `utils`? No, import as `utils` is wrong usage pattern usually.
-      // Correct usage: import { utils, writeFile } from 'xlsx';
-      // But based on existing imports: import { read, utils } from 'xlsx';
-      // We'll skip actual file write logic here to avoid adding dependency complexity, just log as placeholder or assume user knows.
       console.log("Template structure:", template);
       showToast("Template structure logged to console.", "info");
+  };
+
+  const handleEditClick = (emp: Employee) => {
+      setNewEmployee({ ...emp });
+      setIsEditing(true);
+      setShowAddModal(true);
+  };
+
+  const handleCloseModal = () => {
+      setShowAddModal(false);
+      setIsEditing(false);
+      setNewEmployee({ 
+          firstName: '', lastName: '', email: '', role: 'Employee', position: '', 
+          department: '', salary: 0, joinDate: new Date().toISOString().split('T')[0], 
+          status: EmployeeStatus.ACTIVE 
+      });
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
       try {
-          const emp: Employee = {
-              id: Math.random().toString(36).substr(2, 9),
-              employeeId: `EMP-${Math.floor(Math.random()*10000)}`,
-              firstName: newEmployee.firstName || '',
-              lastName: newEmployee.lastName || '',
-              email: newEmployee.email || '',
-              password: 'password123',
-              role: newEmployee.role || 'Employee',
-              position: newEmployee.position || 'Staff',
-              department: newEmployee.department || 'General',
-              salary: Number(newEmployee.salary) || 0,
-              joinDate: newEmployee.joinDate || new Date().toISOString().split('T')[0],
-              status: EmployeeStatus.ACTIVE,
-              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((newEmployee.firstName||'') + ' ' + (newEmployee.lastName||''))}&background=0D9488&color=fff`,
-              projectIds: [],
-              location: { latitude: 20.5937, longitude: 78.9629, address: 'Office HQ' },
-              workLocation: 'Office HQ',
-              managerId: '',
-              settings: {
-                notifications: { emailLeaves: true, emailAttendance: false, pushWeb: true, pushMobile: true, systemAlerts: true },
-                appConfig: { aiAssistant: true, azureSync: true, strictSso: false }
-             }
-          } as Employee;
+          if (isEditing && newEmployee.id) {
+              await onUpdateEmployee(newEmployee as Employee);
+              showToast("Employee updated successfully.", "success");
+          } else {
+              const emp: Employee = {
+                  id: Math.random().toString(36).substr(2, 9),
+                  employeeId: `EMP-${Math.floor(Math.random()*10000)}`,
+                  firstName: newEmployee.firstName || '',
+                  lastName: newEmployee.lastName || '',
+                  email: newEmployee.email || '',
+                  password: 'password123',
+                  role: newEmployee.role || 'Employee',
+                  position: newEmployee.position || 'Staff',
+                  department: newEmployee.department || 'General',
+                  salary: Number(newEmployee.salary) || 0,
+                  joinDate: newEmployee.joinDate || new Date().toISOString().split('T')[0],
+                  status: newEmployee.status || EmployeeStatus.ACTIVE,
+                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((newEmployee.firstName||'') + ' ' + (newEmployee.lastName||''))}&background=0D9488&color=fff`,
+                  projectIds: [],
+                  location: { latitude: 20.5937, longitude: 78.9629, address: 'Office HQ' },
+                  workLocation: 'Office HQ',
+                  managerId: '',
+                  settings: {
+                    notifications: { emailLeaves: true, emailAttendance: false, pushWeb: true, pushMobile: true, systemAlerts: true },
+                    appConfig: { aiAssistant: true, azureSync: true, strictSso: false }
+                 }
+              } as Employee;
 
-          await onAddEmployee(emp);
-          setShowAddModal(false);
-          setNewEmployee({ firstName: '', lastName: '', email: '', role: 'Employee', position: '', department: '', salary: 0, joinDate: new Date().toISOString().split('T')[0] });
-          showToast("Employee added successfully.", "success");
+              await onAddEmployee(emp);
+              showToast("Employee added successfully.", "success");
+          }
+          handleCloseModal();
       } catch(err) {
-          showToast("Failed to add employee.", "error");
+          showToast("Operation failed.", "error");
       } finally {
           setIsSubmitting(false);
       }
@@ -163,7 +177,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               <button 
-                onClick={() => setShowAddModal(true)}
+                onClick={() => { setIsEditing(false); setShowAddModal(true); }}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition shadow-sm font-medium text-sm"
               >
                   <Plus size={16} /> <span>Add Employee</span>
@@ -227,13 +241,18 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                                 <div className="flex justify-end gap-2">
                                     <button 
                                         className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
-                                        onClick={(e) => { e.stopPropagation(); /* Logic handled by parent usually via specific edit click, here just placeholder */ }}
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            handleEditClick(emp);
+                                        }}
+                                        title="Edit Employee"
                                     >
                                         <Edit2 size={16} />
                                     </button>
                                     <button 
                                         className="p-2 text-slate-400 hover:text-red-600 transition-colors"
                                         onClick={(e) => { e.stopPropagation(); onDeleteEmployee(emp.id); }}
+                                        title="Delete Employee"
                                     >
                                         <Trash2 size={16} />
                                     </button>
@@ -249,29 +268,29 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
         </div>
       </div>
 
-      {/* Single Employee Add Modal */}
-      <DraggableModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Employee" width="max-w-2xl">
+      {/* Single Employee Add/Edit Modal */}
+      <DraggableModal isOpen={showAddModal} onClose={handleCloseModal} title={isEditing ? "Edit Employee" : "Add New Employee"} width="max-w-2xl">
           <form onSubmit={handleAddSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">First Name</label>
-                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.firstName} onChange={e => setNewEmployee({...newEmployee, firstName: e.target.value})} />
+                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.firstName} onChange={e => setNewEmployee({...newEmployee, firstName: e.target.value})} />
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Last Name</label>
-                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.lastName} onChange={e => setNewEmployee({...newEmployee, lastName: e.target.value})} />
+                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.lastName} onChange={e => setNewEmployee({...newEmployee, lastName: e.target.value})} />
                   </div>
               </div>
               
               <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Email Address</label>
-                  <input required type="email" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})} />
+                  <input required type="email" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Role / Access</label>
-                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.role} onChange={e => setNewEmployee({...newEmployee, role: e.target.value})}>
+                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.role} onChange={e => setNewEmployee({...newEmployee, role: e.target.value})}>
                           <option value="Employee">Employee</option>
                           <option value="Team Manager">Team Manager</option>
                           <option value="HR Manager">HR Manager</option>
@@ -280,33 +299,47 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Designation</label>
-                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.position} onChange={e => setNewEmployee({...newEmployee, position: e.target.value})} placeholder="e.g. Software Engineer" />
+                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.position} onChange={e => setNewEmployee({...newEmployee, position: e.target.value})}>
+                          <option value="" disabled>Select Designation</option>
+                          {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                      </select>
                   </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Department</label>
-                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.department} onChange={e => setNewEmployee({...newEmployee, department: e.target.value})}>
+                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.department} onChange={e => setNewEmployee({...newEmployee, department: e.target.value})}>
                           <option value="" disabled>Select Dept</option>
                           {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                           <option value="General">General</option>
                       </select>
                   </div>
                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Salary</label>
-                      <input type="number" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.salary} onChange={e => setNewEmployee({...newEmployee, salary: parseFloat(e.target.value)})} />
-                  </div>
-                  <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Join Date</label>
-                      <input type="date" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.joinDate} onChange={e => setNewEmployee({...newEmployee, joinDate: e.target.value})} />
+                      <input type="date" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.joinDate} onChange={e => setNewEmployee({...newEmployee, joinDate: e.target.value})} />
                   </div>
               </div>
 
+              <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Account Status</label>
+                  <select 
+                    required 
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" 
+                    value={newEmployee.status} 
+                    onChange={e => setNewEmployee({...newEmployee, status: e.target.value as any})}
+                  >
+                      <option value={EmployeeStatus.ACTIVE}>Active</option>
+                      <option value={EmployeeStatus.ON_LEAVE}>On Leave</option>
+                      <option value={EmployeeStatus.INACTIVE}>Inactive</option>
+                      <option value={EmployeeStatus.INVITED}>Invited</option>
+                  </select>
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors">Cancel</button>
+                  <button type="button" onClick={handleCloseModal} className="px-4 py-2 text-slate-500 font-bold hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">Cancel</button>
                   <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold shadow-lg hover:bg-teal-700 transition active:scale-95 flex items-center gap-2">
-                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Create Employee'}
+                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (isEditing ? 'Update Employee' : 'Create Employee')}
                   </button>
               </div>
           </form>
