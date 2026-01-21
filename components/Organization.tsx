@@ -172,7 +172,7 @@ const Organization = () => {
   const [directorySearch, setDirectorySearch] = useState('');
   const [directoryView, setDirectoryView] = useState<'map' | 'list'>('list');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Projects State
   const [projectView, setProjectView] = useState<'card' | 'list'>('card');
@@ -796,35 +796,89 @@ const Organization = () => {
                            </div>
                        </div>
                        
-                       <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                           {paginatedEmployees.map(emp => (
-                               <div key={emp.id} className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
-                                   <div className="flex items-center gap-4 w-full sm:w-auto">
-                                       <div className="w-10 h-10 rounded-full bg-teal-700 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm">
-                                           {getInitials(emp.firstName, emp.lastName)}
-                                       </div>
-                                       <div>
-                                           <h4 className="font-bold text-slate-800 dark:text-white">{emp.firstName} {emp.lastName}</h4>
-                                           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{emp.position || emp.jobTitle || 'Team Member'}</p>
-                                       </div>
-                                   </div>
-                                   <a 
-                                        href={`mailto:${emp.email}`}
-                                        className="text-slate-500 dark:text-slate-400 text-sm flex items-center gap-2 font-medium w-full sm:w-auto justify-start sm:justify-end hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
-                                        onClick={(e) => e.stopPropagation()}
-                                   >
-                                       <Mail size={16} className="text-slate-400 group-hover:text-teal-500 transition-colors" />
-                                       {emp.email}
-                                   </a>
-                               </div>
-                           ))}
-                           {paginatedEmployees.length === 0 && (
-                               <div className="p-12 text-center text-slate-400 italic">No employees found.</div>
-                           )}
+                       <div className="overflow-x-auto">
+                           <table className="w-full text-left text-sm">
+                               <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                   <tr>
+                                       <th className="px-6 py-4">Employee</th>
+                                       <th className="px-6 py-4">Department</th>
+                                       <th className="px-6 py-4">Status</th>
+                                       <th className="px-6 py-4">Contact</th>
+                                       {isPowerUser && <th className="px-6 py-4 text-right">Actions</th>}
+                                   </tr>
+                               </thead>
+                               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                   {paginatedEmployees.map(emp => (
+                                       <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors">
+                                           <td className="px-6 py-4">
+                                               <div className="flex items-center gap-3">
+                                                   <div className="w-10 h-10 rounded-full bg-teal-700 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm overflow-hidden">
+                                                       {emp.avatar ? <img src={emp.avatar} alt="" className="w-full h-full object-cover" /> : getInitials(emp.firstName, emp.lastName)}
+                                                   </div>
+                                                   <div>
+                                                       <p className="font-bold text-slate-800 dark:text-white">{emp.firstName} {emp.lastName}</p>
+                                                       <p className="text-xs text-slate-500">{emp.position || 'Team Member'}</p>
+                                                   </div>
+                                               </div>
+                                           </td>
+                                           <td className="px-6 py-4">
+                                               <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium">
+                                                   {emp.department || 'General'}
+                                               </span>
+                                           </td>
+                                           <td className="px-6 py-4">
+                                               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                                                   emp.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 
+                                                   emp.status === 'On Leave' ? 'bg-amber-100 text-amber-700' :
+                                                   'bg-slate-100 text-slate-500'
+                                               }`}>
+                                                   <span className={`w-1.5 h-1.5 rounded-full ${
+                                                       emp.status === 'Active' ? 'bg-emerald-500' : 
+                                                       emp.status === 'On Leave' ? 'bg-amber-500' : 
+                                                       'bg-slate-400'
+                                                   }`}></span>
+                                                   {emp.status}
+                                               </span>
+                                           </td>
+                                           <td className="px-6 py-4">
+                                               <a href={`mailto:${emp.email}`} className="text-slate-500 hover:text-teal-600 transition-colors flex items-center gap-2 text-xs font-medium">
+                                                   <Mail size={14} /> {emp.email}
+                                               </a>
+                                           </td>
+                                           {isPowerUser && (
+                                               <td className="px-6 py-4 text-right">
+                                                   <button onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: emp.projectIds || []}); }} className="p-2 text-slate-400 hover:text-teal-600 transition-colors"><Edit2 size={16} /></button>
+                                               </td>
+                                           )}
+                                       </tr>
+                                   ))}
+                                   {paginatedEmployees.length === 0 && (
+                                       <tr>
+                                           <td colSpan={isPowerUser ? 5 : 4} className="p-12 text-center text-slate-400 italic">No employees found.</td>
+                                       </tr>
+                                   )}
+                               </tbody>
+                           </table>
                        </div>
 
                        <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-slate-400 gap-4">
-                           <span>Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredDirectoryEmployees.length)} of {filteredDirectoryEmployees.length} members</span>
+                           <div className="flex items-center gap-4">
+                               <span className="text-xs font-medium">Rows per page:</span>
+                               <select 
+                                   value={itemsPerPage}
+                                   onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                   className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs py-1 px-2 outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                               >
+                                   <option value={5}>5</option>
+                                   <option value={10}>10</option>
+                                   <option value={20}>20</option>
+                                   <option value={50}>50</option>
+                               </select>
+                               <span className="text-xs">
+                                   Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredDirectoryEmployees.length)} of {filteredDirectoryEmployees.length}
+                               </span>
+                           </div>
+                           
                            <div className="flex items-center gap-1">
                                <button 
                                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}

@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
-  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick, Search
+  Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick, Search,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -120,6 +121,10 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [editingTypeId, setEditingTypeId] = useState<string | number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
   const [formData, setFormData] = useState({
     type: '', startDate: '', endDate: '', durationType: 'Full Day' as LeaveDurationType, reason: '', notifyUserIds: [] as (string|number)[], approverId: '', isUrgent: false
   });
@@ -179,6 +184,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         leave.type.toLowerCase().includes(query)
     );
   }, [leaves, searchQuery, currentUser, users]);
+
+  const totalPages = Math.ceil(filteredLeaves.length / itemsPerPage);
+  
+  const paginatedLeaves = useMemo(() => {
+      return filteredLeaves.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredLeaves, currentPage, itemsPerPage]);
 
   const getBalancesForUser = (userId: string | number) => {
     return leaveTypes.map(type => {
@@ -482,7 +493,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                             type="text"
                             placeholder="Search by name, type or status..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                             className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-sm"
                         />
                     </div>
@@ -492,10 +503,17 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
-                      <tr><th className="px-6 py-4">Employee</th><th className="px-6 py-4">Category</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Actions</th></tr>
+                      <tr>
+                        <th className="px-6 py-4">Employee</th>
+                        <th className="px-6 py-4">Category</th>
+                        <th className="px-6 py-4">Period</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Comments</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                      {filteredLeaves.map(leave => {
+                      {paginatedLeaves.map(leave => {
                           // Robust ID comparison using trim and toString to avoid numeric/string mismatches
                           const currentUserIdStr = String(currentUser?.id || '').trim();
                           const leaveUserIdStr = String(leave.userId || '').trim();
@@ -531,6 +549,21 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                               </td>
                               <td className="px-6 py-4 font-mono text-[10px] text-slate-500">{leave.startDate} {leave.durationType !== 'Half Day' ? `to ${leave.endDate}` : ''}</td>
                               <td className="px-6 py-4"><StatusBadge status={leave.status} /></td>
+                              <td className="px-6 py-4">
+                                {leave.managerComment && (
+                                    <div className="mb-1">
+                                        <span className="font-bold text-[10px] text-slate-400 uppercase mr-1">Mgr:</span>
+                                        <span className="text-xs text-slate-600 dark:text-slate-400 italic">"{leave.managerComment}"</span>
+                                    </div>
+                                )}
+                                {leave.hrComment && (
+                                    <div>
+                                        <span className="font-bold text-[10px] text-slate-400 uppercase mr-1">HR:</span>
+                                        <span className="text-xs text-slate-600 dark:text-slate-400 italic">"{leave.hrComment}"</span>
+                                    </div>
+                                )}
+                                {!leave.managerComment && !leave.hrComment && <span className="text-slate-300">-</span>}
+                              </td>
                               <td className="px-6 py-4 text-right">
                                   <div className="flex justify-end gap-2">
                                       {canApprove && (
@@ -552,7 +585,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                       })}
                       {filteredLeaves.length === 0 && (
                           <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm italic">
+                              <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm italic">
                                   No leave requests found {searchQuery ? `matching "${searchQuery}"` : ''}
                               </td>
                           </tr>
@@ -560,6 +593,58 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     </tbody>
                   </table>
                 </div>
+
+                {filteredLeaves.length > 0 && (
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-slate-400 gap-4">
+                        <div className="flex items-center gap-4">
+                            <span className="text-xs font-medium">Rows per page:</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs py-1 px-2 outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                            >
+                                <option value={5}>5</option>
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                            </select>
+                            <span className="text-xs">
+                                Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredLeaves.length)} of {filteredLeaves.length}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                disabled={currentPage === 1}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <ChevronLeft size={16} /> Previous
+                            </button>
+                            <div className="flex gap-1 px-2">
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                    .map((p, i, arr) => (
+                                    <React.Fragment key={p}>
+                                        {i > 0 && arr[i-1] !== p - 1 && <span className="px-1 self-end pb-1">...</span>}
+                                        <button
+                                                onClick={() => setCurrentPage(p)}
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${currentPage === p ? 'bg-teal-600 text-white shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600'}`}
+                                        >
+                                            {p}
+                                        </button>
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                            <button
+                                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage === totalPages}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Next <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
       )}
