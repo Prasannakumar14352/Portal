@@ -499,7 +499,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updatePayslip = async (slip: Payslip) => { await db.updatePayslip(slip); await refreshData(); };
   const deletePayslip = async (id: string | number) => { await db.deletePayslip(String(id)); await refreshData(); };
 
-  const sendLeaveStatusEmail = async (data: any) => { console.log("Sending email", data); };
+  // Implement Email Sending for Status
+  const sendLeaveStatusEmail = async (data: any) => {
+      try {
+          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          
+          if (isMock) {
+              console.log("[Mock Email] Leave Status:", data);
+              showToast(`Mock Status Email sent`, "success");
+              return;
+          }
+
+          const res = await fetch(`${API_BASE}/notify/leave-status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+          });
+          
+          if (!res.ok) throw new Error("Failed to send status email");
+      } catch (err) {
+          console.error("Failed to send status email", err);
+      }
+  };
 
   const sendLeaveRequestEmail = async (data: any) => {
       try {

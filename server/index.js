@@ -270,6 +270,49 @@ apiRouter.post('/notify/leave-request', async (req, res) => {
     }
 });
 
+// Send Leave Status Update Email (Approved/Rejected)
+apiRouter.post('/notify/leave-status', async (req, res) => {
+    try {
+        const { to, employeeName, status, type, managerComment } = req.body;
+        
+        if (process.env.MOCK_EMAIL === 'true') {
+            console.log(`[Mock Email] Leave Status Update to ${to}: ${status}`);
+            return res.json({ success: true, mock: true });
+        }
+
+        const isApproved = status.toLowerCase() === 'approved';
+        const color = isApproved ? '#10b981' : '#ef4444'; // Emerald or Red
+
+        await transporter.sendMail({
+            from: `"HR Portal" <${SMTP_USER}>`,
+            to,
+            subject: `Leave Request ${status}: ${type}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px; color: #333;">
+                    <div style="border-bottom: 2px solid ${color}; padding-bottom: 10px; margin-bottom: 20px;">
+                        <h3 style="color: ${color}; margin: 0;">Leave Request ${status}</h3>
+                    </div>
+                    <p>Hello ${employeeName},</p>
+                    <p>Your request for <strong>${type}</strong> has been <strong>${status.toLowerCase()}</strong>.</p>
+                    
+                    ${managerComment ? `
+                    <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <strong>Approver Comment:</strong><br/>
+                        <p style="margin: 5px 0 0 0; font-style: italic;">"${managerComment}"</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p style="margin-top: 20px;">You can check the details in the <a href="http://localhost:5173" style="color: #0f766e;">HR Portal</a>.</p>
+                </div>
+            `
+        });
+        res.json({ success: true });
+    } catch (err) { 
+        console.error("Email Error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
 // Project Assignment Notification
 apiRouter.post('/notify/project-assignment', async (req, res) => {
     try {
