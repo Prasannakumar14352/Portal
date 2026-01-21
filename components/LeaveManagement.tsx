@@ -99,7 +99,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast, notify, employees, deleteLeave, sendLeaveStatusEmail } = useAppContext();
+  const { showToast, notify, employees, deleteLeave, sendLeaveStatusEmail, sendLeaveRequestEmail } = useAppContext();
   
   // Modals state
   const [showModal, setShowModal] = useState(false);
@@ -324,7 +324,21 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
       const manager = employees.find(emp => String(emp.id) === String(formData.approverId));
       if (manager) {
+          // In-App Notification
           await notify(`${currentUser?.name} submitted a ${formData.type} request for approval.`, manager.id);
+          
+          // Email Notification
+          if (manager.email && currentUser?.email) {
+             await sendLeaveRequestEmail({
+                 to: manager.email,
+                 employeeName: currentUser.name,
+                 employeeEmail: currentUser.email,
+                 type: formData.type,
+                 startDate: finalData.startDate,
+                 endDate: finalData.endDate,
+                 reason: formData.reason
+             });
+          }
       }
       
       if (formData.notifyUserIds.length > 0) {

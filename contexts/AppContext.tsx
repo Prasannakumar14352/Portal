@@ -95,6 +95,7 @@ interface AppContextType {
   deletePayslip: (id: string | number) => Promise<void>;
   
   sendLeaveStatusEmail: (data: any) => Promise<void>;
+  sendLeaveRequestEmail: (data: any) => Promise<void>;
   sendProjectAssignmentEmail: (data: { email: string, name: string, projectName: string, managerName: string }) => Promise<void>;
 
   installApp: () => Promise<void>;
@@ -500,6 +501,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const sendLeaveStatusEmail = async (data: any) => { console.log("Sending email", data); };
 
+  const sendLeaveRequestEmail = async (data: any) => {
+      try {
+          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          
+          if (isMock) {
+              console.log("[Mock Email] Leave Request:", data);
+              showToast(`Mock Email sent to approver`, "success");
+              return;
+          }
+
+          const res = await fetch(`${API_BASE}/notify/leave-request`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+          });
+          
+          if (!res.ok) throw new Error("Failed to send email");
+      } catch (err) {
+          console.error("Failed to send leave email", err);
+      }
+  };
+
   const sendProjectAssignmentEmail = async (data: { email: string, name: string, projectName: string, managerName: string }) => {
       try {
           const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
@@ -546,7 +570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteAttendanceRecord, addTimeEntry, updateTimeEntry, deleteTimeEntry,
       markNotificationRead, markAllRead, notify, addHoliday, addHolidays, deleteHoliday, 
       syncHolidayLogs, manualAddPayslip, updatePayslip, deletePayslip, sendLeaveStatusEmail,
-      sendProjectAssignmentEmail,
+      sendLeaveRequestEmail, sendProjectAssignmentEmail,
       installApp, isInstallable: !!deferredPrompt && !isStandalone
     }}>
       {children}

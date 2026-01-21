@@ -226,18 +226,38 @@ apiRouter.put('/notifications/read-all/:userId', async (req, res) => {
 // Send Leave Request Notification Email
 apiRouter.post('/notify/leave-request', async (req, res) => {
     try {
-        const { to, cc, employeeName, type, startDate, endDate, reason, isWithdrawal } = req.body;
+        const { to, cc, employeeName, employeeEmail, type, startDate, endDate, reason, isWithdrawal } = req.body;
         
         if (process.env.MOCK_EMAIL === 'true') {
-            console.log(`[Mock Email] Leave Request to ${to}: ${employeeName} - ${type}`);
+            console.log(`[Mock Email] Leave Request to ${to} from ${employeeName} (${employeeEmail}): ${type}`);
             return res.json({ success: true, mock: true });
         }
 
         await transporter.sendMail({
-            from: `"EmpowerCorp HR" <${SMTP_USER}>`,
-            to, cc, 
-            subject: `${isWithdrawal ? 'Withdrawn' : 'New'} Leave: ${employeeName}`,
-            html: `<p><strong>${employeeName}</strong> has ${isWithdrawal ? 'withdrawn' : 'submitted'} a <strong>${type}</strong> request.</p><p>Dates: ${startDate} to ${endDate}</p><p>Reason: ${reason}</p>`
+            from: `"${employeeName} (via HR)" <${SMTP_USER}>`,
+            to, 
+            cc,
+            replyTo: employeeEmail, // Reply goes to requester
+            subject: `${isWithdrawal ? 'Withdrawn' : 'New'} Leave Request: ${employeeName}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px; color: #333;">
+                    <h3 style="color: #0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 10px;">Leave Request ${isWithdrawal ? 'Withdrawn' : 'Submitted'}</h3>
+                    <div style="margin-top: 20px;">
+                        <p><strong>Employee:</strong> ${employeeName} (<a href="mailto:${employeeEmail}" style="color: #0f766e;">${employeeEmail}</a>)</p>
+                        <p><strong>Leave Type:</strong> ${type}</p>
+                        <p><strong>Duration:</strong> ${startDate} to ${endDate}</p>
+                        <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                            <strong>Reason:</strong><br/>
+                            <p style="margin: 5px 0 0 0; font-style: italic;">${reason}</p>
+                        </div>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p style="font-size: 12px; color: #666;">
+                        This email was sent via the EmpowerCorp HR Portal. 
+                        <strong>Reply to this email to contact ${employeeName} directly.</strong>
+                    </p>
+                </div>
+            `
         });
         res.json({ success: true });
     } catch (err) { 
