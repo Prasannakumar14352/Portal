@@ -100,7 +100,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast, notify, employees, deleteLeave, sendLeaveStatusEmail, sendLeaveRequestEmail } = useAppContext();
+  const { showToast, notify, employees, deleteLeave, sendLeaveStatusEmail, sendLeaveRequestEmail, holidays } = useAppContext();
   
   // Modals state
   const [showModal, setShowModal] = useState(false);
@@ -137,17 +137,38 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     if (formData.durationType === 'Half Day') return 0.5;
     if (!formData.startDate || !formData.endDate) return 0;
     
-    const start = new Date(formData.startDate);
-    const end = new Date(formData.endDate);
+    // Use local time construction to avoid UTC offsets shifting the day
+    const parseLocal = (s: string) => {
+        const [y, m, d] = s.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    };
+
+    const start = parseLocal(formData.startDate);
+    const end = parseLocal(formData.endDate);
     
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-    // To treat same day as 1 day, end >= start
     if (end.getTime() < start.getTime()) return 0;
 
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
-    return diffDays;
-  }, [formData.startDate, formData.endDate, formData.durationType]);
+    let count = 0;
+    const current = new Date(start);
+    const holidaySet = new Set(holidays.map(h => h.date));
+
+    while (current <= end) {
+        const day = current.getDay();
+        const isWeekend = day === 0 || day === 6; // Sun=0, Sat=6
+        
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${d}`;
+        
+        if (!isWeekend && !holidaySet.has(dateStr)) {
+            count++;
+        }
+        current.setDate(current.getDate() + 1);
+    }
+    return count;
+  }, [formData.startDate, formData.endDate, formData.durationType, holidays]);
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const isManager = currentUser?.role === UserRole.MANAGER;
@@ -220,11 +241,21 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         if (l.durationType === 'Half Day') {
           usedDays += 0.5;
         } else {
+          // Re-calculate working days excluding weekends/holidays for consistency with request logic
           const start = new Date(l.startDate);
           const end = new Date(l.endDate);
-          const diffTime = Math.abs(end.getTime() - start.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-          usedDays += diffDays;
+          let count = 0;
+          const current = new Date(start);
+          const holidaySet = new Set(holidays.map(h => h.date));
+          
+          while(current <= end) {
+             const day = current.getDay();
+             const isWeekend = day === 0 || day === 6;
+             const dStr = current.toISOString().split('T')[0];
+             if (!isWeekend && !holidaySet.has(dStr)) count++;
+             current.setDate(current.getDate() + 1);
+          }
+          usedDays += count;
         }
       });
 
@@ -239,7 +270,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const userBalances = useMemo(() => {
     if (!currentUser) return [];
     return getBalancesForUser(currentUser.id);
-  }, [leaveTypes, leaves, currentUser]);
+  }, [leaveTypes, leaves, currentUser, holidays]);
 
   const teamMembers = useMemo(() => {
       if (!currentUser) return [];
@@ -890,9 +921,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 <div className="bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 p-3 rounded-xl border border-teal-100 dark:border-teal-800 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Clock size={16} />
-                        <span className="text-xs font-bold uppercase tracking-wider">Total Duration</span>
+                        <div className="flex flex-col">
+                            <span className="text-xs font-bold uppercase tracking-wider">Total Duration</span>
+                            <span className="text-[9px] opacity-70 font-bold">Excl. Weekends & Holidays</span>
+                        </div>
                     </div>
-                    <span className="text-sm font-black">{leaveDuration} {leaveDuration === 1 ? 'Day' : 'Days'}</span>
+                    <span className="text-sm font-black">{leaveDuration} Working {leaveDuration === 1 ? 'Day' : 'Days'}</span>
                 </div>
             )}
 
