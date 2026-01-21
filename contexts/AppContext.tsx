@@ -264,8 +264,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const forgotPassword = async (email: string): Promise<boolean> => {
       try {
+          // If using Proxy (recommended), API_BASE can be empty string or just '/api'
           const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
               console.log("[Mock API] Forgot Password Triggered for:", email);
@@ -289,7 +290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
       } catch (err) {
           console.error("Forgot Password Failed", err);
-          showToast("Network error. Please try again later.", "error");
+          showToast("Network error. Ensure backend is running on port 8000.", "error");
           return false;
       }
   };
@@ -530,7 +531,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const sendLeaveStatusEmail = async (data: any) => {
       try {
           const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
               console.log("[Mock Email] Leave Status:", data);
@@ -553,7 +554,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const sendLeaveRequestEmail = async (data: any) => {
       try {
           const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
               console.log("[Mock Email] Leave Request:", data);
@@ -576,7 +577,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const sendProjectAssignmentEmail = async (data: { email: string, name: string, projectName: string, managerName: string }) => {
       try {
           const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
               console.log("[Mock Email] Project Assignment:", data);
