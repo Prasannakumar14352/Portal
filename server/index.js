@@ -24,11 +24,15 @@ const dbConfig = {
     }
 };
 
-// Email Configuration
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.example.com';
+// Email Configuration - Support multiple env var naming conventions
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = process.env.SMTP_PORT || 587;
-const SMTP_USER = process.env.SMTP_USER || 'hr@empowercorp.com';
-const SMTP_PASS = process.env.SMTP_PASS || 'password';
+const SMTP_USER = process.env.SMTP_USER || process.env.GMAIL_USER || 'hr@empowercorp.com';
+// Support GMAIL_APP_PASSWORD and remove spaces if present (common in copy-paste)
+const rawPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || 'password';
+const SMTP_PASS = rawPass.replace(/\s+/g, '');
+
+console.log(`[Email Config] Host: ${SMTP_HOST}, User: ${SMTP_USER}`);
 
 const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
@@ -38,6 +42,24 @@ const transporter = nodemailer.createTransport({
         user: SMTP_USER,
         pass: SMTP_PASS,
     },
+});
+
+// Email Service Status Flag
+let isEmailServiceReady = false;
+
+// Verify SMTP Connection on Startup
+transporter.verify(function (error, success) {
+    if (error) {
+        console.warn('⚠️  WARNING: Email service connection failed.');
+        console.warn(`   Error Code: ${error.code || 'UNKNOWN'}`);
+        console.warn(`   Message: ${error.message}`);
+        console.warn('   -> The server will automatically switch to MOCK EMAIL mode (logging to console).');
+        console.warn('   -> Check your GMAIL_USER and GMAIL_APP_PASSWORD in .env');
+        isEmailServiceReady = false;
+    } else {
+        console.log('✅ Email server is ready to send messages');
+        isEmailServiceReady = true;
+    }
 });
 
 // Database Connection Pool
@@ -232,9 +254,16 @@ apiRouter.post('/notify/leave-request', async (req, res) => {
     try {
         const { to, cc, employeeName, employeeEmail, type, startDate, endDate, reason, isWithdrawal } = req.body;
         
-        if (process.env.MOCK_EMAIL === 'true') {
-            console.log(`[Mock Email] Leave Request to ${to} from ${employeeName} (${employeeEmail}): ${type}`);
-            return res.json({ success: true, mock: true });
+        // Auto-fallback to mock if service not ready or explicitly mocked
+        if (process.env.MOCK_EMAIL === 'true' || !isEmailServiceReady) {
+            console.log('---------------------------------------------------');
+            console.log(`[MOCK EMAIL] Leave Request`);
+            console.log(`To: ${to}`);
+            console.log(`From: ${employeeName}`);
+            console.log(`Type: ${type} (${startDate} to ${endDate})`);
+            console.log(`Reason: ${reason}`);
+            console.log('---------------------------------------------------');
+            return res.json({ success: true, mock: true, warning: !isEmailServiceReady ? "SMTP Disconnected" : undefined });
         }
 
         await transporter.sendMail({
@@ -275,9 +304,14 @@ apiRouter.post('/notify/leave-status', async (req, res) => {
     try {
         const { to, employeeName, status, type, managerComment } = req.body;
         
-        if (process.env.MOCK_EMAIL === 'true') {
-            console.log(`[Mock Email] Leave Status Update to ${to}: ${status}`);
-            return res.json({ success: true, mock: true });
+        if (process.env.MOCK_EMAIL === 'true' || !isEmailServiceReady) {
+            console.log('---------------------------------------------------');
+            console.log(`[MOCK EMAIL] Leave Status Update`);
+            console.log(`To: ${to}`);
+            console.log(`Status: ${status} for ${type}`);
+            console.log(`Comment: ${managerComment}`);
+            console.log('---------------------------------------------------');
+            return res.json({ success: true, mock: true, warning: !isEmailServiceReady ? "SMTP Disconnected" : undefined });
         }
 
         const isApproved = status.toLowerCase() === 'approved';
@@ -318,9 +352,13 @@ apiRouter.post('/notify/project-assignment', async (req, res) => {
     try {
         const { email, name, projectName, managerName } = req.body;
         
-        if (process.env.MOCK_EMAIL === 'true') {
-            console.log(`[Mock Email] Project Assign to ${email}: ${projectName}`);
-            return res.json({ success: true, mock: true });
+        if (process.env.MOCK_EMAIL === 'true' || !isEmailServiceReady) {
+            console.log('---------------------------------------------------');
+            console.log(`[MOCK EMAIL] Project Assignment`);
+            console.log(`To: ${email}`);
+            console.log(`Project: ${projectName}`);
+            console.log('---------------------------------------------------');
+            return res.json({ success: true, mock: true, warning: !isEmailServiceReady ? "SMTP Disconnected" : undefined });
         }
 
         await transporter.sendMail({
@@ -356,9 +394,12 @@ apiRouter.post('/notify/reset-password', async (req, res) => {
     try {
         const { email } = req.body;
         
-        if (process.env.MOCK_EMAIL === 'true') {
-            console.log(`[Mock Email] Reset Password for ${email}`);
-            return res.json({ success: true, mock: true });
+        if (process.env.MOCK_EMAIL === 'true' || !isEmailServiceReady) {
+            console.log('---------------------------------------------------');
+            console.log(`[MOCK EMAIL] Password Reset`);
+            console.log(`To: ${email}`);
+            console.log('---------------------------------------------------');
+            return res.json({ success: true, mock: true, warning: !isEmailServiceReady ? "SMTP Disconnected" : undefined });
         }
 
         await transporter.sendMail({

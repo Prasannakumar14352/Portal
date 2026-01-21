@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
   Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick, Search,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Clock
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -132,6 +132,22 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [typeData, setTypeData] = useState({
     name: '', days: 10, description: '', isActive: true, color: 'text-teal-600'
   });
+
+  const leaveDuration = useMemo(() => {
+    if (formData.durationType === 'Half Day') return 0.5;
+    if (!formData.startDate || !formData.endDate) return 0;
+    
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+    // To treat same day as 1 day, end >= start
+    if (end.getTime() < start.getTime()) return 0;
+
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+    return diffDays;
+  }, [formData.startDate, formData.endDate, formData.durationType]);
 
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const isManager = currentUser?.role === UserRole.MANAGER;
@@ -868,6 +884,17 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   </div>
                 )}
             </div>
+
+            {/* Total Duration Display */}
+            {leaveDuration > 0 && (
+                <div className="bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 p-3 rounded-xl border border-teal-100 dark:border-teal-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Clock size={16} />
+                        <span className="text-xs font-bold uppercase tracking-wider">Total Duration</span>
+                    </div>
+                    <span className="text-sm font-black">{leaveDuration} {leaveDuration === 1 ? 'Day' : 'Days'}</span>
+                </div>
+            )}
 
             <MultiSelectUser 
               label="Notify People"
