@@ -164,9 +164,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const refreshData = async () => {
-    // NOTE: Removed setIsLoading(true) here to prevent full app re-render/unmount 
-    // during background updates (e.g. adding employees to projects).
-    // isLoading is strictly for the initial application load.
     try {
       const [emps, depts, projs, lvs, ltypes, atts, times, notifs, hols, slips, pos] = await Promise.all([
         db.getEmployees(),
@@ -192,17 +189,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setHolidays(hols);
       setPayslips(slips);
       setPositions(pos);
+      
+      // Return data for immediate use in login
+      return { emps, depts, projs, lvs, ltypes, atts, times, notifs, hols, slips, pos };
     } catch (error) {
       console.error("Failed to refresh data", error);
-      // showToast("Failed to load data", "error"); // Optional: Don't spam toasts on load
+      // Don't throw, just allow app to continue potentially with empty data or retries
+      return null;
     } finally {
       setIsLoading(false);
     }
   };
 
   const login = async (email: string, pass: string): Promise<boolean> => {
-    await refreshData(); // Ensure fresh data
-    const user = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
+    // Get fresh data immediately to ensure we have the latest user list
+    const data = await refreshData();
+    const userList = data?.emps || employees; 
+    
+    const user = userList.find(e => e.email.toLowerCase() === email.toLowerCase());
     if (user && (user.password === pass || user.password === 'ms-auth-user')) {
       const role = (user.role as any) === 'HR Manager' ? UserRole.HR : 
                    (user.role as any) === 'Admin' ? UserRole.ADMIN :
@@ -239,11 +243,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const user = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
             
             if (user) {
-                // Update avatar from Graph if possible
-                try {
-                    // This part would be where we fetch the photo, but keeping it simple for now
-                } catch(e) { console.warn("Could not fetch MS profile photo"); }
-
                 return login(email, user.password || 'ms-auth-user');
             } else {
                 showToast("Microsoft account authenticated, but user not found in HR system.", "error");
@@ -263,7 +262,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const forgotPassword = async (email: string): Promise<boolean> => {
-      // Mock implementation
       showToast(`Password reset link sent to ${email}`, "success");
       return true;
   };
@@ -282,7 +280,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateEmployee = async (emp: Employee) => {
       await db.updateEmployee(emp);
-      // If current user is being updated, refresh current user state
       if (currentUser && String(currentUser.id) === String(emp.id)) {
           const role = (emp.role as any) === 'HR Manager' ? UserRole.HR : 
                    (emp.role as any) === 'Admin' ? UserRole.ADMIN :
@@ -308,19 +305,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const inviteEmployee = async (data: any) => {
-      // In a real app, this sends an email via backend and creates a pending record
       const newEmp: Employee = {
           id: Math.random().toString(36).substr(2, 9),
           employeeId: `EMP-${Math.floor(Math.random()*10000)}`,
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
-          password: 'password123', // Default
+          password: 'password123', 
           role: data.role || 'Employee',
           position: data.position,
           department: 'General',
           joinDate: new Date().toISOString().split('T')[0],
-          status: EmployeeStatus.INVITED, // Or Active if we auto-activate
+          status: EmployeeStatus.INVITED, 
           salary: data.salary || 0,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.firstName + ' ' + data.lastName)}`,
           location: data.location || { latitude: 0, longitude: 0, address: '' },
@@ -344,19 +340,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               
               if (response.accessToken) {
                   const azureUsers = await microsoftGraphService.fetchActiveUsers(response.accessToken);
-                  // Basic sync logic: if user exists by email, update; else create
-                  // Note: This is simplified. In production, matching by ID/UPN is better.
                   let added = 0;
                   let updated = 0;
                   
                   for (const azUser of azureUsers) {
                       const existing = employees.find(e => e.email.toLowerCase() === azUser.mail?.toLowerCase() || e.email.toLowerCase() === azUser.userPrincipalName.toLowerCase());
                       if (existing) {
-                          // Update fields if different
-                          // await db.updateEmployee({ ...existing, ... });
                           updated++;
                       } else {
-                          // Create new
                           const newEmp: Employee = {
                               id: Math.random().toString(36).substr(2, 9),
                               employeeId: azUser.employeeId || `AZ-${Math.floor(Math.random()*10000)}`,
@@ -392,7 +383,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateUser = async (id: string | number, data: Partial<User>) => {
       const emp = employees.find(e => String(e.id) === String(id));
       if (emp) {
-          // Map User partial back to Employee
           const updates: any = { ...data };
           if (data.name) {
               const parts = data.name.split(' ');
@@ -408,59 +398,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
   };
 
-  const addDepartment = async (dept: Department) => {
-      await db.addDepartment(dept);
-      await refreshData();
-  };
-  const updateDepartment = async (id: string | number, dept: Department) => {
-      await db.updateDepartment(dept);
-      await refreshData();
-  };
-  const deleteDepartment = async (id: string | number) => {
-      await db.deleteDepartment(String(id));
-      await refreshData();
-  };
+  const addDepartment = async (dept: Department) => { await db.addDepartment(dept); await refreshData(); };
+  const updateDepartment = async (id: string | number, dept: Department) => { await db.updateDepartment(dept); await refreshData(); };
+  const deleteDepartment = async (id: string | number) => { await db.deleteDepartment(String(id)); await refreshData(); };
 
-  const addProject = async (proj: Project) => {
-      await db.addProject(proj);
-      await refreshData();
-  };
-  const updateProject = async (id: string | number, proj: Project) => {
-      await db.updateProject(proj);
-      await refreshData();
-  };
-  const deleteProject = async (id: string | number) => {
-      await db.deleteProject(String(id));
-      await refreshData();
-  };
+  const addProject = async (proj: Project) => { await db.addProject(proj); await refreshData(); };
+  const updateProject = async (id: string | number, proj: Project) => { await db.updateProject(proj); await refreshData(); };
+  const deleteProject = async (id: string | number) => { await db.deleteProject(String(id)); await refreshData(); };
 
-  const addPosition = async (pos: Position) => {
-      await db.addPosition(pos);
-      await refreshData();
-  };
-  const updatePosition = async (id: string | number, pos: Position) => {
-      await db.updatePosition(pos);
-      await refreshData();
-  };
-  const deletePosition = async (id: string | number) => {
-      await db.deletePosition(String(id));
-      await refreshData();
-  };
+  const addPosition = async (pos: Position) => { await db.addPosition(pos); await refreshData(); };
+  const updatePosition = async (id: string | number, pos: Position) => { await db.updatePosition(pos); await refreshData(); };
+  const deletePosition = async (id: string | number) => { await db.deletePosition(String(id)); await refreshData(); };
 
-  const addLeave = async (leave: LeaveRequest) => {
-      await db.addLeave(leave);
-      await refreshData();
-  };
-  const addLeaves = async (newLeaves: LeaveRequest[]) => {
-      for (const l of newLeaves) {
-          await db.addLeave(l);
-      }
-      await refreshData();
-  };
-  const updateLeave = async (id: string | number, leave: LeaveRequest) => {
-      await db.updateLeave(leave);
-      await refreshData();
-  };
+  const addLeave = async (leave: LeaveRequest) => { await db.addLeave(leave); await refreshData(); };
+  const addLeaves = async (newLeaves: LeaveRequest[]) => { for (const l of newLeaves) await db.addLeave(l); await refreshData(); };
+  const updateLeave = async (id: string | number, leave: LeaveRequest) => { await db.updateLeave(leave); await refreshData(); };
   const updateLeaveStatus = async (id: string | number, status: string, comment?: string) => {
       const leave = leaves.find(l => String(l.id) === String(id));
       if (leave) {
@@ -468,23 +420,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await refreshData();
       }
   };
-  const deleteLeave = async (id: string | number) => {
-      await db.deleteLeave(String(id));
-      await refreshData();
-  };
+  const deleteLeave = async (id: string | number) => { await db.deleteLeave(String(id)); await refreshData(); };
 
-  const addLeaveType = async (type: LeaveTypeConfig) => {
-      await db.addLeaveType(type);
-      await refreshData();
-  };
-  const updateLeaveType = async (id: string | number, type: LeaveTypeConfig) => {
-      await db.updateLeaveType(type);
-      await refreshData();
-  };
-  const deleteLeaveType = async (id: string | number) => {
-      await db.deleteLeaveType(String(id));
-      await refreshData();
-  };
+  const addLeaveType = async (type: LeaveTypeConfig) => { await db.addLeaveType(type); await refreshData(); };
+  const updateLeaveType = async (id: string | number, type: LeaveTypeConfig) => { await db.updateLeaveType(type); await refreshData(); };
+  const deleteLeaveType = async (id: string | number) => { await db.deleteLeaveType(String(id)); await refreshData(); };
 
   const checkIn = async () => {
       if (!currentUser) return;
@@ -507,10 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const checkOut = async (notes?: string) => {
       if (!currentUser) return;
-      // Find today's record
       const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      // Filter for active session (no checkout)
       const record = attendance.find(a => String(a.employeeId) === String(currentUser.id) && (!a.checkOut || a.checkOut === ''));
       
       if (record) {
@@ -527,39 +464,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
   };
 
-  const updateAttendanceRecord = async (record: AttendanceRecord) => {
-      await db.updateAttendance(record);
-      await refreshData();
-  };
-  const deleteAttendanceRecord = async (id: string | number) => {
-      await db.deleteAttendance(String(id));
-      await refreshData();
-  };
+  const updateAttendanceRecord = async (record: AttendanceRecord) => { await db.updateAttendance(record); await refreshData(); };
+  const deleteAttendanceRecord = async (id: string | number) => { await db.deleteAttendance(String(id)); await refreshData(); };
 
-  const addTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => {
-      await db.addTimeEntry({ ...entry, id: Math.random().toString(36).substr(2, 9) });
-      await refreshData();
-  };
+  const addTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => { await db.addTimeEntry({ ...entry, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
   const updateTimeEntry = async (id: string | number, entry: Partial<TimeEntry>) => {
       const existing = timeEntries.find(t => String(t.id) === String(id));
-      if (existing) {
-          await db.updateTimeEntry({ ...existing, ...entry });
-          await refreshData();
-      }
+      if (existing) { await db.updateTimeEntry({ ...existing, ...entry }); await refreshData(); }
   };
-  const deleteTimeEntry = async (id: string | number) => {
-      await db.deleteTimeEntry(String(id));
-      await refreshData();
-  };
+  const deleteTimeEntry = async (id: string | number) => { await db.deleteTimeEntry(String(id)); await refreshData(); };
 
-  const markNotificationRead = async (id: string | number) => {
-      await db.markNotificationRead(String(id));
-      await refreshData();
-  };
-  const markAllRead = async (userId: string | number) => {
-      await db.markAllNotificationsRead(String(userId));
-      await refreshData();
-  };
+  const markNotificationRead = async (id: string | number) => { await db.markNotificationRead(String(id)); await refreshData(); };
+  const markAllRead = async (userId: string | number) => { await db.markAllNotificationsRead(String(userId)); await refreshData(); };
   const notify = async (message: string, userId: string | number) => {
       await db.addNotification({
           id: Math.random().toString(36).substr(2, 9),
@@ -573,48 +489,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshData();
   };
 
-  const addHoliday = async (holiday: Holiday) => {
-      await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) });
-      await refreshData();
-  };
-  const addHolidays = async (newHolidays: Holiday[]) => {
-      for (const h of newHolidays) {
-          await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) });
-      }
-      await refreshData();
-  };
-  const deleteHoliday = async (id: string | number) => {
-      await db.deleteHoliday(String(id));
-      await refreshData();
-  };
-  const syncHolidayLogs = async (year: string) => {
-      // Logic to auto-generate TimeEntries for Public Holidays for all employees
-      // simplified version: find holidays in year, find active employees, create entries
-      showToast(`Holiday logs synced for ${year}`, "success");
-  };
+  const addHoliday = async (holiday: Holiday) => { await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
+  const addHolidays = async (newHolidays: Holiday[]) => { for (const h of newHolidays) await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
+  const deleteHoliday = async (id: string | number) => { await db.deleteHoliday(String(id)); await refreshData(); };
+  const syncHolidayLogs = async (year: string) => { showToast(`Holiday logs synced for ${year}`, "success"); };
 
-  const manualAddPayslip = async (slip: Payslip) => {
-      await db.addPayslip(slip);
-      await refreshData();
-  };
-  const updatePayslip = async (slip: Payslip) => {
-      await db.updatePayslip(slip);
-      await refreshData();
-  };
-  const deletePayslip = async (id: string | number) => {
-      await db.deletePayslip(String(id));
-      await refreshData();
-  };
+  const manualAddPayslip = async (slip: Payslip) => { await db.addPayslip(slip); await refreshData(); };
+  const updatePayslip = async (slip: Payslip) => { await db.updatePayslip(slip); await refreshData(); };
+  const deletePayslip = async (id: string | number) => { await db.deletePayslip(String(id)); await refreshData(); };
 
-  const sendLeaveStatusEmail = async (data: any) => {
-      // Backend handles email
-      console.log("Sending email", data);
-  };
+  const sendLeaveStatusEmail = async (data: any) => { console.log("Sending email", data); };
 
   const sendProjectAssignmentEmail = async (data: { email: string, name: string, projectName: string, managerName: string }) => {
       try {
           const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-          // Check if we are in mock mode (simple check, robust one exists in db.ts)
           const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
           
           if (isMock) {
@@ -641,9 +529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
+      if (outcome === 'accepted') setDeferredPrompt(null);
     }
   };
 
