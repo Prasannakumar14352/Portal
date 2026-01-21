@@ -21,6 +21,7 @@ interface LeaveManagementProps {
   deleteLeaveType: (id: string | number) => Promise<void>;
 }
 
+// ... MultiSelectUser Component remains the same ...
 const MultiSelectUser = ({ 
   options, 
   selectedIds, 
@@ -100,7 +101,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   addLeave, editLeave, addLeaves, updateLeaveStatus,
   addLeaveType, updateLeaveType, deleteLeaveType 
 }) => {
-  const { showToast, notify, employees, deleteLeave, sendLeaveStatusEmail, sendLeaveRequestEmail, holidays } = useAppContext();
+  const { showToast, notify, employees, deleteLeave, holidays } = useAppContext();
   
   // Modals state
   const [showModal, setShowModal] = useState(false);
@@ -378,25 +379,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     try {
       const finalData = { ...formData, endDate: formData.durationType === 'Half Day' ? formData.startDate : formData.endDate };
       if (isEditingId) await editLeave(isEditingId, finalData);
-      else await addLeave(finalData);
+      else await addLeave(finalData); // Backend now sends email automatically
 
       const manager = employees.find(emp => String(emp.id) === String(formData.approverId));
       if (manager) {
-          // In-App Notification
+          // In-App Notification (Frontend triggered for immediate UI feedback)
           await notify(`${currentUser?.name} submitted a ${formData.type} request for approval.`, manager.id);
-          
-          // Email Notification
-          if (manager.email && currentUser?.email) {
-             await sendLeaveRequestEmail({
-                 to: manager.email,
-                 employeeName: currentUser.name,
-                 employeeEmail: currentUser.email,
-                 type: formData.type,
-                 startDate: finalData.startDate,
-                 endDate: finalData.endDate,
-                 reason: formData.reason
-             });
-          }
       }
       
       if (formData.notifyUserIds.length > 0) {
@@ -417,26 +405,17 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const handleStatusUpdate = async (leave: LeaveRequest, newStatus: LeaveStatusEnum, comment: string = '') => {
       setIsProcessing(true);
       try {
-        await updateLeaveStatus(leave.id, newStatus, comment);
+        await updateLeaveStatus(leave.id, newStatus, comment); // Backend sends email automatically
         
         const employee = employees.find(emp => String(emp.id) === String(leave.userId));
         
-        // Logical Workflow: Notify HR if Manager just approved to second level
+        // Logical Workflow: Notify HR in-app if Manager just approved to second level
         if (newStatus === LeaveStatusEnum.PENDING_HR) {
             const hrManagers = users.filter(u => u.role === UserRole.HR || u.role === UserRole.ADMIN);
             hrManagers.forEach(hr => notify(`Manager approved ${leave.userName}'s leave. Final action required.`, hr.id));
         } else if (employee) {
             // Standard notification for final statuses
             await notify(`Your leave status for ${leave.type} is now: ${newStatus}`, employee.id);
-            if (employee.email) {
-                await sendLeaveStatusEmail({
-                    to: employee.email,
-                    employeeName: leave.userName,
-                    status: newStatus,
-                    type: leave.type,
-                    managerComment: comment
-                });
-            }
         }
 
         showToast(`Status updated to ${newStatus}`, "success");
@@ -561,7 +540,6 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                       {paginatedLeaves.map(leave => {
-                          // Robust ID comparison using trim and toString to avoid numeric/string mismatches
                           const currentUserIdStr = String(currentUser?.id || '').trim();
                           const leaveUserIdStr = String(leave.userId || '').trim();
                           const leaveApproverIdStr = String(leave.approverId || '').trim();
@@ -569,16 +547,12 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                           const isDesignatedApprover = leaveApproverIdStr === currentUserIdStr;
                           const isOwnRequest = leaveUserIdStr === currentUserIdStr;
                           
-                          // Sequential Visibility Logic:
-                          // 1. Manager level: Show if user is the assigned approver for this request
                           const isPendingManagerLevel = leave.status === LeaveStatusEnum.PENDING_MANAGER;
                           const canManagerAction = isDesignatedApprover && isPendingManagerLevel;
                           
-                          // 2. HR level: Show if user has HR/Admin role AND manager has already approved
                           const isPendingHRLevel = leave.status === LeaveStatusEnum.PENDING_HR;
                           const canHRAction = isHR && isPendingHRLevel;
 
-                          // Final Permission check
                           const canApprove = (canManagerAction || canHRAction) && !isOwnRequest;
                           const canEditDelete = isOwnRequest && isPendingManagerLevel;
 
@@ -696,6 +670,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
         </div>
       )}
 
+      {/* Leave Type List, Balances, and Team views remain unchanged ... */}
       {viewMode === 'types' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {leaveTypes.map(type => (
@@ -857,6 +832,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
       {/* Leave Request Modal */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditingId ? 'Modify Request' : 'Submit Leave Request'} width="max-w-2xl">
         <form onSubmit={handleLeaveSubmit} className="space-y-6">
+            {/* ... Form content ... */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Category</label>

@@ -263,8 +263,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const forgotPassword = async (email: string): Promise<boolean> => {
-      showToast(`Password reset link sent to ${email}`, "success");
-      return true;
+      try {
+          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true' || !process.env.VITE_API_BASE_URL;
+          
+          if (isMock) {
+              console.log("[Mock API] Forgot Password Triggered for:", email);
+              showToast(`Password reset link sent to ${email}`, "success");
+              return true;
+          }
+
+          const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email })
+          });
+          
+          const data = await res.json();
+          if (res.ok) {
+              showToast(data.message || "Reset link sent", "success");
+              return true;
+          } else {
+              showToast(data.message || "Failed to process request", "error");
+              return false;
+          }
+      } catch (err) {
+          console.error("Forgot Password Failed", err);
+          showToast("Network error. Please try again later.", "error");
+          return false;
+      }
   };
 
   // --- CRUD Operations ---
