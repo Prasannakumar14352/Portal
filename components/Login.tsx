@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { Lock, Mail, ChevronRight, Loader2, CheckCircle2, Layout, User as UserIcon, Building2, Users, Clock, Sparkles, X, ShieldCheck, FileText, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, ChevronRight, Loader2, CheckCircle2, Layout, User as UserIcon, Building2, Users, Clock, Sparkles, X, ShieldCheck, FileText, ArrowLeft, Key } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 
 interface LoginProps {
@@ -8,20 +8,41 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { login, loginWithMicrosoft, forgotPassword, employees, showToast } = useAppContext();
+  const { login, loginWithMicrosoft, forgotPassword, confirmPasswordReset, employees, showToast } = useAppContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showFeaturesModal, setShowFeaturesModal] = useState(false);
   
+  // View State: 'login' | 'reset-password'
+  const [viewMode, setViewMode] = useState<'login' | 'reset-password'>('login');
+  
   // Forgot Password State
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
-  const [resetUsername, setResetUsername] = useState('');
   const [isResetting, setIsResetting] = useState(false);
+
+  // Reset Password Form State
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Check if Mock Data is enabled
   const showDemoAccess = process.env.VITE_USE_MOCK_DATA !== 'false';
+
+  // Check URL for Reset Token on mount
+  useEffect(() => {
+      const path = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (path === '/reset-password' || token) {
+          if (token) {
+              setResetToken(token);
+              setViewMode('reset-password');
+          }
+      }
+  }, []);
 
   const isMicrosoftDomain = (emailStr: string) => {
       const domains = ['outlook.com', 'hotmail.com', 'live.com', 'microsoft.com', 'msn.com'];
@@ -43,22 +64,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             setIsLoading(false);
             return;
         }
-        // If local login failed with the provided password, we proceed to check for MS SSO fallback.
     }
 
     // Priority 2: SSO Flow
-    // Trigger if strictly SSO user OR no password provided for a Microsoft domain
     const isMSAccount = (targetUser && targetUser.password === 'ms-auth-user') || isMicrosoftDomain(trimmedEmail);
     
     if (isMSAccount) {
         showToast("Microsoft account detected. Launching secure sign-in...", "info");
-        // Pass the entered email as a loginHint to skip the "Pick an account" screen
         const success = await loginWithMicrosoft(trimmedEmail);
         if (!success) {
             showToast("Microsoft authentication was cancelled or failed.", "error");
         }
     } else {
-        // Standard local login fallback if not a Microsoft account
         if (!password) {
             showToast("Please enter a password for this local account.", "warning");
         } else {
@@ -80,7 +97,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       if (success) {
           setShowForgotPasswordModal(false);
           setResetEmail('');
-          setResetUsername('');
+      }
+  };
+
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (newPassword !== confirmPassword) {
+          showToast("Passwords do not match.", "error");
+          return;
+      }
+      if (newPassword.length < 6) {
+          showToast("Password must be at least 6 characters.", "warning");
+          return;
+      }
+
+      setIsLoading(true);
+      const success = await confirmPasswordReset(resetToken, newPassword);
+      setIsLoading(false);
+
+      if (success) {
+          setViewMode('login');
+          // Clean URL
+          window.history.pushState({}, '', '/');
       }
   };
 
@@ -115,94 +153,158 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <span className="text-xl font-bold text-teal-800">EmpowerCorp HR</span>
             </div>
 
-            <div>
-                <h2 className="text-3xl font-bold text-slate-900">
-                    Welcome back
-                </h2>
-                <p className="text-slate-500 mt-2">
-                    Sign in with your organizational email to access the platform.
-                </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Username or Email</label>
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text"
-                            required
-                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                            placeholder="Your email address"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
-                    <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="password" 
-                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                            placeholder={isMicrosoftDomain(email) ? "Optional for Microsoft SSO" : "Your password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                    </div>
-                    {isMicrosoftDomain(email) && (
-                        <p className="text-[10px] text-teal-600 font-bold mt-1.5 uppercase tracking-tight flex items-center gap-1">
-                            <Sparkles size={10}/> Tip: Leave password blank to sign in via Microsoft 365
+            {viewMode === 'login' ? (
+                <>
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-900">
+                            Welcome back
+                        </h2>
+                        <p className="text-slate-500 mt-2">
+                            Sign in with your organizational email to access the platform.
                         </p>
-                    )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500" />
-                        <span className="text-sm text-slate-600">Remember me</span>
-                    </label>
-                    <button type="button" onClick={openForgotPassword} className="text-sm font-medium text-teal-700 hover:text-teal-800">
-                        Forgot your password?
-                    </button>
-                </div>
-
-                <button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed mt-2"
-                >
-                    {isLoading ? (
-                        <Loader2 className="animate-spin" size={20} />
-                    ) : (
-                        'Login'
-                    )}
-                </button>
-            </form>
-
-            <div className="pt-4 flex items-center gap-2 text-xs text-slate-400 justify-center">
-                <ShieldCheck size={14} className="text-teal-600" />
-                <span>Encrypted connection with Microsoft 365 Bridge</span>
-            </div>
-
-            {/* Demo Credentials Helper */}
-            {showDemoAccess && (
-                <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-xs text-center text-slate-400 mb-2 uppercase font-bold tracking-wider">Quick Demo Access</p>
-                    <div className="flex gap-2 justify-center flex-wrap">
-                        <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
-                            Fill Admin
-                        </button>
-                        <button onClick={() => fillDemoCreds('manager')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
-                            Fill Manager
-                        </button>
-                        <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
-                            Fill Employee
-                        </button>
                     </div>
-                </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Username or Email</label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input 
+                                    type="text"
+                                    required
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
+                                    placeholder="Your email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input 
+                                    type="password" 
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
+                                    placeholder={isMicrosoftDomain(email) ? "Optional for Microsoft SSO" : "Your password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                            </div>
+                            {isMicrosoftDomain(email) && (
+                                <p className="text-[10px] text-teal-600 font-bold mt-1.5 uppercase tracking-tight flex items-center gap-1">
+                                    <Sparkles size={10}/> Tip: Leave password blank to sign in via Microsoft 365
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500" />
+                                <span className="text-sm text-slate-600">Remember me</span>
+                            </label>
+                            <button type="button" onClick={openForgotPassword} className="text-sm font-medium text-teal-700 hover:text-teal-800">
+                                Forgot your password?
+                            </button>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            disabled={isLoading}
+                            className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                        >
+                            {isLoading ? (
+                                <Loader2 className="animate-spin" size={20} />
+                            ) : (
+                                'Login'
+                            )}
+                        </button>
+                    </form>
+
+                    <div className="pt-4 flex items-center gap-2 text-xs text-slate-400 justify-center">
+                        <ShieldCheck size={14} className="text-teal-600" />
+                        <span>Encrypted connection with Microsoft 365 Bridge</span>
+                    </div>
+
+                    {showDemoAccess && (
+                        <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <p className="text-xs text-center text-slate-400 mb-2 uppercase font-bold tracking-wider">Quick Demo Access</p>
+                            <div className="flex gap-2 justify-center flex-wrap">
+                                <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
+                                    Fill Admin
+                                </button>
+                                <button onClick={() => fillDemoCreds('manager')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
+                                    Fill Manager
+                                </button>
+                                <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
+                                    Fill Employee
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
+            ) : (
+                /* Reset Password View */
+                <>
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-900">
+                            Reset Password
+                        </h2>
+                        <p className="text-slate-500 mt-2">
+                            Create a new, strong password for your account.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handlePasswordResetSubmit} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">New Password</label>
+                            <div className="relative">
+                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input 
+                                    type="password"
+                                    required
+                                    minLength={6}
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition-all bg-white text-slate-900"
+                                    placeholder="New password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Confirm Password</label>
+                            <div className="relative">
+                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input 
+                                    type="password" 
+                                    required
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition-all bg-white text-slate-900"
+                                    placeholder="Confirm new password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            disabled={isLoading}
+                            className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-4 rounded-lg transition-all shadow-lg flex items-center justify-center disabled:opacity-70"
+                        >
+                            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Change Password'}
+                        </button>
+
+                        <button 
+                            type="button" 
+                            onClick={() => setViewMode('login')}
+                            className="w-full text-center text-sm text-slate-500 hover:text-teal-700"
+                        >
+                            Back to Login
+                        </button>
+                    </form>
+                </>
             )}
         </div>
       </div>

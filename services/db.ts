@@ -1,13 +1,15 @@
-
 import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role, Position, Invitation } from '../types';
 import { 
   mockEmployees, mockDepartments, mockProjects, mockLeaves, mockLeaveTypes, 
   mockAttendance, mockTimeEntries, mockNotifications, mockHolidays, mockPayslips, mockRoles
 } from './mockData';
 
-// If API URL is provided, default USE_MOCK_DATA to false
-const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true' || (!process.env.VITE_API_BASE_URL && process.env.VITE_USE_MOCK_DATA !== 'false');
+// Switch default to relative '/api' path to use Vite Proxy
+const API_BASE = process.env.VITE_API_BASE_URL 
+    ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+    : '/api';
+
+const USE_MOCK_DATA = process.env.VITE_USE_MOCK_DATA === 'true';
 
 console.log(`[DB Service] Initialized. Mode: ${USE_MOCK_DATA ? 'MOCK DATA' : 'REAL API'}`);
 console.log(`[DB Service] Target URL: ${API_BASE}`);
@@ -72,7 +74,6 @@ const store = {
 const mockDb = {
     getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
     addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
-    // Mock bulk add simulates array push
     bulkAddEmployees: async (emps: Employee[]) => { store.employees.push(...emps); return Promise.resolve(); },
     updateEmployee: async (emp: Employee) => {
         const idx = store.employees.findIndex(e => String(e.id) === String(emp.id));
@@ -210,7 +211,6 @@ const mockDb = {
 const apiDb = {
   getEmployees: () => api.get('/employees'),
   addEmployee: (emp: Employee) => api.post('/employees', emp),
-  // New bulk method
   bulkAddEmployees: (emps: Employee[]) => api.post('/employees/bulk', emps),
   updateEmployee: (emp: Employee) => api.put(`/employees/${emp.id}`, emp),
   deleteEmployee: (id: string) => api.delete(`/employees/${id}`),

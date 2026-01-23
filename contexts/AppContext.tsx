@@ -34,6 +34,7 @@ interface AppContextType {
   loginWithMicrosoft: (hint?: string) => Promise<boolean>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<boolean>;
+  confirmPasswordReset: (token: string, newPass: string) => Promise<boolean>;
   toggleTheme: () => void;
   
   showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
@@ -264,8 +265,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const forgotPassword = async (email: string): Promise<boolean> => {
       try {
-          // If using Proxy (recommended), API_BASE can be empty string or just '/api'
-          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const API_BASE = process.env.VITE_API_BASE_URL 
+              ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+              : '/api';
+          
           const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
@@ -291,6 +294,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (err) {
           console.error("Forgot Password Failed", err);
           showToast("Network error. Ensure backend is running on port 8000.", "error");
+          return false;
+      }
+  };
+
+  const confirmPasswordReset = async (token: string, newPass: string): Promise<boolean> => {
+      try {
+          const API_BASE = process.env.VITE_API_BASE_URL 
+              ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+              : '/api';
+          
+          const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
+          
+          if (isMock) {
+              console.log("[Mock API] Password Reset with Token:", token);
+              showToast(`Password reset successful. Please login.`, "success");
+              return true;
+          }
+
+          const res = await fetch(`${API_BASE}/auth/reset-password`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token, newPassword: newPass })
+          });
+          
+          const data = await res.json();
+          if (res.ok) {
+              showToast(data.message || "Password updated", "success");
+              return true;
+          } else {
+              showToast(data.message || "Failed to reset password", "error");
+              return false;
+          }
+      } catch (err) {
+          console.error("Reset Password Failed", err);
+          showToast("Connection error.", "error");
           return false;
       }
   };
@@ -530,7 +568,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Implement Email Sending for Status
   const sendLeaveStatusEmail = async (data: any) => {
       try {
-          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const API_BASE = process.env.VITE_API_BASE_URL 
+              ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+              : '/api';
+          
           const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
@@ -553,7 +594,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const sendLeaveRequestEmail = async (data: any) => {
       try {
-          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const API_BASE = process.env.VITE_API_BASE_URL 
+              ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+              : '/api';
+          
           const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
@@ -576,7 +620,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const sendProjectAssignmentEmail = async (data: { email: string, name: string, projectName: string, managerName: string }) => {
       try {
-          const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+          const API_BASE = process.env.VITE_API_BASE_URL 
+              ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+              : '/api';
+          
           const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
           
           if (isMock) {
@@ -611,7 +658,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       currentUser, employees, departments, projects, leaves, leaveTypes, attendance, 
       timeEntries, notifications, holidays, payslips, positions, toasts, isLoading, theme,
-      login, loginWithMicrosoft, logout, forgotPassword, toggleTheme, showToast, removeToast,
+      login, loginWithMicrosoft, logout, forgotPassword, confirmPasswordReset, toggleTheme, showToast, removeToast,
       refreshData, addEmployee, bulkAddEmployees, updateEmployee, deleteEmployee, inviteEmployee, 
       syncAzureUsers, updateUser, addDepartment, updateDepartment, deleteDepartment,
       addProject, updateProject, deleteProject, addPosition, updatePosition, deletePosition,
