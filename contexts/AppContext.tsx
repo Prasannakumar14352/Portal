@@ -541,8 +541,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const deleteTimeEntry = async (id: string | number) => { await db.deleteTimeEntry(String(id)); await refreshData(); };
 
-  const markNotificationRead = async (id: string | number) => { await db.markNotificationRead(String(id)); await refreshData(); };
-  const markAllRead = async (userId: string | number) => { await db.markAllNotificationsRead(String(userId)); await refreshData(); };
+  // Optimistic UI updates for notifications
+  const markNotificationRead = async (id: string | number) => { 
+      setNotifications(prev => prev.map(n => String(n.id) === String(id) ? { ...n, read: true } : n));
+      await db.markNotificationRead(String(id)); 
+      // Refreshing data will sync eventual consistency, but UI is updated immediately
+      await refreshData(); 
+  };
+
+  const markAllRead = async (userId: string | number) => { 
+      setNotifications(prev => prev.map(n => String(n.userId) === String(userId) ? { ...n, read: true } : n));
+      await db.markAllNotificationsRead(String(userId)); 
+      await refreshData(); 
+  };
+
   const notify = async (message: string, userId: string | number) => {
       await db.addNotification({
           id: Math.random().toString(36).substr(2, 9),

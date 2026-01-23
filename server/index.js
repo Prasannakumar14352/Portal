@@ -13,6 +13,12 @@ const PORT = process.env.PORT || 8000;
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
+// Request Logger Middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Database Configuration
 const dbConfig = {
     user: process.env.DB_USER || 'sa',
@@ -78,9 +84,45 @@ connectDb();
 // --- API Router Definition ---
 const apiRouter = express.Router();
 
-// 1. REGISTER AUTH & CUSTOM ROUTES FIRST (Priority)
+// 1. CUSTOM ROUTES (Must be defined BEFORE generic routes)
 
-// Forgot Password Route
+// -- Notification Routes --
+// Important: Place these specific routes before the generic /notifications/:id route
+
+// Mark All Notifications as Read for User
+apiRouter.put('/notifications/read-all/:userId', async (req, res) => {
+    console.log(`[API] Marking all notifications read for user: ${req.params.userId}`);
+    try {
+        if (!pool) throw new Error('DB disconnected');
+        const { userId } = req.params;
+        await pool.request()
+            .input('userId', userId)
+            .query('UPDATE notifications SET [read] = 1 WHERE userId = @userId');
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[API] Notification Read All Error:", err.message);
+        res.json({ success: true, mock: true }); // Fallback success to unblock UI
+    }
+});
+
+// Mark Single Notification as Read
+apiRouter.put('/notifications/:id/read', async (req, res) => {
+    console.log(`[API] Marking notification read: ${req.params.id}`);
+    try {
+        if (!pool) throw new Error('DB disconnected');
+        const { id } = req.params;
+        await pool.request()
+            .input('id', id)
+            .query('UPDATE notifications SET [read] = 1 WHERE id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[API] Notification Read Error:", err.message);
+        res.json({ success: true, mock: true });
+    }
+});
+
+// -- Auth Routes --
+
 apiRouter.post('/auth/forgot-password', async (req, res) => {
     console.log(`[API] Forgot Password Request for: ${req.body.email}`);
     try {
@@ -94,7 +136,7 @@ apiRouter.post('/auth/forgot-password', async (req, res) => {
             user = result.recordset[0];
         } else {
             console.warn("[API] DB not connected, using mock user for forgot-password");
-            user = { id: 1, firstName: 'User' }; // Mock
+            user = { id: 1, firstName: 'User' }; 
         }
 
         if (!user) {
@@ -102,22 +144,20 @@ apiRouter.post('/auth/forgot-password', async (req, res) => {
         }
 
         const resetToken = crypto.randomBytes(32).toString('hex');
-        const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
+        const expiry = new Date(Date.now() + 60 * 60 * 1000); 
 
         if (pool) {
             try {
-                // Assuming columns ResetToken and ResetTokenExpiry exist on employees table
                 await pool.request()
                     .input('token', sql.NVarChar, resetToken)
                     .input('expiry', sql.DateTime, expiry)
                     .input('id', user.id)
                     .query('UPDATE employees SET ResetToken = @token, ResetTokenExpiry = @expiry WHERE id = @id');
             } catch (dbErr) { 
-                console.warn("DB Update Failed (Columns might be missing). Sending link anyway for security obscurity.", dbErr.message); 
+                console.warn("DB Update Failed (Columns might be missing).", dbErr.message); 
             }
         }
 
-        // Handle specific route path for frontend
         const frontendUrl = req.headers.origin || 'http://localhost:5173';
         const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
         
@@ -129,7 +169,6 @@ apiRouter.post('/auth/forgot-password', async (req, res) => {
                 <p>
                     <a href="${resetLink}" style="background-color: #0f766e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
                 </p>
-                <p style="font-size: 12px; color: #666; margin-top: 20px;">If you didn't ask for this, you can ignore this email.</p>
             </div>
         `;
 
@@ -142,28 +181,19 @@ apiRouter.post('/auth/forgot-password', async (req, res) => {
     }
 });
 
-// Reset Password Route (New)
 apiRouter.post('/auth/reset-password', async (req, res) => {
     try {
         const { token, newPassword } = req.body;
-
-        if (!token || !newPassword) {
-            return res.status(400).json({ message: "Token and password are required.", status: "error" });
-        }
+        if (!token || !newPassword) return res.status(400).json({ message: "Token and password are required.", status: "error" });
 
         if (pool) {
-            // Find user with valid token
             const result = await pool.request()
                 .input('token', sql.NVarChar, token)
                 .query('SELECT id FROM employees WHERE ResetToken = @token AND ResetTokenExpiry > GETDATE()');
             
             const user = result.recordset[0];
+            if (!user) return res.status(400).json({ message: "Invalid or expired reset token.", status: "error" });
 
-            if (!user) {
-                return res.status(400).json({ message: "Invalid or expired reset token.", status: "error" });
-            }
-
-            // Update password and clear token
             await pool.request()
                 .input('password', sql.NVarChar, newPassword)
                 .input('id', user.id)
@@ -171,67 +201,22 @@ apiRouter.post('/auth/reset-password', async (req, res) => {
             
             res.json({ message: "Password updated successfully. Please login.", status: "success" });
         } else {
-            // Mock behavior
             if (token === 'mock-token') return res.status(400).json({ message: "Invalid token (mock)", status: "error" });
             res.json({ message: "Password updated successfully (Mock).", status: "success" });
         }
-
     } catch (err) {
         console.error("[API] Reset Password Error:", err);
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
 
-// Notification Routes (Custom)
-apiRouter.post('/notify/leave-request', async (req, res) => {
-    // Logic handled, just acknowledge
-    res.json({ success: true });
-});
-
-apiRouter.post('/notify/leave-status', async (req, res) => {
-    res.json({ success: true });
-});
-
-apiRouter.post('/notify/project-assignment', async (req, res) => {
-    // ... logic ...
-    res.json({ success: true });
-});
-
-// Mark Single Notification as Read
-apiRouter.put('/notifications/:id/read', async (req, res) => {
-    try {
-        if (!pool) throw new Error('DB disconnected');
-        const { id } = req.params;
-        await pool.request()
-            .input('id', id)
-            .query('UPDATE notifications SET [read] = 1 WHERE id = @id');
-        res.json({ success: true });
-    } catch (err) {
-        console.error("[API] Notification Read Error:", err.message);
-        // Return success even if DB fails to prevent UI blocking in demo mode
-        res.json({ success: true, mock: true });
-    }
-});
-
-// Mark All Notifications as Read for User
-apiRouter.put('/notifications/read-all/:userId', async (req, res) => {
-    try {
-        if (!pool) throw new Error('DB disconnected');
-        const { userId } = req.params;
-        await pool.request()
-            .input('userId', userId)
-            .query('UPDATE notifications SET [read] = 1 WHERE userId = @userId');
-        res.json({ success: true });
-    } catch (err) {
-        console.error("[API] Notification Read All Error:", err.message);
-        // Return success even if DB fails to prevent UI blocking in demo mode
-        res.json({ success: true, mock: true });
-    }
-});
+// -- Notification System Routes --
+apiRouter.post('/notify/leave-request', async (req, res) => { res.json({ success: true }); });
+apiRouter.post('/notify/leave-status', async (req, res) => { res.json({ success: true }); });
+apiRouter.post('/notify/project-assignment', async (req, res) => { res.json({ success: true }); });
 
 // 2. REGISTER GENERIC CRUD ROUTES (Fallbacks)
 const registerStandardRoutes = (route, tableName) => {
-    // GET
     apiRouter.get(`/${route}`, async (req, res) => {
         try {
             if (!pool) throw new Error('DB disconnected');
@@ -240,7 +225,6 @@ const registerStandardRoutes = (route, tableName) => {
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
     
-    // POST
     apiRouter.post(`/${route}`, async (req, res) => {
         try {
             if (!pool) throw new Error('DB disconnected');
@@ -258,7 +242,6 @@ const registerStandardRoutes = (route, tableName) => {
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
-    // PUT
     apiRouter.put(`/${route}/:id`, async (req, res) => {
         try {
             if (!pool) throw new Error('DB disconnected');
@@ -278,7 +261,6 @@ const registerStandardRoutes = (route, tableName) => {
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
-    // DELETE
     apiRouter.delete(`/${route}/:id`, async (req, res) => {
         try {
             if (!pool) throw new Error('DB disconnected');
@@ -291,7 +273,6 @@ const registerStandardRoutes = (route, tableName) => {
     });
 };
 
-// Define entities excluding 'leaves' if handled manually, or keep them generic if not colliding
 const entities = [
     { route: 'employees', table: 'employees' },
     { route: 'departments', table: 'departments' },
