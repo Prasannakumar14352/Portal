@@ -257,8 +257,9 @@ const apiDb = {
 
   getNotifications: () => api.get('/notifications'),
   addNotification: (notif: Notification) => api.post('/notifications', notif),
-  markNotificationRead: (id: string) => api.put(`/notifications/${id}/read`, {}),
-  markAllNotificationsRead: (userId: string) => api.put(`/notifications/read-all/${userId}`, {}),
+  // Updated endpoints to POST
+  markNotificationRead: (id: string) => api.post('/notifications/mark-read', { id }),
+  markAllNotificationsRead: (userId: string) => api.post('/notifications/mark-all-read', { userId }),
 
   getHolidays: () => api.get('/holidays'),
   addHoliday: (holiday: Holiday) => api.post('/holidays', holiday),

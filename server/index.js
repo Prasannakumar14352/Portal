@@ -87,30 +87,31 @@ const apiRouter = express.Router();
 // 1. CUSTOM ROUTES (Must be defined BEFORE generic routes)
 
 // -- Notification Routes --
-// Important: Place these specific routes before the generic /notifications/:id route
+// Refactored to POST to avoid conflict with generic PUT /:id routes
 
 // Mark All Notifications as Read for User
-apiRouter.put('/notifications/read-all/:userId', async (req, res) => {
-    console.log(`[API] Marking all notifications read for user: ${req.params.userId}`);
+apiRouter.post('/notifications/mark-all-read', async (req, res) => {
+    const { userId } = req.body;
+    console.log(`[API] Marking ALL notifications read for user: ${userId}`);
     try {
         if (!pool) throw new Error('DB disconnected');
-        const { userId } = req.params;
         await pool.request()
             .input('userId', userId)
             .query('UPDATE notifications SET [read] = 1 WHERE userId = @userId');
         res.json({ success: true });
     } catch (err) {
         console.error("[API] Notification Read All Error:", err.message);
-        res.json({ success: true, mock: true }); // Fallback success to unblock UI
+        // Fallback success to unblock UI
+        res.json({ success: true, mock: true }); 
     }
 });
 
 // Mark Single Notification as Read
-apiRouter.put('/notifications/:id/read', async (req, res) => {
-    console.log(`[API] Marking notification read: ${req.params.id}`);
+apiRouter.post('/notifications/mark-read', async (req, res) => {
+    const { id } = req.body;
+    console.log(`[API] Marking single notification read: ${id}`);
     try {
         if (!pool) throw new Error('DB disconnected');
-        const { id } = req.params;
         await pool.request()
             .input('id', id)
             .query('UPDATE notifications SET [read] = 1 WHERE id = @id');

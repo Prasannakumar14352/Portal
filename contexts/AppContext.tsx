@@ -544,15 +544,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Optimistic UI updates for notifications
   const markNotificationRead = async (id: string | number) => { 
       setNotifications(prev => prev.map(n => String(n.id) === String(id) ? { ...n, read: true } : n));
+      // NOTE: We do NOT await refreshData() here to preserve the optimistic update
+      // and prevent UI flickering if the backend is slow or returns old data.
       await db.markNotificationRead(String(id)); 
-      // Refreshing data will sync eventual consistency, but UI is updated immediately
-      await refreshData(); 
   };
 
   const markAllRead = async (userId: string | number) => { 
       setNotifications(prev => prev.map(n => String(n.userId) === String(userId) ? { ...n, read: true } : n));
+      // NOTE: We do NOT await refreshData() here to preserve the optimistic update.
       await db.markAllNotificationsRead(String(userId)); 
-      await refreshData(); 
   };
 
   const notify = async (message: string, userId: string | number) => {
