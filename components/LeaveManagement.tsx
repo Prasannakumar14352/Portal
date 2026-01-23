@@ -550,10 +550,13 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                           const isPendingManagerLevel = leave.status === LeaveStatusEnum.PENDING_MANAGER;
                           const canManagerAction = isDesignatedApprover && isPendingManagerLevel;
                           
+                          // Allow HR to override/act on Manager Pending requests
+                          const canHROverride = isHR && isPendingManagerLevel;
+
                           const isPendingHRLevel = leave.status === LeaveStatusEnum.PENDING_HR;
                           const canHRAction = isHR && isPendingHRLevel;
 
-                          const canApprove = (canManagerAction || canHRAction) && !isOwnRequest;
+                          const canApprove = (canManagerAction || canHRAction || canHROverride) && !isOwnRequest;
                           const canEditDelete = isOwnRequest && isPendingManagerLevel;
 
                           return (
