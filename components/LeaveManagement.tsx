@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UserRole, LeaveStatus, LeaveStatus as LeaveStatusEnum, LeaveRequest, LeaveTypeConfig, User, LeaveDurationType } from '../types';
 import { 
   Plus, Calendar, CheckCircle, X, ChevronDown, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, Mail, Layers, Activity, GripHorizontal, MessageSquare, ShieldCheck, Users, MousePointerClick, Search,
-  ChevronLeft, ChevronRight, Clock
+  ChevronLeft, ChevronRight, Clock, FileClock, History
 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -118,6 +118,8 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<'requests' | 'balances' | 'types' | 'team'>('requests');
+  const [activeRequestTab, setActiveRequestTab] = useState<'pending' | 'all'>('pending');
+
   const [isEditingId, setIsEditingId] = useState<string | number | null>(null);
   const [editingTypeId, setEditingTypeId] = useState<string | number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,6 +135,11 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
   const [typeData, setTypeData] = useState({
     name: '', days: 10, description: '', isActive: true, color: 'text-teal-600'
   });
+
+  // Reset pagination when tab changes
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [activeRequestTab, viewMode]);
 
   const leaveDuration = useMemo(() => {
     if (formData.durationType === 'Half Day') return 0.5;
@@ -209,8 +216,26 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                 
                 return isOwn || isApprover || isDirectReport;
             });
+        } else if (currentUser.role === UserRole.HR || currentUser.role === UserRole.ADMIN) {
+            // HR and Admin see records, but with specific exclusions based on workflow stage
+            data = data.filter(l => {
+                const isOwn = String(l.userId) === currentIdStr;
+                const isApprover = String(l.approverId) === currentIdStr;
+                
+                if (isOwn) return true; // Always see own requests
+                
+                // If acting as direct manager, must see pending manager requests
+                if (isApprover && l.status === LeaveStatusEnum.PENDING_MANAGER) return true;
+
+                // Otherwise, hide requests that are still with the manager from HR main queue
+                if (l.status === LeaveStatusEnum.PENDING_MANAGER) return false;
+
+                // Hide requests rejected by manager (indicated by status REJECTED and no HR comment)
+                if (l.status === LeaveStatusEnum.REJECTED && !l.hrComment) return false;
+
+                return true;
+            });
         }
-        // HR and Admin see all records by default
     }
 
     if (!searchQuery.trim()) return data;
@@ -223,11 +248,47 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
     );
   }, [leaves, searchQuery, currentUser, users]);
 
-  const totalPages = Math.ceil(filteredLeaves.length / itemsPerPage);
+  // Final display list taking into account the "Pending" vs "All" tabs
+  const finalDisplayLeaves = useMemo(() => {
+      // If user is Employee, they don't use the tabs (logic remains simple)
+      if (currentUser?.role === UserRole.EMPLOYEE) return filteredLeaves;
+
+      if (activeRequestTab === 'pending') {
+          return filteredLeaves.filter(l => {
+              const isDirectApprover = String(l.approverId) === String(currentUser?.id);
+              
+              // Manager pending logic
+              if (l.status === LeaveStatusEnum.PENDING_MANAGER && isDirectApprover) return true;
+              
+              // HR pending logic
+              if ((currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN)) {
+                  // HR sees Pending HR
+                  if (l.status === LeaveStatusEnum.PENDING_HR) return true;
+                  // HR also acts as a Manager for their own direct reports, so show those pending too
+                  if (l.status === LeaveStatusEnum.PENDING_MANAGER && isDirectApprover) return true;
+              }
+              
+              return false;
+          });
+      }
+      
+      // 'all' tab now strictly shows COMPLETED history (Approved/Rejected)
+      // Pending items are filtered out to keep this view clean
+      if (activeRequestTab === 'all') {
+          return filteredLeaves.filter(l => 
+              l.status === LeaveStatusEnum.APPROVED || 
+              l.status === LeaveStatusEnum.REJECTED
+          );
+      }
+      
+      return filteredLeaves;
+  }, [filteredLeaves, activeRequestTab, currentUser]);
+
+  const totalPages = Math.ceil(finalDisplayLeaves.length / itemsPerPage);
   
   const paginatedLeaves = useMemo(() => {
-      return filteredLeaves.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filteredLeaves, currentPage, itemsPerPage]);
+      return finalDisplayLeaves.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [finalDisplayLeaves, currentPage, itemsPerPage]);
 
   const getBalancesForUser = (userId: string | number) => {
     return leaveTypes.map(type => {
@@ -511,6 +572,25 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
 
       {viewMode === 'requests' && (
         <div className="space-y-4">
+            
+            {/* NEW: Action Tabs for Managers and HR */}
+            {canSearch && (
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-700 pb-1 mb-2">
+                  <button 
+                    onClick={() => setActiveRequestTab('pending')}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-all ${activeRequestTab === 'pending' ? 'border-teal-500 text-teal-600 dark:text-teal-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                  >
+                    <FileClock size={16} /> Pending Action
+                  </button>
+                  <button 
+                    onClick={() => setActiveRequestTab('all')}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-all ${activeRequestTab === 'all' ? 'border-teal-500 text-teal-600 dark:text-teal-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                  >
+                    <History size={16} /> All Requests
+                  </button>
+              </div>
+            )}
+
             {canSearch && (
                 <div className="flex justify-end">
                     <div className="relative w-full max-w-xs">
@@ -607,7 +687,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                             </tr>
                           );
                       })}
-                      {filteredLeaves.length === 0 && (
+                      {finalDisplayLeaves.length === 0 && (
                           <tr>
                               <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm italic">
                                   No leave requests found {searchQuery ? `matching "${searchQuery}"` : ''}
@@ -618,7 +698,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                   </table>
                 </div>
 
-                {filteredLeaves.length > 0 && (
+                {finalDisplayLeaves.length > 0 && (
                     <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-slate-400 gap-4">
                         <div className="flex items-center gap-4">
                             <span className="text-xs font-medium">Rows per page:</span>
@@ -632,7 +712,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                                 <option value={20}>20</option>
                             </select>
                             <span className="text-xs">
-                                Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredLeaves.length)} of {filteredLeaves.length}
+                                Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, finalDisplayLeaves.length)} of {finalDisplayLeaves.length}
                             </span>
                         </div>
 

@@ -483,7 +483,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateLeaveStatus = async (id: string | number, status: string, comment?: string) => {
       const leave = leaves.find(l => String(l.id) === String(id));
       if (leave) {
-          await db.updateLeave({ ...leave, status: status as any, managerComment: comment });
+          const updates: any = { status: status as any };
+          // Assign comment to the correct field based on role
+          if (currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN) {
+              updates.hrComment = comment;
+          } else {
+              updates.managerComment = comment;
+          }
+          
+          await db.updateLeave({ ...leave, ...updates });
           await refreshData();
       }
   };
