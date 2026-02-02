@@ -93,13 +93,6 @@ const checkAndNotifyMissingTimesheets = async (targetDate) => {
     // If DB not connected (Mock Mode fallback)
     if (!pool) {
         console.warn("[Service] DB not connected. Simulating email sending for mock mode.");
-        const mockHtml = `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-                <p>Dear Demo User,</p>
-                <p>Your timesheet for ${targetDate} has not been completed...</p>
-            </div>
-        `;
-        await sendEmailAsync('demo@example.com', 'Action Required: Incomplete Timesheet', mockHtml);
         return { success: true, message: "Mock reminders sent", count: 1 };
     }
 
@@ -135,7 +128,7 @@ const checkAndNotifyMissingTimesheets = async (targetDate) => {
                     <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
                         <p>Dear ${emp.firstName} ${emp.lastName},</p>
                         
-                        <p>Your timesheet for the below-mentioned date(s) has not been completed. Please ensure it is completed and submitted by today, as timesheet data is directly linked to attendance records.</p>
+                        <p>Your timesheet for <strong>${targetDate}</strong> has not been completed. Please ensure it is completed and submitted by today.</p>
                         
                         <table style="border-collapse: collapse; width: 100%; max-width: 500px; margin: 20px 0;">
                             <thead>
@@ -175,9 +168,97 @@ const checkAndNotifyMissingTimesheets = async (targetDate) => {
     }
 };
 
+const checkAndNotifyWeeklyCompliance = async () => {
+    console.log(`[Service] Running Weekly Compliance Check`);
+
+    if (!pool) {
+        console.warn("[Service] DB not connected. Simulating weekly compliance email.");
+        return { success: true, message: "Mock weekly compliance sent", count: 1 };
+    }
+
+    try {
+        // Calculate Week Range (Monday to Friday of current week)
+        const today = new Date();
+        const day = today.getDay(); // 0-6
+        const diffToMon = today.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+        const monday = new Date(today.setDate(diffToMon));
+        const friday = new Date(today.setDate(diffToMon + 4));
+
+        const formatDate = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        };
+
+        const startStr = formatDate(monday);
+        const endStr = formatDate(friday);
+
+        // 1. Get Active Employees
+        const empResult = await pool.request()
+            .query("SELECT id, firstName, lastName, email FROM employees WHERE status = 'Active'");
+        const employees = empResult.recordset;
+
+        // 2. Get logs for the whole week
+        const logResult = await pool.request()
+            .input('start', sql.NVarChar, startStr)
+            .input('end', sql.NVarChar, endStr)
+            .query("SELECT userId, durationMinutes, extraMinutes FROM time_entries WHERE date >= @start AND date <= @end");
+        const logs = logResult.recordset;
+
+        let sentCount = 0;
+        // Standard week: 5 days * 8 hours * 60 mins = 2400 mins
+        // If checking mid-week (e.g. Friday 5pm), expectation is full week.
+        const EXPECTED_WEEKLY_MINUTES = 2400; 
+
+        for (const emp of employees) {
+            const userLogs = logs.filter(l => String(l.userId) === String(emp.id));
+            const totalMinutes = userLogs.reduce((sum, log) => sum + (log.durationMinutes || 0) + (log.extraMinutes || 0), 0);
+
+            // Threshold: If less than 95% of expected hours, trigger warning
+            if (totalMinutes < (EXPECTED_WEEKLY_MINUTES * 0.95)) {
+                
+                const loggedHours = (totalMinutes / 60).toFixed(1);
+                
+                const emailHtml = `
+                    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                        <p>Dear ${emp.firstName},</p>
+                        
+                        <p style="color: #c2410c; font-weight: bold; font-size: 16px;">Action Required: Weekly TMS Compliance Warning</p>
+                        
+                        <p>Our records indicate incomplete Time Management System (TMS) logs for the week of <strong>${startStr} to ${endStr}</strong>.</p>
+                        <p><strong>Total Hours Logged:</strong> ${loggedHours} / 40.0</p>
+
+                        <div style="background-color: #fff1f2; border-left: 4px solid #e11d48; padding: 15px; margin: 20px 0;">
+                            <p style="margin: 0; font-weight: bold;">All employees are expected to complete and submit their TMS (time logs) on time without exception, as TMS data is directly linked to attendance, compliance, and reporting requirements.</p>
+                            <br/>
+                            <p style="margin: 0; font-weight: bold; color: #9f1239;">Please be advised that repeated non-compliance will be viewed seriously and may result in strict action, in line with company policy.</p>
+                        </div>
+
+                        <p>We appreciate your cooperation in ensuring timely and accurate TMS (time logs) updates.</p>
+                        
+                        <p style="margin-top: 30px;">
+                            Regards,<br/>
+                            HR & Compliance Team
+                        </p>
+                    </div>
+                `;
+
+                await sendEmailAsync(emp.email, 'URGENT: Weekly TMS Non-Compliance Notice', emailHtml);
+                sentCount++;
+            }
+        }
+        return { success: true, message: `Compliance warnings sent to ${sentCount} employees.`, count: sentCount };
+
+    } catch (err) {
+        console.error("Error in weekly compliance check:", err);
+        throw err;
+    }
+}
+
 // --- Scheduled Tasks ---
 
-// Schedule: Daily at 10:00 AM (server time)
+// 1. Daily Check: 10:00 AM (server time)
 // Checks for "Yesterday's" logs
 cron.schedule('0 10 * * *', async () => {
     console.log('[CRON] Running Daily Timesheet Check...');
@@ -193,16 +274,32 @@ cron.schedule('0 10 * * *', async () => {
     await checkAndNotifyMissingTimesheets(targetDate);
 });
 
+// 2. Weekly Compliance Check: Friday 5:00 PM (server time)
+cron.schedule('0 17 * * 5', async () => {
+    console.log('[CRON] Running Weekly Compliance Audit...');
+    await checkAndNotifyWeeklyCompliance();
+});
+
 // --- API Router Definition ---
 const apiRouter = express.Router();
 
 // 1. CUSTOM ROUTES
 
-// -- Timesheet Reminder Route (Manual Trigger) --
+// -- Timesheet Reminder Route (Manual Trigger - Daily) --
 apiRouter.post('/notify/missing-timesheets', async (req, res) => {
     const { targetDate } = req.body; // Expects YYYY-MM-DD
     try {
         const result = await checkAndNotifyMissingTimesheets(targetDate);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// -- Weekly Compliance Trigger (Manual) --
+apiRouter.post('/notify/weekly-compliance', async (req, res) => {
+    try {
+        const result = await checkAndNotifyWeeklyCompliance();
         res.json(result);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -418,5 +515,5 @@ app.use('/api', apiRouter);
 // Start Server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Routes registered. Cron job scheduled for 10:00 AM daily.`);
+    console.log(`Routes registered. Cron jobs active (Daily + Weekly).`);
 });

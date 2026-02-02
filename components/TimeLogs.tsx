@@ -5,7 +5,7 @@ import {
   Clock, Plus, FileText, ChevronDown, ChevronRight, ChevronLeft, Edit2, Trash2,
   DollarSign, FileSpreadsheet, AlertTriangle, CheckCircle2, MoreHorizontal, SlidersHorizontal, Zap, 
   Calendar as CalendarIcon, Search, Filter, Download, MoreVertical, Coffee, RefreshCcw, PartyPopper,
-  Mail, Send
+  Mail, Send, ShieldAlert
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import DraggableModal from './DraggableModal';
 
 const TimeLogs = () => {
-  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, employees, showToast, syncHolidayLogs, holidays, notifyMissingTimesheets } = useAppContext();
+  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, employees, showToast, syncHolidayLogs, holidays, notifyMissingTimesheets, notifyWeeklyCompliance } = useAppContext();
   
   // UI State
   const [showModal, setShowModal] = useState(false);
@@ -300,6 +300,25 @@ const TimeLogs = () => {
       }
   };
 
+  const handleWeeklyComplianceCheck = async () => {
+      if (!window.confirm(`Trigger WEEKLY compliance audit? This will send stern warnings to all employees with missing logs for the current week.`)) return;
+      
+      setIsSendingReminders(true);
+      try {
+          const res = await notifyWeeklyCompliance();
+          const data = await res.json();
+          if (data.success) {
+              showToast(data.message || `Compliance warnings sent to ${data.count} employees.`, "success");
+          } else {
+              showToast("Failed to execute audit.", "error");
+          }
+      } catch (err) {
+          showToast("Server error.", "error");
+      } finally {
+          setIsSendingReminders(false);
+      }
+  };
+
   // --- Specialized Exports Matching User Requirement ---
 
   const formatDateLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -502,7 +521,7 @@ const TimeLogs = () => {
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-slate-50"
                     >
                         <RefreshCcw size={18} className="text-emerald-500" />
-                        <span className="whitespace-nowrap">Sync Holiday Logs</span>
+                        <span className="whitespace-nowrap">Sync Holidays</span>
                     </button>
                     <button 
                         onClick={handleSendReminders}
@@ -511,7 +530,16 @@ const TimeLogs = () => {
                         title="Send email reminders to employees with missing logs for yesterday"
                     >
                         <Mail size={18} className="text-amber-500" />
-                        <span className="whitespace-nowrap">{isSendingReminders ? 'Sending...' : 'Send Reminders'}</span>
+                        <span className="whitespace-nowrap">{isSendingReminders ? 'Sending...' : 'Remind Yesterday'}</span>
+                    </button>
+                    <button 
+                        onClick={handleWeeklyComplianceCheck}
+                        disabled={isSendingReminders}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-rose-100 disabled:opacity-50"
+                        title="Trigger Weekly TMS Compliance Check"
+                    >
+                        <ShieldAlert size={18} className="text-rose-600" />
+                        <span className="whitespace-nowrap">Weekly Audit</span>
                     </button>
                   </>
               )}

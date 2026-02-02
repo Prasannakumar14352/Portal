@@ -100,6 +100,7 @@ interface AppContextType {
   sendProjectAssignmentEmail: (data: { email: string, name: string, projectName: string, managerName: string }) => Promise<void>;
   
   notifyMissingTimesheets: (targetDate: string) => Promise<any>;
+  notifyWeeklyCompliance: () => Promise<any>;
 
   installApp: () => Promise<void>;
   isInstallable: boolean;
@@ -669,7 +670,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const notifyMissingTimesheets = async (targetDate: string) => {
-      return db.notifyMissingTimesheets(targetDate);
+      const API_BASE = process.env.VITE_API_BASE_URL 
+          ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+          : '/api';
+      
+      const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
+      if (isMock) {
+          console.log("[Mock API] Notify missing timesheets triggered");
+          return { json: () => Promise.resolve({ success: true, count: 5, message: "Mock reminders sent" }) };
+      }
+
+      return fetch(`${API_BASE}/notify/missing-timesheets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetDate })
+      });
+  };
+
+  const notifyWeeklyCompliance = async () => {
+      const API_BASE = process.env.VITE_API_BASE_URL 
+          ? process.env.VITE_API_BASE_URL.replace(/\/$/, '') 
+          : '/api';
+      
+      const isMock = process.env.VITE_USE_MOCK_DATA === 'true';
+      if (isMock) {
+          console.log("[Mock API] Notify weekly compliance triggered");
+          return { json: () => Promise.resolve({ success: true, count: 3, message: "Mock weekly audit completed" }) };
+      }
+
+      return fetch(`${API_BASE}/notify/weekly-compliance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+      });
   };
 
   const installApp = async () => {
@@ -693,7 +726,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteAttendanceRecord, addTimeEntry, updateTimeEntry, deleteTimeEntry,
       markNotificationRead, markAllRead, notify, addHoliday, addHolidays, deleteHoliday, 
       syncHolidayLogs, manualAddPayslip, updatePayslip, deletePayslip, sendLeaveStatusEmail,
-      sendLeaveRequestEmail, sendProjectAssignmentEmail, notifyMissingTimesheets,
+      sendLeaveRequestEmail, sendProjectAssignmentEmail, notifyMissingTimesheets, notifyWeeklyCompliance,
       installApp, isInstallable: !!deferredPrompt && !isStandalone
     }}>
       {children}
