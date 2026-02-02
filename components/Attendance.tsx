@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
-import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown } from 'lucide-react';
+import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown, Zap } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -68,6 +68,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       description: '',
       isBillable: true
   });
+  
+  const [logDurationSplit, setLogDurationSplit] = useState({ standard: 0, extra: 0 });
 
   const NO_PROJECT_ID = "NO_PROJECT";
 
@@ -150,9 +152,17 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const handleCheckOutClick = () => {
     if (!currentUser || !pendingRecord) return;
     
+    let durationHrs = 0;
+    if (pendingRecord.checkInTime) {
+        const checkInTime = new Date(pendingRecord.checkInTime);
+        if (!isNaN(checkInTime.getTime())) {
+            durationHrs = (currentTime.getTime() - checkInTime.getTime()) / 3600000;
+        }
+    }
+    
     // Check 1: Duration < 9 hours (Early Checkout)
-    const durationHrs = (currentTime.getTime() - new Date(pendingRecord.checkInTime!).getTime()) / 3600000;
-    if (durationHrs < 9) {
+    // Only prompt for early checkout if duration is valid and less than 9h
+    if (durationHrs > 0 && durationHrs < 9) {
       setShowEarlyReasonModal(true);
       return;
     }
@@ -178,6 +188,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       if (!hasLog) {
           // Reset log form for fresh entry
           setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
+          
+          // Calculate split: Standard capped at 8h (480m), rest is Extra
+          const totalMins = getDurationInMinutes(pendingRecord);
+          const standard = Math.min(totalMins, 480);
+          const extra = Math.max(0, totalMins - 480);
+          setLogDurationSplit({ standard, extra });
+          
           setShowTimeLogModal(true);
           return;
       }
@@ -192,13 +209,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       
       setIsSubmittingLog(true);
       try {
-          const totalMinutes = getDurationInMinutes(pendingRecord);
           await addTimeEntry({
               userId: currentUser.id,
               projectId: logFormData.projectId === NO_PROJECT_ID ? "" : logFormData.projectId,
               task: logFormData.task,
               date: pendingRecord.date,
-              durationMinutes: totalMinutes,
+              durationMinutes: logDurationSplit.standard,
+              extraMinutes: logDurationSplit.extra,
               description: logFormData.description,
               status: 'Pending',
               isBillable: logFormData.isBillable
@@ -240,7 +257,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
     // Validation: End Date/Time must be >= Start Date/Time
     const checkOutDate = new Date(`${retroForm.date}T${retroForm.time}:00`);
-    const checkInDate = new Date(pendingRecord.checkInTime!); 
+    let checkInDate = new Date();
+    if (pendingRecord.checkInTime) checkInDate = new Date(pendingRecord.checkInTime);
 
     if (checkOutDate < checkInDate) {
         showToast("Check-out date/time cannot be earlier than check-in date/time.", "error");
@@ -560,15 +578,50 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </div>
               </div>
 
-              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-teal-600"><Clock size={18}/></div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+                  <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                           <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-teal-600"><Clock size={18}/></div>
+                           <div>
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Session</p>
+                               <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{calculateDuration(pendingRecord || ({} as any))}</p>
+                           </div>
+                      </div>
+                      {logDurationSplit.extra > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Zap size={10}/> Overtime Detected</span>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                       <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calculated Duration</p>
-                          <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{calculateDuration(pendingRecord || ({} as any))}</p>
+                          <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Standard (Max 8h)</label>
+                          <input 
+                              type="text" 
+                              className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold text-slate-500"
+                              value={`${Math.floor(logDurationSplit.standard / 60)}h ${logDurationSplit.standard % 60}m`}
+                              readOnly 
+                          /> 
+                      </div>
+                      <div>
+                           <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Extra Hours</label>
+                           <div className="flex gap-2">
+                              <input 
+                                  type="number"
+                                  min="0"
+                                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                  value={Math.floor(logDurationSplit.extra / 60)}
+                                  onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (parseInt(e.target.value) || 0) * 60 + (prev.extra % 60) }))}
+                              />
+                              <span className="self-center font-bold text-slate-400">:</span>
+                              <input 
+                                  type="number"
+                                  min="0"
+                                  max="59"
+                                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                  value={logDurationSplit.extra % 60}
+                                  onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (Math.floor(prev.extra / 60) * 60) + (parseInt(e.target.value) || 0) }))}
+                              />
+                           </div>
                       </div>
                   </div>
-                  <div className="bg-teal-600 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Auto Sync Enabled</div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
