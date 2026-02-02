@@ -205,6 +205,10 @@ const mockDb = {
     deleteInvitation: async (id: string) => {
         store.invitations = store.invitations.filter(i => String(i.id) !== String(id));
         return Promise.resolve();
+    },
+    notifyMissingTimesheets: async (targetDate: string) => { 
+        console.log(`[Mock DB] Checking missing timesheets for ${targetDate}`);
+        return { success: true, count: 0 }; 
     }
 };
 
@@ -272,7 +276,9 @@ const apiDb = {
 
   getInvitations: () => api.get('/invitations'),
   addInvitation: (invite: Invitation) => api.post('/invitations', invite),
-  deleteInvitation: (id: string) => api.delete(`/invitations/${id}`)
+  deleteInvitation: (id: string) => api.delete(`/invitations/${id}`),
+
+  notifyMissingTimesheets: (targetDate: string) => api.post('/notify/missing-timesheets', { targetDate })
 };
 
 const createHybridDb = () => {

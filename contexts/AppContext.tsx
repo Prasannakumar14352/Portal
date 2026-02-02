@@ -98,6 +98,8 @@ interface AppContextType {
   sendLeaveStatusEmail: (data: any) => Promise<void>;
   sendLeaveRequestEmail: (data: any) => Promise<void>;
   sendProjectAssignmentEmail: (data: { email: string, name: string, projectName: string, managerName: string }) => Promise<void>;
+  
+  notifyMissingTimesheets: (targetDate: string) => Promise<any>;
 
   installApp: () => Promise<void>;
   isInstallable: boolean;
@@ -666,6 +668,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
   };
 
+  const notifyMissingTimesheets = async (targetDate: string) => {
+      return db.notifyMissingTimesheets(targetDate);
+  };
+
   const installApp = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -687,7 +693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteAttendanceRecord, addTimeEntry, updateTimeEntry, deleteTimeEntry,
       markNotificationRead, markAllRead, notify, addHoliday, addHolidays, deleteHoliday, 
       syncHolidayLogs, manualAddPayslip, updatePayslip, deletePayslip, sendLeaveStatusEmail,
-      sendLeaveRequestEmail, sendProjectAssignmentEmail,
+      sendLeaveRequestEmail, sendProjectAssignmentEmail, notifyMissingTimesheets,
       installApp, isInstallable: !!deferredPrompt && !isStandalone
     }}>
       {children}

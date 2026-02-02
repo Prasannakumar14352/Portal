@@ -58,6 +58,8 @@ transporter.verify(function (error, success) {
 const sendEmailAsync = async (to, subject, htmlBody) => {
     if (process.env.MOCK_EMAIL === 'true' || !isEmailServiceReady) {
         console.log(`[MOCK EMAIL] To: ${to} | Subject: ${subject}`);
+        // Log body preview for debugging
+        console.log(`[MOCK EMAIL BODY PREVIEW]:`, htmlBody.substring(0, 100) + '...');
         return;
     }
     try {
@@ -65,6 +67,7 @@ const sendEmailAsync = async (to, subject, htmlBody) => {
             from: `"EmpowerCorp HR" <${SMTP_USER}>`,
             to, subject, html: htmlBody
         });
+        console.log(`[EMAIL SENT] To: ${to}`);
     } catch (ex) {
         console.error("Email send failed:", ex);
     }
@@ -85,6 +88,99 @@ connectDb();
 const apiRouter = express.Router();
 
 // 1. CUSTOM ROUTES (Must be defined BEFORE generic routes)
+
+// -- Timesheet Reminder Route --
+apiRouter.post('/notify/missing-timesheets', async (req, res) => {
+    const { targetDate } = req.body; // Expects YYYY-MM-DD
+    console.log(`[API] Checking missing timesheets for: ${targetDate}`);
+
+    try {
+        // If DB not connected (Mock Mode fallback logic inside the block)
+        if (!pool) {
+            console.warn("[API] DB not connected. Simulating email sending for mock mode.");
+            // Simulate sending to a demo user
+            const mockHtml = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <p>Dear Demo User,</p>
+                    <p>Your timesheet for the below-mentioned date(s) has not been completed...</p>
+                </div>
+            `;
+            await sendEmailAsync('demo@example.com', 'Action Required: Incomplete Timesheet', mockHtml);
+            return res.json({ success: true, message: "Mock reminders sent", count: 1 });
+        }
+
+        // 1. Get All Active Employees
+        const empResult = await pool.request()
+            .query("SELECT id, firstName, lastName, email FROM employees WHERE status = 'Active'");
+        const employees = empResult.recordset;
+
+        // 2. Get Time Logs for the specific date
+        const logResult = await pool.request()
+            .input('date', sql.NVarChar, targetDate)
+            .query("SELECT userId, durationMinutes, extraMinutes FROM time_entries WHERE date = @date");
+        const logs = logResult.recordset;
+
+        let sentCount = 0;
+
+        // 3. Check each employee
+        for (const emp of employees) {
+            // Calculate total minutes logged by this user on this date
+            const userLogs = logs.filter(l => String(l.userId) === String(emp.id));
+            const totalMinutes = userLogs.reduce((sum, log) => sum + (log.durationMinutes || 0) + (log.extraMinutes || 0), 0);
+            
+            // Standard day is 8 hours = 480 minutes
+            const STANDARD_MINUTES = 480;
+
+            if (totalMinutes < STANDARD_MINUTES) {
+                const hoursFilled = Math.floor(totalMinutes / 60);
+                const hoursMissing = ((STANDARD_MINUTES - totalMinutes) / 60).toFixed(1); // e.g. 8.0 or 4.5
+
+                // Construct Email Matching the Screenshot
+                const emailHtml = `
+                    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                        <p>Dear ${emp.firstName} ${emp.lastName},</p>
+                        
+                        <p>Your timesheet for the below-mentioned date(s) has not been completed. Please ensure it is completed and submitted by today, as timesheet data is directly linked to attendance records.</p>
+                        
+                        <table style="border-collapse: collapse; width: 100%; max-width: 500px; margin: 20px 0;">
+                            <thead>
+                                <tr style="background-color: #f8f9fa;">
+                                    <th style="border: 1px solid #000; padding: 10px; text-align: left;">Date</th>
+                                    <th style="border: 1px solid #000; padding: 10px; text-align: left;">Hours Filled</th>
+                                    <th style="border: 1px solid #000; padding: 10px; text-align: left;">Hours Missing</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="border: 1px solid #000; padding: 10px;">${targetDate}</td>
+                                    <td style="border: 1px solid #000; padding: 10px;">${hoursFilled}</td>
+                                    <td style="border: 1px solid #000; padding: 10px;">${hoursMissing}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <p>Kindly update your timesheet at the earliest.</p>
+                        
+                        <p style="margin-top: 30px;">
+                            Thanks,<br/>
+                            HR Team
+                        </p>
+                    </div>
+                `;
+
+                // Send Email
+                await sendEmailAsync(emp.email, 'Action Required: Incomplete Timesheet', emailHtml);
+                sentCount++;
+            }
+        }
+
+        res.json({ success: true, message: `Reminders sent to ${sentCount} employees.`, count: sentCount });
+
+    } catch (err) {
+        console.error("[API] Missing Timesheet Check Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // -- Notification Routes --
 // Refactored to POST to avoid conflict with generic PUT /:id routes
@@ -298,5 +394,5 @@ app.use('/api', apiRouter);
 // Start Server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Routes registered. Example: POST /api/auth/forgot-password`);
+    console.log(`Routes registered. Example: POST /api/notify/missing-timesheets`);
 });

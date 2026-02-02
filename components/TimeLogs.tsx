@@ -1,11 +1,11 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { TimeEntry, Project, UserRole } from '../types';
 import { 
   Clock, Plus, FileText, ChevronDown, ChevronRight, ChevronLeft, Edit2, Trash2,
   DollarSign, FileSpreadsheet, AlertTriangle, CheckCircle2, MoreHorizontal, SlidersHorizontal, Zap, 
-  Calendar as CalendarIcon, Search, Filter, Download, MoreVertical, Coffee, RefreshCcw, PartyPopper
+  Calendar as CalendarIcon, Search, Filter, Download, MoreVertical, Coffee, RefreshCcw, PartyPopper,
+  Mail, Send
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import DraggableModal from './DraggableModal';
 
 const TimeLogs = () => {
-  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, employees, showToast, syncHolidayLogs, holidays } = useAppContext();
+  const { currentUser, projects, timeEntries, addTimeEntry, updateTimeEntry, deleteTimeEntry, employees, showToast, syncHolidayLogs, holidays, notifyMissingTimesheets } = useAppContext();
   
   // UI State
   const [showModal, setShowModal] = useState(false);
@@ -22,6 +22,7 @@ const TimeLogs = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [includeExtra, setIncludeExtra] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
   
   // View State
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
@@ -270,6 +271,32 @@ const TimeLogs = () => {
       await syncHolidayLogs(year);
   };
 
+  const handleSendReminders = async () => {
+      // Pick a date to check - usually yesterday or today. For simplicity let's use the visible month's current date logic
+      // Or better, let them pick via a prompt or default to 'yesterday'
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const targetDate = yesterday.toISOString().split('T')[0];
+      
+      // Confirmation
+      if (!window.confirm(`Send missing timesheet reminders for ${targetDate}?`)) return;
+
+      setIsSendingReminders(true);
+      try {
+          const res = await notifyMissingTimesheets(targetDate);
+          const data = await res.json();
+          if (data.success) {
+              showToast(data.message || `Emails sent to ${data.count || 0} employees.`, "success");
+          } else {
+              showToast("Failed to send reminders.", "error");
+          }
+      } catch (err) {
+          showToast("Error communicating with server.", "error");
+      } finally {
+          setIsSendingReminders(false);
+      }
+  };
+
   // --- Specialized Exports Matching User Requirement ---
 
   const formatDateLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -466,13 +493,24 @@ const TimeLogs = () => {
           
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
               {isHR && (
-                  <button 
-                    onClick={handleSyncHolidays}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-slate-50"
-                  >
-                      <RefreshCcw size={18} className="text-emerald-500" />
-                      <span>Sync Holiday Logs</span>
-                  </button>
+                  <>
+                    <button 
+                        onClick={handleSyncHolidays}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-slate-50"
+                    >
+                        <RefreshCcw size={18} className="text-emerald-500" />
+                        <span className="whitespace-nowrap">Sync Holiday Logs</span>
+                    </button>
+                    <button 
+                        onClick={handleSendReminders}
+                        disabled={isSendingReminders}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50"
+                        title="Send email reminders to employees with missing logs for yesterday"
+                    >
+                        <Mail size={18} className="text-amber-500" />
+                        <span className="whitespace-nowrap">{isSendingReminders ? 'Sending...' : 'Send Reminders'}</span>
+                    </button>
+                  </>
               )}
               <button 
                 onClick={() => { resetForm(); setShowModal(true); }}
@@ -790,7 +828,7 @@ const TimeLogs = () => {
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div>
                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Date</label>
-                       <input required type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                       <input required type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500" value={formData.date} onChange={e => setFormData({...formData,date: e.target.value})} />
                    </div>
                    <div>
                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Project</label>
