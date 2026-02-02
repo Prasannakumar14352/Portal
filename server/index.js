@@ -5,6 +5,7 @@ const sql = require('mssql');
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const cron = require('node-cron');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -84,31 +85,25 @@ const connectDb = async () => {
 };
 connectDb();
 
-// --- API Router Definition ---
-const apiRouter = express.Router();
+// --- Core Business Logic ---
 
-// 1. CUSTOM ROUTES (Must be defined BEFORE generic routes)
-
-// -- Timesheet Reminder Route --
-apiRouter.post('/notify/missing-timesheets', async (req, res) => {
-    const { targetDate } = req.body; // Expects YYYY-MM-DD
-    console.log(`[API] Checking missing timesheets for: ${targetDate}`);
+const checkAndNotifyMissingTimesheets = async (targetDate) => {
+    console.log(`[Service] Checking missing timesheets for: ${targetDate}`);
+    
+    // If DB not connected (Mock Mode fallback)
+    if (!pool) {
+        console.warn("[Service] DB not connected. Simulating email sending for mock mode.");
+        const mockHtml = `
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+                <p>Dear Demo User,</p>
+                <p>Your timesheet for ${targetDate} has not been completed...</p>
+            </div>
+        `;
+        await sendEmailAsync('demo@example.com', 'Action Required: Incomplete Timesheet', mockHtml);
+        return { success: true, message: "Mock reminders sent", count: 1 };
+    }
 
     try {
-        // If DB not connected (Mock Mode fallback logic inside the block)
-        if (!pool) {
-            console.warn("[API] DB not connected. Simulating email sending for mock mode.");
-            // Simulate sending to a demo user
-            const mockHtml = `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <p>Dear Demo User,</p>
-                    <p>Your timesheet for the below-mentioned date(s) has not been completed...</p>
-                </div>
-            `;
-            await sendEmailAsync('demo@example.com', 'Action Required: Incomplete Timesheet', mockHtml);
-            return res.json({ success: true, message: "Mock reminders sent", count: 1 });
-        }
-
         // 1. Get All Active Employees
         const empResult = await pool.request()
             .query("SELECT id, firstName, lastName, email FROM employees WHERE status = 'Active'");
@@ -132,8 +127,8 @@ apiRouter.post('/notify/missing-timesheets', async (req, res) => {
             const STANDARD_MINUTES = 480;
 
             if (totalMinutes < STANDARD_MINUTES) {
-                const hoursFilled = Math.floor(totalMinutes / 60);
-                const hoursMissing = ((STANDARD_MINUTES - totalMinutes) / 60).toFixed(1); // e.g. 8.0 or 4.5
+                const hoursFilled = (totalMinutes / 60).toFixed(1);
+                const hoursMissing = ((STANDARD_MINUTES - totalMinutes) / 60).toFixed(1);
 
                 // Construct Email Matching the Screenshot
                 const emailHtml = `
@@ -173,18 +168,48 @@ apiRouter.post('/notify/missing-timesheets', async (req, res) => {
                 sentCount++;
             }
         }
-
-        res.json({ success: true, message: `Reminders sent to ${sentCount} employees.`, count: sentCount });
-
+        return { success: true, message: `Reminders sent to ${sentCount} employees.`, count: sentCount };
     } catch (err) {
-        console.error("[API] Missing Timesheet Check Error:", err);
+        console.error("[Service] Error processing missing timesheets:", err);
+        throw err;
+    }
+};
+
+// --- Scheduled Tasks ---
+
+// Schedule: Daily at 10:00 AM (server time)
+// Checks for "Yesterday's" logs
+cron.schedule('0 10 * * *', async () => {
+    console.log('[CRON] Running Daily Timesheet Check...');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Format YYYY-MM-DD using local time components to avoid UTC shift issues
+    const y = yesterday.getFullYear();
+    const m = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const d = String(yesterday.getDate()).padStart(2, '0');
+    const targetDate = `${y}-${m}-${d}`;
+
+    await checkAndNotifyMissingTimesheets(targetDate);
+});
+
+// --- API Router Definition ---
+const apiRouter = express.Router();
+
+// 1. CUSTOM ROUTES
+
+// -- Timesheet Reminder Route (Manual Trigger) --
+apiRouter.post('/notify/missing-timesheets', async (req, res) => {
+    const { targetDate } = req.body; // Expects YYYY-MM-DD
+    try {
+        const result = await checkAndNotifyMissingTimesheets(targetDate);
+        res.json(result);
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 // -- Notification Routes --
-// Refactored to POST to avoid conflict with generic PUT /:id routes
-
 // Mark All Notifications as Read for User
 apiRouter.post('/notifications/mark-all-read', async (req, res) => {
     const { userId } = req.body;
@@ -197,7 +222,6 @@ apiRouter.post('/notifications/mark-all-read', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error("[API] Notification Read All Error:", err.message);
-        // Fallback success to unblock UI
         res.json({ success: true, mock: true }); 
     }
 });
@@ -394,5 +418,5 @@ app.use('/api', apiRouter);
 // Start Server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Routes registered. Example: POST /api/notify/missing-timesheets`);
+    console.log(`Routes registered. Cron job scheduled for 10:00 AM daily.`);
 });

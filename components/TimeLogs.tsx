@@ -272,14 +272,17 @@ const TimeLogs = () => {
   };
 
   const handleSendReminders = async () => {
-      // Pick a date to check - usually yesterday or today. For simplicity let's use the visible month's current date logic
-      // Or better, let them pick via a prompt or default to 'yesterday'
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const targetDate = yesterday.toISOString().split('T')[0];
+      
+      // Use manual formatting to get local YYYY-MM-DD to avoid UTC issues
+      const y = yesterday.getFullYear();
+      const m = String(yesterday.getMonth() + 1).padStart(2, '0');
+      const d = String(yesterday.getDate()).padStart(2, '0');
+      const targetDate = `${y}-${m}-${d}`;
       
       // Confirmation
-      if (!window.confirm(`Send missing timesheet reminders for ${targetDate}?`)) return;
+      if (!window.confirm(`Send email reminders to employees who logged less than 8 hours on ${targetDate} (Yesterday)?`)) return;
 
       setIsSendingReminders(true);
       try {
@@ -687,7 +690,7 @@ const TimeLogs = () => {
                                   <button onClick={() => handleDeleteTrigger(e.id)} className="text-slate-300 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50" title="Delete Log">
                                      <Trash2 size={15} />
                                   </button>
-                               </div>
+                                </div>
                             </td>
                           </tr>
                         );

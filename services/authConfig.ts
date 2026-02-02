@@ -1,4 +1,3 @@
-
 import { Configuration, PopupRequest, LogLevel } from "@azure/msal-browser";
 
 // --- AZURE APP CONFIGURATION ---
@@ -10,11 +9,9 @@ export const msalConfig: Configuration = {
         clientId: CLIENT_ID,
         authority: `https://login.microsoftonline.com/${TENANT_ID}`,
         redirectUri: window.location.origin,
-        navigateToLoginRequestUrl: false,
     },
     cache: {
         cacheLocation: "localStorage", 
-        storeAuthStateInCookie: true,
     },
     system: {
         allowRedirectInIframe: true,

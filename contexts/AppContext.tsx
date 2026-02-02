@@ -39,7 +39,7 @@ interface AppContextType {
   
   showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
-  refreshData: () => Promise<void>;
+  refreshData: () => Promise<any>;
 
   // Data Operations
   addEmployee: (emp: Employee) => Promise<void>;
@@ -86,8 +86,8 @@ interface AppContextType {
   markAllRead: (userId: string | number) => Promise<void>;
   notify: (message: string, userId: string | number) => Promise<void>;
 
-  addHoliday: (holiday: Holiday) => Promise<void>;
-  addHolidays: (holidays: Holiday[]) => Promise<void>;
+  addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<void>;
+  addHolidays: (holidays: Omit<Holiday, 'id'>[]) => Promise<void>;
   deleteHoliday: (id: string | number) => Promise<void>;
   syncHolidayLogs: (year: string) => Promise<void>;
 
@@ -578,8 +578,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshData();
   };
 
-  const addHoliday = async (holiday: Holiday) => { await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
-  const addHolidays = async (newHolidays: Holiday[]) => { for (const h of newHolidays) await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) }); await refreshData(); };
+  const addHoliday = async (holiday: Omit<Holiday, 'id'>) => { await db.addHoliday({ ...holiday, id: Math.random().toString(36).substr(2, 9) } as Holiday); await refreshData(); };
+  const addHolidays = async (newHolidays: Omit<Holiday, 'id'>[]) => { for (const h of newHolidays) await db.addHoliday({ ...h, id: Math.random().toString(36).substr(2, 9) } as Holiday); await refreshData(); };
   const deleteHoliday = async (id: string | number) => { await db.deleteHoliday(String(id)); await refreshData(); };
   const syncHolidayLogs = async (year: string) => { showToast(`Holiday logs synced for ${year}`, "success"); };
 

@@ -6,7 +6,7 @@ import {
   Globe, Navigation, Map as MapIcon, ChevronDown, ChevronRight, 
   Calendar, Minus, Layout, Search, Locate, Target, UserPlus, 
   RefreshCw, MapPinned, Info, Building2, LocateFixed, Loader2, Shield, UserSquare, Layers,
-  Mail, ChevronLeft, List, Grid, CheckCircle2, AlertCircle, Clock, Activity, BarChart3, ArrowLeft, UserCheck, UserMinus, Filter
+  Mail, ChevronLeft, List, Grid, CheckCircle2, AlertCircle, Clock, Activity, BarChart3, ArrowLeft, UserCheck, UserMinus, Filter, Save
 } from 'lucide-react';
 import EmployeeList from './EmployeeList';
 import DraggableModal from './DraggableModal';
@@ -460,7 +460,6 @@ const Organization = () => {
   }, [!!editingEmployee, showAddModalQuick]);
 
   const refreshMapMarkers = async (list: Employee[]) => {
-      // ... (keep existing implementation)
       if (!graphicsLayerRef.current) return;
       const [Graphic] = await loadModules(["esri/Graphic"]);
       graphicsLayerRef.current.removeAll();
@@ -516,7 +515,6 @@ const Organization = () => {
   };
 
   const focusEmployeeOnMap = (emp: Employee) => {
-      // ... (keep existing implementation)
       if (!viewInstanceRef.current || !emp.location) {
           showToast(`No location set for ${emp.firstName}.`, "warning");
           return;
@@ -529,7 +527,6 @@ const Organization = () => {
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
-      // ... (keep existing implementation)
       e.preventDefault();
       setIsProcessing(true);
       await addProject({ ...projectForm, id: Math.random().toString(36).substr(2, 9) });
@@ -540,7 +537,6 @@ const Organization = () => {
   };
 
   const handleUpdateProject = async (e: React.FormEvent) => {
-      // ... (keep existing implementation)
       e.preventDefault();
       if (!editingProject) return;
       setIsProcessing(true);
@@ -569,8 +565,7 @@ const Organization = () => {
 
                       // Notification Logic
                       const message = `You have been assigned to project: ${selectedProject.name}`;
-                      const userSettings = emp.settings || {};
-                      const notifications = userSettings.notifications || {};
+                      const notifications = emp.settings?.notifications || ({} as any);
 
                       if (notifications.pushWeb !== false) {
                           await notify(message, emp.id);
@@ -617,8 +612,7 @@ const Organization = () => {
               
               // Notify
               const message = `You have been removed from project: ${selectedProject.name}`;
-              const userSettings = emp.settings || {};
-              const notifications = userSettings.notifications || {};
+              const notifications = emp.settings?.notifications || ({} as any);
               
               if (notifications.pushWeb !== false) {
                   await notify(message, emp.id);
@@ -652,8 +646,8 @@ const Organization = () => {
                   const project = projects.find(p => String(p.id) === String(pid));
                   if (project) {
                       const message = `You have been assigned to project: ${project.name}`;
-                      const userSettings = employeeFormData.settings || {};
-                      const notifications = userSettings.notifications || {};
+                      // Safe access for potentially new formData structure
+                      const notifications = employeeFormData.settings?.notifications || ({} as any);
                       
                       if (notifications.pushWeb !== false) {
                           await notify(message, employeeFormData.id);
@@ -682,7 +676,6 @@ const Organization = () => {
   };
 
   const handlePositionSubmit = async (e: React.FormEvent) => {
-      // ... (keep existing implementation)
       e.preventDefault();
       setIsProcessing(true);
       try {
@@ -1213,310 +1206,312 @@ const Organization = () => {
                                projectDetails.taskStats.map((stat, idx) => (
                                    <div key={idx} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                                        <div className="flex items-start justify-between mb-4">
-                                           <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
-                                               <Activity size={20} />
+                                           <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                                               <Target size={20} />
                                            </div>
-                                           <span className="font-mono text-xl font-bold text-slate-800 dark:text-white">{stat.hours}h</span>
+                                           <span className="text-2xl font-black text-slate-800 dark:text-white">{stat.hours}h</span>
                                        </div>
                                        <div>
                                            <h4 className="font-bold text-slate-700 dark:text-slate-200 text-sm mb-1">{stat.name}</h4>
                                            <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (stat.hours / projectDetails.totalHours) * 100)}%` }}></div>
+                                               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (stat.hours / (projectDetails.totalHours || 1)) * 100)}%` }}></div>
                                            </div>
                                        </div>
                                    </div>
                                ))
                            ) : (
-                               <div className="col-span-full py-12 text-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-                                   <p className="text-slate-400 italic">No tasks tracked yet.</p>
-                               </div>
+                               <div className="col-span-full py-12 text-center text-slate-400 italic">No tasks tracked yet.</div>
                            )}
                        </div>
                    )}
 
                    {projectDetailTab === 'team' && (
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                           {isPowerUser && (
-                               <button 
-                                   onClick={() => { setMembersToAdd([]); setShowAddMemberModal(true); }}
-                                   className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-teal-600 hover:border-teal-200 hover:bg-teal-50/30 transition-all group min-h-[120px]"
-                               >
-                                   <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full mb-2 group-hover:bg-white shadow-sm transition-colors">
-                                       <UserPlus size={24} />
-                                   </div>
-                                   <span className="font-bold text-xs uppercase tracking-wide">Add Team Member</span>
-                               </button>
-                           )}
-
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            {projectDetails.team.map(member => (
-                               <div key={member.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:border-teal-200 dark:hover:border-teal-800 transition-colors relative group">
-                                   <img src={member.avatar} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-slate-100 dark:border-slate-700" />
-                                   <div>
-                                       <h4 className="font-bold text-slate-800 dark:text-white">{member.firstName} {member.lastName}</h4>
-                                       <p className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-tight mb-0.5">{member.position || member.role}</p>
-                                       <p className="text-[10px] text-slate-400">{member.email}</p>
+                               <div key={member.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                   <div className="flex items-center gap-3">
+                                       <img src={member.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                                       <div>
+                                           <p className="font-bold text-slate-800 dark:text-white text-sm">{member.firstName} {member.lastName}</p>
+                                           <p className="text-xs text-slate-500 dark:text-slate-400">{member.position}</p>
+                                       </div>
                                    </div>
                                    {isPowerUser && (
-                                       <button 
-                                            onClick={(e) => { e.stopPropagation(); handleRemoveMemberFromProject(member.id); }}
-                                            className="absolute top-2 right-2 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                            title="Remove from Project"
-                                       >
-                                           <UserMinus size={16} />
-                                       </button>
+                                       <button onClick={() => handleRemoveMemberFromProject(member.id)} className="text-slate-400 hover:text-red-600 p-2"><UserMinus size={16} /></button>
                                    )}
                                </div>
                            ))}
-                           
-                           {projectDetails.team.length === 0 && !isPowerUser && (
-                               <div className="col-span-full py-12 text-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-                                   <Users size={40} className="mx-auto text-slate-300 mb-3" />
-                                   <p className="text-slate-500 dark:text-slate-400">No active team members assigned.</p>
-                               </div>
+                           {isPowerUser && (
+                               <button onClick={() => setShowAddMemberModal(true)} className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-teal-600 hover:border-teal-300 transition-all">
+                                   <UserPlus size={20} />
+                                   <span className="font-bold text-sm">Add Member</span>
+                               </button>
                            )}
                        </div>
                    )}
 
                    {projectDetailTab === 'logs' && (
-                       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                           <table className="w-full text-left text-sm">
-                               <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100 dark:border-slate-700">
-                                   <tr>
-                                       <th className="px-6 py-4">Date</th>
-                                       <th className="px-6 py-4">Employee</th>
-                                       <th className="px-6 py-4">Task</th>
-                                       <th className="px-6 py-4">Description</th>
-                                       <th className="px-6 py-4 text-right">Duration</th>
-                                   </tr>
-                               </thead>
-                               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                   {projectDetails.logs.map(log => {
-                                       const user = employees.find(u => String(u.id) === String(log.userId));
-                                       return (
-                                           <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                                               <td className="px-6 py-4 font-mono text-xs text-slate-500">{log.date}</td>
-                                               <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-xs">
-                                                   {user ? `${user.firstName} ${user.lastName}` : 'Unknown'}
-                                               </td>
-                                               <td className="px-6 py-4">
-                                                   <span className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">
-                                                       {log.task}
-                                                   </span>
-                                               </td>
-                                               <td className="px-6 py-4 text-slate-500 dark:text-slate-400 max-w-xs truncate" title={log.description}>{log.description}</td>
-                                               <td className="px-6 py-4 text-right font-mono font-bold text-slate-800 dark:text-white">
-                                                   {Math.floor((log.durationMinutes + (log.extraMinutes || 0)) / 60)}h {(log.durationMinutes + (log.extraMinutes || 0)) % 60}m
-                                               </td>
-                                           </tr>
-                                       );
-                                   })}
-                                   {projectDetails.logs.length === 0 && (
-                                       <tr><td colSpan={5} className="text-center py-12 text-slate-400 italic">No activity logs recorded yet.</td></tr>
-                                   )}
-                               </tbody>
-                           </table>
+                       <div className="space-y-3">
+                           {projectDetails.logs.map(log => (
+                               <div key={log.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                   <div>
+                                       <p className="font-bold text-slate-800 dark:text-white text-sm">{log.task}</p>
+                                       <p className="text-xs text-slate-500 dark:text-slate-400">{log.description}</p>
+                                   </div>
+                                   <div className="text-right">
+                                       <p className="font-mono font-bold text-slate-700 dark:text-slate-200">{(log.durationMinutes / 60).toFixed(1)}h</p>
+                                       <p className="text-[10px] text-slate-400">{log.date}</p>
+                                   </div>
+                               </div>
+                           ))}
+                           {projectDetails.logs.length === 0 && <div className="text-center py-12 text-slate-400 italic">No activity logged.</div>}
                        </div>
                    )}
                </div>
            </div>
        )}
 
-       {activeTab === 'positions' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {positions.map(pos => (
-                   <div key={pos.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col relative group">
-                       <div className="flex items-center gap-3 mb-4">
-                           <div className="p-2.5 bg-purple-50 dark:bg-purple-900/30 rounded-xl text-purple-600 dark:text-purple-400">
-                               <Briefcase size={20} />
-                           </div>
-                           <h3 className="font-bold text-slate-800 dark:text-white">{pos.title}</h3>
-                       </div>
-                       <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-4 flex-1">{pos.description}</p>
-                       <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
-                           <span>Role ID: {pos.id}</span>
-                       </div>
-                       {isPowerUser && (
-                           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
-                               <button onClick={() => { setEditingPosition(pos); setPositionForm(pos); setShowPositionModal(true); }} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"><Edit2 size={14} /></button>
-                               <button onClick={() => deletePosition(pos.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={14} /></button>
-                           </div>
-                       )}
-                   </div>
-               ))}
-           </div>
-       )}
-
-       {activeTab === 'chart' && (
-            <div className="overflow-x-auto pb-12 pt-8 cursor-grab active:cursor-grabbing bg-slate-50 dark:bg-slate-900/30 rounded-3xl border border-slate-200 dark:border-slate-700 min-h-[600px] flex justify-center items-start shadow-inner">
-                <ul className="flex flex-row gap-12 pt-4 min-w-max px-8">
-                    {tree.map(node => <OrgChartNode key={node.id} node={node} />)}
-                </ul>
-            </div>
-       )}
-
-       {/* MODALS */}
-       <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Workforce Administration" width="max-w-7xl">
-           <EmployeeList employees={employees} onAddEmployee={addEmployee} onUpdateEmployee={updateEmployee} onDeleteEmployee={deleteEmployee} />
-       </DraggableModal>
-
-       <DraggableModal isOpen={!!editingEmployee || showAddModalQuick} onClose={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} title={editingEmployee ? "Modify Employee Profile" : "Add New Employee"} width="max-w-3xl">
-           <form onSubmit={handleUpdateEmployee} className="space-y-8">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="space-y-1.5">
-                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</label>
-                       <input required type="text" value={employeeFormData?.firstName || ''} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-                   </div>
-                   <div className="space-y-1.5">
-                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Last Name</label>
-                       <input required type="text" value={employeeFormData?.lastName || ''} onChange={e => setEmployeeFormData({...employeeFormData, lastName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-                   </div>
+       {/* Modals Section */}
+       {/* Project Modal */}
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? 'Edit Project' : 'New Project'} width="max-w-md">
+           <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label>
+                   <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} />
                </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="space-y-1.5">
-                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email</label>
-                       <input required type="email" value={employeeFormData?.email || ''} onChange={e => setEmployeeFormData({...employeeFormData, email: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-                   </div>
-                   <div className="space-y-1.5">
-                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Position / Title</label>
-                       <input type="text" value={employeeFormData?.position || ''} onChange={e => setEmployeeFormData({...employeeFormData, position: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-                   </div>
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
+                   <textarea rows={3} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} />
                </div>
-
-               <div className="space-y-1.5">
-                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">System Role</label>
-                   <select value={employeeFormData?.role || 'Employee'} onChange={e => setEmployeeFormData({...employeeFormData, role: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm">
-                       <option value="Employee">Employee</option>
-                       <option value="Team Manager">Team Manager</option>
-                       <option value="HR Manager">HR Manager</option>
-                       <option value="Admin">Admin</option>
-                   </select>
-               </div>
-
-               <div className="space-y-1.5">
-                   <div className="flex justify-between items-center">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Location (Click map to set)</label>
-                        <button type="button" onClick={() => setIsEditImagery(!isEditImagery)} className="text-[10px] font-bold text-teal-600 hover:underline">{isEditImagery ? 'Switch to Map' : 'Switch to Satellite'}</button>
-                   </div>
-                   <div className="h-64 w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 relative bg-slate-100 dark:bg-slate-900">
-                       <div ref={editMapRef} className="w-full h-full"></div>
-                   </div>
-                   <div className="flex gap-4 text-[10px] text-slate-400 font-mono pl-1">
-                       <span>LAT: {employeeFormData?.location?.latitude?.toFixed(6) || 'N/A'}</span>
-                       <span>LNG: {employeeFormData?.location?.longitude?.toFixed(6) || 'N/A'}</span>
-                   </div>
-               </div>
-
-               <div className="space-y-1.5">
-                   <MultiSelectProject 
-                       options={projects} 
-                       selectedIds={employeeFormData?.projectIds || []} 
-                       onChange={(ids) => setEmployeeFormData({...employeeFormData, projectIds: ids})} 
-                   />
-               </div>
-
-               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-700">
-                   <button type="button" onClick={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} className="px-6 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors">Cancel</button>
-                   <button type="submit" disabled={isProcessing} className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition flex items-center gap-2">
-                       {isProcessing ? <Loader2 size={16} className="animate-spin" /> : (editingEmployee ? 'Update Profile' : 'Send Invitation')}
-                   </button>
-               </div>
-           </form>
-       </DraggableModal>
-
-       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? "Modify Project" : "Create New Project"} width="max-w-2xl">
-           <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-6">
-               <div className="space-y-1.5">
-                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Name</label>
-                   <input required type="text" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="space-y-1.5">
-                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Status</label>
-                       <select value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm">
+               <div className="grid grid-cols-2 gap-4">
+                   <div>
+                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                       <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}>
                            <option value="Active">Active</option>
                            <option value="On Hold">On Hold</option>
                            <option value="Completed">Completed</option>
                        </select>
                    </div>
-                   <div className="space-y-1.5">
-                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Due Date</label>
-                       <input type="date" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
+                   <div>
+                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Due Date</label>
+                       <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} />
                    </div>
                </div>
-               <div className="space-y-1.5">
-                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Description</label>
-                   <textarea rows={4} value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-               </div>
-               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-700">
-                   <button type="button" onClick={() => setShowProjectModal(false)} className="px-6 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors">Cancel</button>
-                   <button type="submit" disabled={isProcessing} className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition flex items-center gap-2">
-                       {isProcessing ? <Loader2 size={16} className="animate-spin" /> : (editingProject ? 'Update Project' : 'Create Project')}
-                   </button>
-               </div>
-           </form>
-       </DraggableModal>
-
-       <DraggableModal isOpen={showPositionModal} onClose={() => setShowPositionModal(false)} title={editingPosition ? "Edit Position" : "Create Position"} width="max-w-md">
-           <form onSubmit={handlePositionSubmit} className="space-y-6">
-               <div className="space-y-1.5">
-                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Title</label>
-                   <input required type="text" value={positionForm.title} onChange={e => setPositionForm({...positionForm, title: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-               </div>
-               <div className="space-y-1.5">
-                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Description</label>
-                   <textarea rows={4} value={positionForm.description} onChange={e => setPositionForm({...positionForm, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 dark:text-white text-sm" />
-               </div>
-               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-700">
-                   <button type="button" onClick={() => setShowPositionModal(false)} className="px-6 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors">Cancel</button>
-                   <button type="submit" disabled={isProcessing} className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition flex items-center gap-2">
-                       {isProcessing ? <Loader2 size={16} className="animate-spin" /> : 'Save Position'}
+               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                   <button type="button" onClick={() => setShowProjectModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
+                   <button type="submit" disabled={isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition flex items-center gap-2">
+                       {isProcessing && <Loader2 size={14} className="animate-spin" />} Save Project
                    </button>
                </div>
            </form>
        </DraggableModal>
 
        {/* Add Member Modal */}
-       <DraggableModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title={`Add Members to ${selectedProject?.name}`} width="max-w-lg">
-           <div className="space-y-6">
-               <div className="bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 max-h-60 overflow-y-auto p-2">
+       <DraggableModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Add Team Members" width="max-w-md">
+           <div className="space-y-4">
+               <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl">
                    {availableEmployeesForProject.length === 0 ? (
-                       <p className="text-center text-slate-400 py-8 text-sm">All employees are already assigned.</p>
+                       <p className="p-4 text-center text-slate-400 text-sm">No available employees to add.</p>
                    ) : (
                        availableEmployeesForProject.map(emp => (
-                           <label key={emp.id} className="flex items-center gap-3 p-3 hover:bg-white dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
-                               <input 
-                                   type="checkbox" 
-                                   className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
-                                   checked={membersToAdd.includes(String(emp.id))}
-                                   onChange={(e) => {
-                                       if (e.target.checked) setMembersToAdd([...membersToAdd, String(emp.id)]);
-                                       else setMembersToAdd(membersToAdd.filter(id => id !== String(emp.id)));
-                                   }}
-                               />
-                               <div className="flex items-center gap-3">
-                                   <img src={emp.avatar} alt="" className="w-8 h-8 rounded-full bg-slate-200 object-cover" />
-                                   <div>
-                                       <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{emp.firstName} {emp.lastName}</p>
-                                       <p className="text-[10px] text-slate-400 uppercase tracking-wide">{emp.position}</p>
-                                   </div>
+                           <div key={emp.id} onClick={() => setMembersToAdd(prev => prev.includes(String(emp.id)) ? prev.filter(id => id !== String(emp.id)) : [...prev, String(emp.id)])} className={`flex items-center gap-3 p-3 cursor-pointer border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700 ${membersToAdd.includes(String(emp.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
+                               <div className={`w-4 h-4 rounded border flex items-center justify-center ${membersToAdd.includes(String(emp.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-300'}`}>
+                                   {membersToAdd.includes(String(emp.id)) && <CheckCircle2 size={10} className="text-white" />}
                                </div>
-                           </label>
+                               <div>
+                                   <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{emp.firstName} {emp.lastName}</p>
+                                   <p className="text-xs text-slate-500">{emp.position}</p>
+                               </div>
+                           </div>
                        ))
                    )}
                </div>
-               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-                   <button onClick={() => setShowAddMemberModal(false)} className="px-6 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-slate-600 transition-colors">Cancel</button>
-                   <button 
-                       onClick={handleAddMembersToProject} 
-                       disabled={isProcessing || membersToAdd.length === 0} 
-                       className="px-8 py-3 bg-teal-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                   >
-                       {isProcessing ? <Loader2 size={16} className="animate-spin" /> : `Add ${membersToAdd.length} Members`}
+               <div className="flex justify-end gap-3">
+                   <button onClick={() => setShowAddMemberModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
+                   <button onClick={handleAddMembersToProject} disabled={membersToAdd.length === 0 || isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition disabled:opacity-50">
+                       {isProcessing ? 'Adding...' : 'Add Selected'}
                    </button>
                </div>
            </div>
        </DraggableModal>
+
+       {/* Position Modal */}
+       <DraggableModal isOpen={showPositionModal} onClose={() => setShowPositionModal(false)} title={editingPosition ? 'Edit Position' : 'New Position'} width="max-w-sm">
+           <form onSubmit={handlePositionSubmit} className="space-y-4">
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
+                   <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={positionForm.title} onChange={e => setPositionForm({...positionForm, title: e.target.value})} />
+               </div>
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
+                   <textarea rows={3} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={positionForm.description} onChange={e => setPositionForm({...positionForm, description: e.target.value})} />
+               </div>
+               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                   <button type="button" onClick={() => setShowPositionModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
+                   <button type="submit" disabled={isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition">Save</button>
+               </div>
+           </form>
+       </DraggableModal>
+
+       {/* Org Chart View */}
+       {activeTab === 'chart' && (
+           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 overflow-x-auto min-h-[600px] flex justify-center">
+               <ul className="flex flex-row justify-center">
+                   {tree.map(root => (
+                       <OrgChartNode key={root.id} node={root} />
+                   ))}
+               </ul>
+           </div>
+       )}
+
+       {/* Manage Employees (Sync) Modal - Simple for now */}
+       <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Directory Management" width="max-w-md">
+           <div className="space-y-6 text-center py-6">
+               <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center text-blue-600 mb-4">
+                   <RefreshCw size={32} className={isSyncing ? "animate-spin" : ""} />
+               </div>
+               <h3 className="text-xl font-bold text-slate-800 dark:text-white">Azure Active Directory Sync</h3>
+               <p className="text-sm text-slate-500 dark:text-slate-400">
+                   Synchronize your local employee database with Microsoft Azure AD to keep records up-to-date.
+               </p>
+               <button onClick={handleSync} disabled={isSyncing} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest shadow-lg hover:bg-blue-700 transition disabled:opacity-50">
+                   {isSyncing ? 'Syncing Records...' : 'Start Synchronization'}
+               </button>
+           </div>
+       </DraggableModal>
+
+       {/* Employee Edit/Add Modal with Map */}
+       {(showAddModalQuick || editingEmployee) && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+               <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex overflow-hidden">
+                   {/* Left Panel - Form */}
+                   <div className="w-1/2 p-8 overflow-y-auto border-r border-slate-200 dark:border-slate-700">
+                       <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-3">
+                           {editingEmployee ? <Edit2 size={24} className="text-teal-600"/> : <UserPlus size={24} className="text-teal-600"/>}
+                           {editingEmployee ? 'Edit Employee Profile' : 'New Employee Entry'}
+                       </h3>
+                       
+                       <form onSubmit={handleUpdateEmployee} className="space-y-5">
+                           <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">First Name</label>
+                                   <input required type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.firstName} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} />
+                               </div>
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Last Name</label>
+                                   <input required type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.lastName} onChange={e => setEmployeeFormData({...employeeFormData, lastName: e.target.value})} />
+                               </div>
+                           </div>
+
+                           <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Email Address</label>
+                               <input required type="email" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.email} onChange={e => setEmployeeFormData({...employeeFormData, email: e.target.value})} />
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Role</label>
+                                   <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.role} onChange={e => setEmployeeFormData({...employeeFormData, role: e.target.value})}>
+                                       <option value={UserRole.EMPLOYEE}>Employee</option>
+                                       <option value={UserRole.MANAGER}>Team Manager</option>
+                                       <option value={UserRole.HR}>HR Manager</option>
+                                       <option value={UserRole.ADMIN}>Admin</option>
+                                   </select>
+                               </div>
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Designation</label>
+                                   <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.position} onChange={e => setEmployeeFormData({...employeeFormData, position: e.target.value})}>
+                                       <option value="" disabled>Select...</option>
+                                       {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                                   </select>
+                               </div>
+                           </div>
+
+                           <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Reporting Manager</label>
+                               <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.managerId || ''} onChange={e => setEmployeeFormData({...employeeFormData, managerId: e.target.value})}>
+                                   <option value="">No Manager (Top Level)</option>
+                                   {potentialManagers.map(m => <option key={m.id} value={m.id}>{m.firstName} {m.lastName} - {m.position}</option>)}
+                               </select>
+                           </div>
+
+                           <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Work Location Name</label>
+                               <input type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.workLocation || ''} onChange={e => setEmployeeFormData({...employeeFormData, workLocation: e.target.value})} placeholder="e.g. London Office" />
+                           </div>
+
+                           <MultiSelectProject 
+                               options={projects} 
+                               selectedIds={employeeFormData?.projectIds || []} 
+                               onChange={(ids) => setEmployeeFormData({...employeeFormData, projectIds: ids})} 
+                           />
+
+                           {!editingEmployee && (
+                               <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                                   <input type="checkbox" id="provAzure" checked={employeeFormData?.provisionInAzure} onChange={e => setEmployeeFormData({...employeeFormData, provisionInAzure: e.target.checked})} className="w-5 h-5 text-teal-600 rounded" />
+                                   <label htmlFor="provAzure" className="text-sm font-bold text-slate-700 dark:text-white">Auto-create Azure AD Account</label>
+                               </div>
+                           )}
+
+                           <div className="flex gap-3 pt-6 mt-4 border-t dark:border-slate-700">
+                               <button type="button" onClick={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 font-bold uppercase text-xs rounded-xl hover:bg-slate-200">Cancel</button>
+                               <button type="submit" className="flex-1 py-3 bg-teal-600 text-white font-bold uppercase text-xs rounded-xl shadow-lg hover:bg-teal-700 flex items-center justify-center gap-2">
+                                   {isProcessing ? <Loader2 className="animate-spin" /> : <Save size={16} />}
+                                   Save Record
+                               </button>
+                           </div>
+                       </form>
+                   </div>
+
+                   {/* Right Panel - Map */}
+                   <div className="w-1/2 relative bg-slate-100 dark:bg-slate-900">
+                       <div ref={editMapRef} className="w-full h-full" />
+                       
+                       <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10 pointer-events-none">
+                           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 pointer-events-auto">
+                               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Geotag Location</p>
+                               <p className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                   <MapPin size={16} className="text-teal-600" />
+                                   Click map to pin address
+                               </p>
+                           </div>
+                           <div className="flex gap-2 pointer-events-auto">
+                               <button onClick={() => setIsEditImagery(!isEditImagery)} className="p-2.5 bg-white dark:bg-slate-800 rounded-lg shadow-md hover:bg-slate-50 text-slate-600 dark:text-slate-300">
+                                   <Layers size={20} />
+                               </button>
+                           </div>
+                       </div>
+
+                       <div className="absolute bottom-6 left-6 right-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-4 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center z-10">
+                           <div className="flex items-center gap-4">
+                               <div>
+                                   <p className="text-[10px] font-bold text-slate-400 uppercase">Latitude</p>
+                                   <p className="font-mono font-bold text-slate-800 dark:text-white">{employeeFormData?.location?.latitude?.toFixed(6) || '---'}</p>
+                               </div>
+                               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
+                               <div>
+                                   <p className="text-[10px] font-bold text-slate-400 uppercase">Longitude</p>
+                                   <p className="font-mono font-bold text-slate-800 dark:text-white">{employeeFormData?.location?.longitude?.toFixed(6) || '---'}</p>
+                               </div>
+                           </div>
+                           <div className="text-right">
+                               <p className="text-[10px] font-bold text-slate-400 uppercase">Address</p>
+                               <input 
+                                   type="text" 
+                                   className="bg-transparent border-b border-slate-300 dark:border-slate-600 text-sm font-medium outline-none focus:border-teal-500 w-48 text-right"
+                                   placeholder="Type address..."
+                                   value={employeeFormData?.location?.address || ''}
+                                   onChange={e => setEmployeeFormData({
+                                       ...employeeFormData, 
+                                       location: { ...employeeFormData.location, address: e.target.value }
+                                   })}
+                               />
+                           </div>
+                       </div>
+                   </div>
+               </div>
+           </div>
+       )}
     </div>
   );
 };
