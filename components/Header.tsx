@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, LogOut, ChevronDown, User as UserIcon, Info, AlertTriangle, CheckCircle, XCircle, Menu, Moon, Sun, Settings } from 'lucide-react';
 import { User } from '../types';
@@ -12,7 +11,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuClick }) => {
-  const { notifications, markNotificationRead, markAllRead, theme, toggleTheme } = useAppContext();
+  const { notifications, markNotificationRead, markAllRead, clearAllNotifications, theme, toggleTheme } = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -90,11 +89,18 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
             <div className="absolute right-0 mt-3 w-72 md:w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-200 z-50">
               <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                 <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Notifications</h3>
-                {unreadCount > 0 && (
-                  <button onClick={() => markAllRead(user.id)} className="text-xs text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 font-medium cursor-pointer">
-                    Mark all read
-                  </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {unreadCount > 0 && (
+                      <button onClick={() => markAllRead(user.id)} className="text-xs text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 font-medium cursor-pointer">
+                        Mark read
+                      </button>
+                    )}
+                    {myNotifications.length > 0 && (
+                      <button onClick={() => clearAllNotifications(user.id)} className="text-xs text-slate-400 hover:text-red-600 font-medium cursor-pointer">
+                        Clear all
+                      </button>
+                    )}
+                </div>
               </div>
               <div className="max-h-80 overflow-y-auto scrollbar-hide">
                 {myNotifications.length === 0 ? (

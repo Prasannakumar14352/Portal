@@ -183,6 +183,10 @@ const mockDb = {
         store.notifications.forEach(n => { if(String(n.userId) === String(userId)) n.read = true; });
         return Promise.resolve();
     },
+    clearAllNotifications: async (userId: string) => {
+        store.notifications = store.notifications.filter(n => String(n.userId) !== String(userId));
+        return Promise.resolve();
+    },
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
     addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
     deleteHoliday: async (id: string) => {
@@ -264,6 +268,7 @@ const apiDb = {
   // Updated endpoints to POST
   markNotificationRead: (id: string) => api.post('/notifications/mark-read', { id }),
   markAllNotificationsRead: (userId: string) => api.post('/notifications/mark-all-read', { userId }),
+  clearAllNotifications: (userId: string) => api.post('/notifications/clear-all', { userId }),
 
   getHolidays: () => api.get('/holidays'),
   addHoliday: (holiday: Holiday) => api.post('/holidays', holiday),

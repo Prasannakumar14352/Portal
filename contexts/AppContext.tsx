@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, Position, UserRole, Invitation, LeaveStatus, UserSettings } from '../types';
+import { User, Employee, Department, Project, LeaveRequest, LeaveTypeConfig, AttendanceRecord, TimeEntry, Notification, Holiday, Payslip, Position, UserRole, Invitation, LeaveStatus, UserSettings, EmployeeStatus } from '../types';
 import { db } from '../services/db';
 import { PublicClientApplication } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from "../services/authConfig";
@@ -72,6 +73,7 @@ interface AppContextType {
   
   markNotificationRead: (id: string|number) => Promise<void>;
   markAllRead: (userId: string|number) => Promise<void>;
+  clearAllNotifications: (userId: string|number) => Promise<void>;
   notify: (message: string, userId: string|number, type?: 'info'|'success'|'warning'|'error') => Promise<void>;
   
   syncAzureUsers: () => Promise<void>;
@@ -198,7 +200,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       jobTitle: emp.jobTitle || emp.position || emp.role,
       departmentId: emp.departmentId,
       email: emp.email,
-      settings: emp.settings
+      settings: emp.settings,
+      bio: emp.bio
     } as User;
   };
 
@@ -559,6 +562,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await db.markAllNotificationsRead(String(userId));
       await refreshData();
   };
+  const clearAllNotifications = async (userId: string|number) => {
+      await db.clearAllNotifications(String(userId));
+      await refreshData();
+  };
   
   const notify = async (message: string, userId: string|number, type: 'info'|'success'|'warning'|'error' = 'info') => {
       await db.addNotification({
@@ -694,7 +701,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addLeaveType, updateLeaveType, deleteLeaveType,
       addHoliday, addHolidays, deleteHoliday,
       manualAddPayslip, updatePayslip, deletePayslip,
-      markNotificationRead, markAllRead, notify,
+      markNotificationRead, markAllRead, clearAllNotifications, notify,
       syncAzureUsers, sendProjectAssignmentEmail, syncHolidayLogs,
       toasts, showToast, removeToast,
       notifyMissingTimesheets, notifyWeeklyCompliance,

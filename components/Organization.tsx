@@ -103,6 +103,9 @@ const MultiSelectProject = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Robust check to ensure selectedIds is always an array to prevent crashes
+  const safeSelectedIds = Array.isArray(selectedIds) ? selectedIds : [];
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -115,10 +118,10 @@ const MultiSelectProject = ({
 
   const handleSelect = (id: string | number) => {
     const idStr = String(id);
-    if (selectedIds.map(String).includes(idStr)) {
-      onChange(selectedIds.filter(sid => String(sid) !== idStr));
+    if (safeSelectedIds.map(String).includes(idStr)) {
+      onChange(safeSelectedIds.filter(sid => String(sid) !== idStr));
     } else {
-      onChange([...selectedIds, id]);
+      onChange([...safeSelectedIds, id]);
     }
   };
 
@@ -129,9 +132,9 @@ const MultiSelectProject = ({
         className="w-full min-h-[46px] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 cursor-pointer bg-slate-50 dark:bg-slate-900 shadow-inner transition-all"
         onClick={() => setIsOpen(!isOpen)}
       >
-        {selectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1">No projects assigned...</span>}
+        {safeSelectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1">No projects assigned...</span>}
         <div className="flex flex-wrap gap-1.5 flex-1">
-          {selectedIds.map(id => {
+          {safeSelectedIds.map(id => {
             const proj = options.find(p => String(p.id) === String(id));
             if (!proj) return null;
             return (
@@ -148,10 +151,10 @@ const MultiSelectProject = ({
         <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-[60] p-2">
             {options.length === 0 && <p className="text-xs text-slate-400 p-2 text-center">No projects available</p>}
             {options.map(proj => (
-              <div key={proj.id} onClick={() => handleSelect(proj.id)} className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.map(String).includes(String(proj.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
+              <div key={proj.id} onClick={() => handleSelect(proj.id)} className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${safeSelectedIds.map(String).includes(String(proj.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
                 <div className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${selectedIds.map(String).includes(String(proj.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-300 dark:border-slate-600'}`}>
-                        {selectedIds.map(String).includes(String(proj.id)) && <CheckCircle2 size={10} className="text-white" />}
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${safeSelectedIds.map(String).includes(String(proj.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-300 dark:border-slate-600'}`}>
+                        {safeSelectedIds.map(String).includes(String(proj.id)) && <CheckCircle2 size={10} className="text-white" />}
                     </div>
                     <span className="text-sm font-bold text-slate-700 dark:text-white">{proj.name}</span>
                 </div>
@@ -840,7 +843,7 @@ const Organization = () => {
                                            </td>
                                            {isPowerUser && (
                                                <td className="px-6 py-4 text-right">
-                                                   <button onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: emp.projectIds || []}); }} className="p-2 text-slate-400 hover:text-teal-600 transition-colors"><Edit2 size={16} /></button>
+                                                   <button onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: getSafeProjectIds(emp)}); }} className="p-2 text-slate-400 hover:text-teal-600 transition-colors"><Edit2 size={16} /></button>
                                                </td>
                                            )}
                                        </tr>
@@ -962,7 +965,7 @@ const Organization = () => {
                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                {isPowerUser && (
                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: emp.projectIds || []}); }} 
+                                                        onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: getSafeProjectIds(emp)}); }} 
                                                         className="p-2 text-slate-400 hover:text-teal-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm border border-transparent hover:border-slate-100 dark:hover:border-slate-600 transition-all"
                                                         title="Edit Record"
                                                    >
@@ -985,6 +988,8 @@ const Organization = () => {
            </div>
        )}
 
+       {/* ... (Projects and other tabs remain mostly unchanged, just rendering based on state) ... */}
+       {/* ... Projects View ... */}
        {activeTab === 'projects' && !selectedProject && (
            <div className="space-y-6">
                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -1000,6 +1005,7 @@ const Organization = () => {
                    </div>
                    
                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                       {/* Filters ... */}
                        <div className="relative w-full sm:w-40">
                            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                            <select 
@@ -1055,6 +1061,7 @@ const Organization = () => {
                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                        {filteredProjects.map(proj => (
                            <div key={proj.id} onClick={() => setSelectedProject(proj)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-all hover:border-teal-500/50 flex flex-col h-full cursor-pointer">
+                               {/* ... Project Card Content ... */}
                                <div className="flex justify-between items-start mb-4">
                                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400">
                                        <Layout size={24} />
@@ -1106,6 +1113,7 @@ const Organization = () => {
                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                    {filteredProjects.map(proj => (
                                        <tr key={proj.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors text-sm cursor-pointer" onClick={() => setSelectedProject(proj)}>
+                                           {/* ... List Rows ... */}
                                            <td className="px-6 py-4 font-bold text-slate-800 dark:text-white flex items-center gap-3">
                                                <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
                                                    <Layout size={16} />
@@ -1145,8 +1153,10 @@ const Organization = () => {
            </div>
        )}
 
+       {/* ... Selected Project Details View ... */}
        {activeTab === 'projects' && selectedProject && projectDetails && (
            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+               {/* ... (Project detail rendering) ... */}
                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                    <button onClick={() => setSelectedProject(null)} className="hover:text-teal-600 hover:underline">Projects</button>
                    <ChevronRight size={14} />
@@ -1272,7 +1282,7 @@ const Organization = () => {
        )}
 
        {/* Modals Section */}
-       {/* Project Modal */}
+       {/* ... Project Modal, Add Member Modal, Position Modal ... */}
        <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? 'Edit Project' : 'New Project'} width="max-w-md">
            <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
                <div>
@@ -1306,7 +1316,6 @@ const Organization = () => {
            </form>
        </DraggableModal>
 
-       {/* Add Member Modal */}
        <DraggableModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Add Team Members" width="max-w-md">
            <div className="space-y-4">
                <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl">
@@ -1335,7 +1344,6 @@ const Organization = () => {
            </div>
        </DraggableModal>
 
-       {/* Position Modal */}
        <DraggableModal isOpen={showPositionModal} onClose={() => setShowPositionModal(false)} title={editingPosition ? 'Edit Position' : 'New Position'} width="max-w-sm">
            <form onSubmit={handlePositionSubmit} className="space-y-4">
                <div>
@@ -1364,7 +1372,7 @@ const Organization = () => {
            </div>
        )}
 
-       {/* Manage Employees (Sync) Modal - Simple for now */}
+       {/* Manage Employees (Sync) Modal */}
        <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Directory Management" width="max-w-md">
            <div className="space-y-6 text-center py-6">
                <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center text-blue-600 mb-4">

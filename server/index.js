@@ -341,6 +341,22 @@ apiRouter.post('/auth/reset-password', async (req, res) => {
 apiRouter.post('/notifications/mark-read', async (req, res) => res.json({ success: true }));
 apiRouter.post('/notifications/mark-all-read', async (req, res) => res.json({ success: true }));
 
+// Clear All Notifications Endpoint
+apiRouter.post('/notifications/clear-all', async (req, res) => {
+    const { userId } = req.body;
+    console.log(`[API] Clearing all notifications for user: ${userId}`);
+    try {
+        if (!pool) throw new Error('DB disconnected');
+        await pool.request()
+            .input('userId', userId)
+            .query('DELETE FROM notifications WHERE userId = @userId');
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[API] Clear All Notifications Error:", err.message);
+        res.json({ success: true, mock: true }); 
+    }
+});
+
 // Mount Generic Router
 app.use('/api', apiRouter);
 

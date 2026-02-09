@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
 import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown, Zap } from 'lucide-react';
@@ -189,10 +190,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           // Reset log form for fresh entry
           setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
           
-          // Calculate split: Standard capped at 8h (480m), rest is Extra
+          // Calculate split: Standard capped at 8h (480m)
+          // Extra is only provided if total exceeds 9 hours (540m)
           const totalMins = getDurationInMinutes(pendingRecord);
           const standard = Math.min(totalMins, 480);
-          const extra = Math.max(0, totalMins - 480);
+          const extra = Math.max(0, totalMins - 540); // Only count time after 9 hours as extra
           setLogDurationSplit({ standard, extra });
           
           setShowTimeLogModal(true);
@@ -402,6 +404,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       );
   };
 
+  const isOvertimeSession = useMemo(() => {
+      if (!pendingRecord) return false;
+      const mins = getDurationInMinutes(pendingRecord);
+      return mins > 540; // 9 hours
+  }, [pendingRecord, currentTime]);
+
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col lg:flex-row justify-between items-center gap-8">
@@ -587,10 +595,10 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                                <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{calculateDuration(pendingRecord || ({} as any))}</p>
                            </div>
                       </div>
-                      {logDurationSplit.extra > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Zap size={10}/> Overtime Detected</span>}
+                      {isOvertimeSession && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Zap size={10}/> Overtime Detected</span>}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className={`grid gap-4 ${isOvertimeSession ? 'grid-cols-2' : 'grid-cols-1'}`}>
                       <div>
                           <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Standard (Max 8h)</label>
                           <input 
@@ -600,27 +608,29 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                               readOnly 
                           /> 
                       </div>
-                      <div>
-                           <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Extra Hours</label>
-                           <div className="flex gap-2">
-                              <input 
-                                  type="number"
-                                  min="0"
-                                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
-                                  value={Math.floor(logDurationSplit.extra / 60)}
-                                  onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (parseInt(e.target.value) || 0) * 60 + (prev.extra % 60) }))}
-                              />
-                              <span className="self-center font-bold text-slate-400">:</span>
-                              <input 
-                                  type="number"
-                                  min="0"
-                                  max="59"
-                                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
-                                  value={logDurationSplit.extra % 60}
-                                  onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (Math.floor(prev.extra / 60) * 60) + (parseInt(e.target.value) || 0) }))}
-                              />
-                           </div>
-                      </div>
+                      {isOvertimeSession && (
+                        <div>
+                             <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Extra Hours</label>
+                             <div className="flex gap-2">
+                                <input 
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                    value={Math.floor(logDurationSplit.extra / 60)}
+                                    onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (parseInt(e.target.value) || 0) * 60 + (prev.extra % 60) }))}
+                                />
+                                <span className="self-center font-bold text-slate-400">:</span>
+                                <input 
+                                    type="number"
+                                    min="0"
+                                    max="59"
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                    value={logDurationSplit.extra % 60}
+                                    onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (Math.floor(prev.extra / 60) * 60) + (parseInt(e.target.value) || 0) }))}
+                                />
+                             </div>
+                        </div>
+                      )}
                   </div>
               </div>
 

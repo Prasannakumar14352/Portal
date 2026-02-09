@@ -100,6 +100,7 @@ export interface Employee {
   phone?: string;
   jobTitle?: string;
   settings?: UserSettings;
+  bio?: string;
 }
 
 export interface LeaveTypeConfig {
@@ -203,6 +204,7 @@ export interface User {
   hireDate?: string;
   email?: string; 
   settings?: UserSettings;
+  bio?: string;
 }
 
 export interface Notification {
