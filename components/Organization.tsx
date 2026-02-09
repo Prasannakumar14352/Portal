@@ -32,9 +32,12 @@ const buildOrgTree = (employees: Employee[]): TreeNode[] => {
 
 // --- Helper for Safe Project IDs ---
 const getSafeProjectIds = (emp: any): (string | number)[] => {
-    if (!emp || !emp.projectIds) return [];
+    if (!emp) return [];
+    // If projectIds doesn't exist, return empty array
+    if (!emp.projectIds) return [];
+    // If it's already an array, return it
     if (Array.isArray(emp.projectIds)) return emp.projectIds;
-    // Handle edge case where projectIds might be a single string or number
+    // If it's a single value (string/number), wrap in array
     return [emp.projectIds];
 };
 
@@ -200,7 +203,10 @@ const Organization = () => {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
   const [showPositionModal, setShowPositionModal] = useState(false);
-  const [showAddModalQuick, setShowAddModalQuick] = useState(false); 
+  
+  // -- Employee Modal State (Consolidated) --
+  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+  const [showManageMenu, setShowManageMenu] = useState(false);
   
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -213,6 +219,7 @@ const Organization = () => {
 
   const editMapRef = useRef<HTMLDivElement>(null);
   const editMapViewRef = useRef<any>(null);
+  const manageMenuRef = useRef<HTMLDivElement>(null);
 
   const [projectForm, setProjectForm] = useState({
       name: '', description: '', status: 'Active' as const, dueDate: '', tasks: [] as string[]
@@ -222,6 +229,16 @@ const Organization = () => {
 
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const tree = useMemo(() => buildOrgTree(employees), [employees]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (manageMenuRef.current && !manageMenuRef.current.contains(event.target as Node)) {
+        setShowManageMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const potentialManagers = useMemo(() => {
       return employees.filter(e => 
@@ -416,7 +433,8 @@ const Organization = () => {
 
   // Edit Modal Map Hook
   useEffect(() => {
-    if ((!editingEmployee && !showAddModalQuick) || !editMapRef.current) return;
+    // Only run if modal is visibly open AND map ref is present
+    if (!showEmployeeModal || !editMapRef.current || !employeeFormData) return;
 
     loadModules([
       "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer",
@@ -425,11 +443,16 @@ const Organization = () => {
       .then(([EsriMap, MapView, Graphic, GraphicsLayer, Home]) => {
         const initialBasemap = isEditImagery ? "satellite" : (theme === 'light' ? 'topo-vector' : 'dark-gray-vector');
         const map = new EsriMap({ basemap: initialBasemap });
+        
+        // Safety check for location data
+        const centerLon = employeeFormData?.location?.longitude || 78.9629;
+        const centerLat = employeeFormData?.location?.latitude || 20.5937;
+
         const view = new MapView({
           container: editMapRef.current!,
           map: map,
           zoom: 5,
-          center: [employeeFormData?.location?.longitude || 78.9, employeeFormData?.location?.latitude || 20.5],
+          center: [centerLon, centerLat],
           ui: { components: ["zoom"] }
         });
 
@@ -469,8 +492,13 @@ const Organization = () => {
         });
       });
 
-    return () => editMapViewRef.current?.destroy();
-  }, [!!editingEmployee, showAddModalQuick]);
+    return () => {
+        if (editMapViewRef.current) {
+            editMapViewRef.current.destroy();
+            editMapViewRef.current = null;
+        }
+    };
+  }, [showEmployeeModal]); // Depend strictly on visibility state
 
   const refreshMapMarkers = async (list: Employee[]) => {
       if (!graphicsLayerRef.current) return;
@@ -552,6 +580,24 @@ const Organization = () => {
             const matchingGraphic = graphicsLayerRef.current?.graphics?.find((g: any) => String(g.attributes.id) === String(emp.id));
             if (matchingGraphic) viewInstanceRef.current.popup.open({ features: [matchingGraphic], location: matchingGraphic.geometry });
         });
+  };
+
+  const handleEditClick = (emp: Employee) => {
+      setEditingEmployee(emp);
+      // Ensure all fields are initialized to avoid undefined errors in inputs
+      setEmployeeFormData({
+          ...emp,
+          projectIds: getSafeProjectIds(emp),
+          location: emp.location || { latitude: 20.5937, longitude: 78.9629, address: '' },
+          // Provide defaults for potentially missing fields
+          role: emp.role || UserRole.EMPLOYEE,
+          salary: emp.salary || 0,
+          position: emp.position || '',
+          managerId: emp.managerId || '',
+          workLocation: emp.workLocation || '',
+          provisionInAzure: false
+      });
+      setShowEmployeeModal(true);
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -693,11 +739,12 @@ const Organization = () => {
           }
 
           setEditingEmployee(null);
+          setShowEmployeeModal(false);
       } else {
           // It's a new employee from the quick add
           const { provisionInAzure, ...empData } = employeeFormData;
           await useAppContext().inviteEmployee(empData);
-          setShowAddModalQuick(false);
+          setShowEmployeeModal(false);
       }
       setIsProcessing(false);
       showToast("Records synchronized.", "success");
@@ -736,9 +783,10 @@ const Organization = () => {
           firstName: '', lastName: '', email: '', role: UserRole.EMPLOYEE,
           salary: 0, position: '', provisionInAzure: false, managerId: '',
           projectIds: [],
-          location: { latitude: 20.5937, longitude: 78.9629, address: '' }
+          location: { latitude: 20.5937, longitude: 78.9629, address: '' },
+          workLocation: '',
       });
-      setShowAddModalQuick(true);
+      setShowEmployeeModal(true);
   };
 
   const getInitials = (fname: string, lname: string) => {
@@ -773,8 +821,29 @@ const Organization = () => {
                 <button onClick={() => { setEditingPosition(null); setPositionForm({ title: '', description: '' }); setShowPositionModal(true); }} className="bg-teal-600 text-white px-6 py-2.5 rounded-xl hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-black shadow-lg shadow-teal-500/20"><Plus size={18} /><span>NEW POSITION</span></button>
             )}
             {activeTab === 'directory' && isPowerUser && (
-                <div className="flex gap-2">
-                    <button onClick={() => setShowManageModal(true)} className="bg-teal-600 text-white px-6 py-2.5 rounded-xl hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-black shadow-lg shadow-teal-500/20"><UserPlus size={18} /><span>MANAGE</span></button>
+                <div className="relative" ref={manageMenuRef}>
+                    <button 
+                        onClick={() => setShowManageMenu(!showManageMenu)} 
+                        className="bg-teal-600 text-white px-6 py-2.5 rounded-xl hover:bg-teal-700 transition flex items-center space-x-2 text-sm font-black shadow-lg shadow-teal-500/20"
+                    >
+                        <UserPlus size={18} /><span>MANAGE</span><ChevronDown size={14} className={`transition-transform ${showManageMenu ? 'rotate-180' : ''}`}/>
+                    </button>
+                    {showManageMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <button 
+                                onClick={() => { openQuickAdd(); setShowManageMenu(false); }} 
+                                className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors border-b dark:border-slate-700"
+                            >
+                                <Plus size={16} className="text-teal-600"/> Add Employee
+                            </button>
+                            <button 
+                                onClick={() => { setShowManageModal(true); setShowManageMenu(false); }} 
+                                className="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                            >
+                                <RefreshCw size={16} className="text-blue-600"/> Sync Directory
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
           </div>
@@ -868,7 +937,15 @@ const Organization = () => {
                                            </td>
                                            {isPowerUser && (
                                                <td className="px-6 py-4 text-right">
-                                                   <button onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: getSafeProjectIds(emp)}); }} className="p-2 text-slate-400 hover:text-teal-600 transition-colors"><Edit2 size={16} /></button>
+                                                   <button 
+                                                       onClick={(e) => { 
+                                                           e.stopPropagation(); 
+                                                           handleEditClick(emp);
+                                                       }} 
+                                                       className="p-2 text-slate-400 hover:text-teal-600 transition-colors"
+                                                   >
+                                                       <Edit2 size={16} />
+                                                   </button>
                                                </td>
                                            )}
                                        </tr>
@@ -990,7 +1067,10 @@ const Organization = () => {
                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                {isPowerUser && (
                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: getSafeProjectIds(emp)}); }} 
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            handleEditClick(emp);
+                                                        }} 
                                                         className="p-2 text-slate-400 hover:text-teal-600 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm border border-transparent hover:border-slate-100 dark:hover:border-slate-600 transition-all"
                                                         title="Edit Record"
                                                    >
@@ -1010,6 +1090,246 @@ const Organization = () => {
                        </div>
                    </div>
                )}
+           </div>
+       )}
+
+       {/* Modals Section */}
+       {/* ... Project Modal, Add Member Modal, Position Modal ... */}
+       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? 'Edit Project' : 'New Project'} width="max-w-md">
+           <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label>
+                   <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} />
+               </div>
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
+                   <textarea rows={3} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} />
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                   <div>
+                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                       <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}>
+                           <option value="Active">Active</option>
+                           <option value="On Hold">On Hold</option>
+                           <option value="Completed">Completed</option>
+                       </select>
+                   </div>
+                   <div>
+                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Due Date</label>
+                       <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} />
+                   </div>
+               </div>
+               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                   <button type="button" onClick={() => setShowProjectModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
+                   <button type="submit" disabled={isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition flex items-center gap-2">
+                       {isProcessing && <Loader2 size={14} className="animate-spin" />} Save Project
+                   </button>
+               </div>
+           </form>
+       </DraggableModal>
+
+       <DraggableModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Add Team Members" width="max-w-md">
+           <div className="space-y-4">
+               <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl">
+                   {availableEmployeesForProject.length === 0 ? (
+                       <p className="p-4 text-center text-slate-400 text-sm">No available employees to add.</p>
+                   ) : (
+                       availableEmployeesForProject.map(emp => (
+                           <div key={emp.id} onClick={() => setMembersToAdd(prev => prev.includes(String(emp.id)) ? prev.filter(id => id !== String(emp.id)) : [...prev, String(emp.id)])} className={`flex items-center gap-3 p-3 cursor-pointer border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700 ${membersToAdd.includes(String(emp.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
+                               <div className={`w-4 h-4 rounded border flex items-center justify-center ${membersToAdd.includes(String(emp.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-300'}`}>
+                                   {membersToAdd.includes(String(emp.id)) && <CheckCircle2 size={10} className="text-white" />}
+                               </div>
+                               <div>
+                                   <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{emp.firstName} {emp.lastName}</p>
+                                   <p className="text-xs text-slate-500">{emp.position}</p>
+                               </div>
+                           </div>
+                       ))
+                   )}
+               </div>
+               <div className="flex justify-end gap-3">
+                   <button onClick={() => setShowAddMemberModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
+                   <button onClick={handleAddMembersToProject} disabled={membersToAdd.length === 0 || isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition disabled:opacity-50">
+                       {isProcessing ? 'Adding...' : 'Add Selected'}
+                   </button>
+               </div>
+           </div>
+       </DraggableModal>
+
+       <DraggableModal isOpen={showPositionModal} onClose={() => setShowPositionModal(false)} title={editingPosition ? 'Edit Position' : 'New Position'} width="max-w-sm">
+           <form onSubmit={handlePositionSubmit} className="space-y-4">
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
+                   <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={positionForm.title} onChange={e => setPositionForm({...positionForm, title: e.target.value})} />
+               </div>
+               <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
+                   <textarea rows={3} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={positionForm.description} onChange={e => setPositionForm({...positionForm, description: e.target.value})} />
+               </div>
+               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
+                   <button type="button" onClick={() => setShowPositionModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
+                   <button type="submit" disabled={isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition">Save</button>
+               </div>
+           </form>
+       </DraggableModal>
+
+       {/* Org Chart View */}
+       {activeTab === 'chart' && (
+           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 overflow-x-auto min-h-[600px] flex justify-center">
+               <ul className="flex flex-row justify-center">
+                   {tree.map(root => (
+                       <OrgChartNode key={root.id} node={root} />
+                   ))}
+               </ul>
+           </div>
+       )}
+
+       {/* Manage Employees (Sync) Modal */}
+       <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Directory Management" width="max-w-md">
+           <div className="space-y-6 text-center py-6">
+               <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center text-blue-600 mb-4">
+                   <RefreshCw size={32} className={isSyncing ? "animate-spin" : ""} />
+               </div>
+               <h3 className="text-xl font-bold text-slate-800 dark:text-white">Azure Active Directory Sync</h3>
+               <p className="text-sm text-slate-500 dark:text-slate-400">
+                   Synchronize your local employee database with Microsoft Azure AD to keep records up-to-date.
+               </p>
+               <button onClick={handleSync} disabled={isSyncing} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest shadow-lg hover:bg-blue-700 transition disabled:opacity-50">
+                   {isSyncing ? 'Syncing Records...' : 'Start Synchronization'}
+               </button>
+           </div>
+       </DraggableModal>
+
+       {/* Employee Edit/Add Modal with Map - Using Explicit State Control */}
+       {(showEmployeeModal && employeeFormData) && (
+           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+               <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex overflow-hidden border border-slate-200 dark:border-slate-700">
+                   {/* Left Panel - Form */}
+                   <div className="w-1/2 p-8 overflow-y-auto border-r border-slate-200 dark:border-slate-700">
+                       <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-3">
+                           {editingEmployee ? <Edit2 size={24} className="text-teal-600"/> : <UserPlus size={24} className="text-teal-600"/>}
+                           {editingEmployee ? 'Edit Employee Profile' : 'New Employee Entry'}
+                       </h3>
+                       
+                       <form onSubmit={handleUpdateEmployee} className="space-y-5">
+                           <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">First Name</label>
+                                   <input required type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.firstName || ''} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} />
+                               </div>
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Last Name</label>
+                                   <input required type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.lastName || ''} onChange={e => setEmployeeFormData({...employeeFormData, lastName: e.target.value})} />
+                               </div>
+                           </div>
+
+                           <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Email Address</label>
+                               <input required type="email" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.email || ''} onChange={e => setEmployeeFormData({...employeeFormData, email: e.target.value})} />
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Role</label>
+                                   <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.role || UserRole.EMPLOYEE} onChange={e => setEmployeeFormData({...employeeFormData, role: e.target.value})}>
+                                       <option value={UserRole.EMPLOYEE}>Employee</option>
+                                       <option value={UserRole.MANAGER}>Team Manager</option>
+                                       <option value={UserRole.HR}>HR Manager</option>
+                                       <option value={UserRole.ADMIN}>Admin</option>
+                                   </select>
+                               </div>
+                               <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Designation</label>
+                                   <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.position || ''} onChange={e => setEmployeeFormData({...employeeFormData, position: e.target.value})}>
+                                       <option value="" disabled>Select...</option>
+                                       {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                                   </select>
+                               </div>
+                           </div>
+
+                           <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Reporting Manager</label>
+                               <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.managerId || ''} onChange={e => setEmployeeFormData({...employeeFormData, managerId: e.target.value})}>
+                                   <option value="">No Manager (Top Level)</option>
+                                   {potentialManagers.map(m => <option key={m.id} value={m.id}>{m.firstName} {m.lastName} - {m.position}</option>)}
+                               </select>
+                           </div>
+
+                           <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Work Location Name</label>
+                               <input type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.workLocation || ''} onChange={e => setEmployeeFormData({...employeeFormData, workLocation: e.target.value})} placeholder="e.g. London Office" />
+                           </div>
+
+                           <MultiSelectProject 
+                               options={projects} 
+                               selectedIds={employeeFormData?.projectIds || []} 
+                               onChange={(ids) => setEmployeeFormData({...employeeFormData, projectIds: ids})} 
+                           />
+
+                           {!editingEmployee && (
+                               <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                                   <input type="checkbox" id="provAzure" checked={employeeFormData?.provisionInAzure || false} onChange={e => setEmployeeFormData({...employeeFormData, provisionInAzure: e.target.checked})} className="w-5 h-5 text-teal-600 rounded" />
+                                   <label htmlFor="provAzure" className="text-sm font-bold text-slate-700 dark:text-white">Auto-create Azure AD Account</label>
+                               </div>
+                           )}
+
+                           <div className="flex gap-3 pt-6 mt-4 border-t dark:border-slate-700">
+                               <button type="button" onClick={() => { setEditingEmployee(null); setShowEmployeeModal(false); }} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 font-bold uppercase text-xs rounded-xl hover:bg-slate-200">Cancel</button>
+                               <button type="submit" className="flex-1 py-3 bg-teal-600 text-white font-bold uppercase text-xs rounded-xl shadow-lg hover:bg-teal-700 flex items-center justify-center gap-2">
+                                   {isProcessing ? <Loader2 className="animate-spin" /> : <Save size={16} />}
+                                   Save Record
+                               </button>
+                           </div>
+                       </form>
+                   </div>
+
+                   {/* Right Panel - Map */}
+                   <div className="w-1/2 relative bg-slate-100 dark:bg-slate-900">
+                       <div ref={editMapRef} className="w-full h-full" />
+                       
+                       <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10 pointer-events-none">
+                           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 pointer-events-auto">
+                               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Geotag Location</p>
+                               <p className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                   <MapPin size={16} className="text-teal-600" />
+                                   Click map to pin address
+                               </p>
+                           </div>
+                           <div className="flex gap-2 pointer-events-auto">
+                               <button onClick={() => setIsEditImagery(!isEditImagery)} className="p-2.5 bg-white dark:bg-slate-800 rounded-lg shadow-md hover:bg-slate-50 text-slate-600 dark:text-slate-300">
+                                   <Layers size={20} />
+                               </button>
+                           </div>
+                       </div>
+
+                       <div className="absolute bottom-6 left-6 right-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-4 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center z-10">
+                           <div className="flex items-center gap-4">
+                               <div>
+                                   <p className="text-[10px] font-bold text-slate-400 uppercase">Latitude</p>
+                                   <p className="font-mono font-bold text-slate-800 dark:text-white">{employeeFormData?.location?.latitude?.toFixed(6) || '---'}</p>
+                               </div>
+                               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
+                               <div>
+                                   <p className="text-[10px] font-bold text-slate-400 uppercase">Longitude</p>
+                                   <p className="font-mono font-bold text-slate-800 dark:text-white">{employeeFormData?.location?.longitude?.toFixed(6) || '---'}</p>
+                               </div>
+                           </div>
+                           <div className="text-right">
+                               <p className="text-[10px] font-bold text-slate-400 uppercase">Address</p>
+                               <input 
+                                   type="text" 
+                                   className="bg-transparent border-b border-slate-300 dark:border-slate-600 text-sm font-medium outline-none focus:border-teal-500 w-48 text-right"
+                                   placeholder="Type address..."
+                                   value={employeeFormData?.location?.address || ''}
+                                   onChange={e => setEmployeeFormData({
+                                       ...employeeFormData, 
+                                       location: { ...employeeFormData.location, address: e.target.value }
+                                   })}
+                               />
+                           </div>
+                       </div>
+                   </div>
+               </div>
            </div>
        )}
     </div>
