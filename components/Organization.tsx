@@ -193,6 +193,8 @@ const Organization = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
   const graphicsLayerRef = useRef<any>(null);
+  const GraphicClassRef = useRef<any>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // Modal State
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -355,11 +357,17 @@ const Organization = () => {
   useEffect(() => {
     if (activeTab !== 'directory' || directoryView !== 'map' || !mapContainerRef.current) return;
 
+    // Reset map ready state when remounting
+    setIsMapReady(false);
+
     loadModules([
       "esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", 
       "esri/widgets/Home"
     ], { css: true }).then(([EsriMap, MapView, Graphic, GraphicsLayer, Home]) => {
         if (!mapContainerRef.current) return;
+
+        // Store Graphic class for later use
+        GraphicClassRef.current = Graphic;
 
         const initialBasemap = isImagery ? "satellite" : (theme === 'light' ? 'topo-vector' : 'dark-gray-vector');
         
@@ -384,7 +392,8 @@ const Organization = () => {
 
         view.when(() => {
             (view.ui as any).add(new Home({ view: view }));
-            refreshMapMarkers(filteredDirectoryEmployees);
+            // Mark map as ready to trigger marker sync
+            setIsMapReady(true);
         }).catch((err: any) => console.error("Map initialization failed", err));
     }).catch(err => console.error("ArcGIS load failed:", err));
 
@@ -393,16 +402,17 @@ const Organization = () => {
             viewInstanceRef.current.destroy();
             viewInstanceRef.current = null;
             graphicsLayerRef.current = null;
+            setIsMapReady(false);
         }
     };
   }, [activeTab, directoryView]);
 
-  // Sync Markers effect
+  // Sync Markers effect - Now depends on isMapReady to ensure layer exists
   useEffect(() => {
-    if (activeTab === 'directory' && directoryView === 'map' && graphicsLayerRef.current) {
+    if (activeTab === 'directory' && directoryView === 'map' && isMapReady && graphicsLayerRef.current) {
         refreshMapMarkers(filteredDirectoryEmployees);
     }
-  }, [filteredDirectoryEmployees, activeTab, directoryView]);
+  }, [filteredDirectoryEmployees, activeTab, directoryView, isMapReady]);
 
   // Edit Modal Map Hook
   useEffect(() => {
@@ -464,7 +474,22 @@ const Organization = () => {
 
   const refreshMapMarkers = async (list: Employee[]) => {
       if (!graphicsLayerRef.current) return;
-      const [Graphic] = await loadModules(["esri/Graphic"]);
+      
+      let Graphic = GraphicClassRef.current;
+      if (!Graphic) {
+          try {
+            const [LoadedGraphic] = await loadModules(["esri/Graphic"]);
+            Graphic = LoadedGraphic;
+            GraphicClassRef.current = LoadedGraphic;
+          } catch(e) {
+            console.error("Failed to load Graphic module", e);
+            return;
+          }
+      }
+      
+      // Ensure layer still exists after async load
+      if (!graphicsLayerRef.current) return;
+
       graphicsLayerRef.current.removeAll();
       
       list.forEach(emp => {
@@ -985,539 +1010,6 @@ const Organization = () => {
                        </div>
                    </div>
                )}
-           </div>
-       )}
-
-       {/* ... (Projects and other tabs remain mostly unchanged, just rendering based on state) ... */}
-       {/* ... Projects View ... */}
-       {activeTab === 'projects' && !selectedProject && (
-           <div className="space-y-6">
-               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                    <div className="relative w-full lg:w-64">
-                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                       <input 
-                           type="text" 
-                           placeholder="Search projects..." 
-                           value={projectSearch}
-                           onChange={(e) => setProjectSearch(e.target.value)}
-                           className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all font-medium dark:text-white shadow-sm"
-                       />
-                   </div>
-                   
-                   <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                       {/* Filters ... */}
-                       <div className="relative w-full sm:w-40">
-                           <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                           <select 
-                               value={projectStatusFilter}
-                               onChange={(e) => setProjectStatusFilter(e.target.value)}
-                               className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none appearance-none font-medium text-slate-600 dark:text-slate-300 shadow-sm cursor-pointer"
-                           >
-                               <option value="All">All Status</option>
-                               <option value="Active">Active</option>
-                               <option value="On Hold">On Hold</option>
-                               <option value="Completed">Completed</option>
-                           </select>
-                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                       </div>
-
-                       <div className="relative w-full sm:w-48">
-                           <UserSquare className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                           <select 
-                               value={projectEmployeeFilter}
-                               onChange={(e) => setProjectEmployeeFilter(e.target.value)}
-                               className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none appearance-none font-medium text-slate-600 dark:text-slate-300 shadow-sm cursor-pointer"
-                           >
-                               <option value="All">All Employees</option>
-                               {employees
-                                   .sort((a, b) => a.firstName.localeCompare(b.firstName))
-                                   .map(emp => (
-                                       <option key={emp.id} value={String(emp.id)}>{emp.firstName} {emp.lastName}</option>
-                               ))}
-                           </select>
-                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                       </div>
-
-                       <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
-                           <button 
-                               onClick={() => setProjectView('card')} 
-                               className={`p-2 rounded-lg transition-all ${projectView === 'card' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
-                               title="Card View"
-                           >
-                               <Grid size={18} />
-                           </button>
-                           <button 
-                               onClick={() => setProjectView('list')} 
-                               className={`p-2 rounded-lg transition-all ${projectView === 'list' ? 'bg-white dark:bg-slate-700 shadow text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}
-                               title="List View"
-                           >
-                               <List size={18} />
-                           </button>
-                       </div>
-                   </div>
-               </div>
-
-               {projectView === 'card' ? (
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                       {filteredProjects.map(proj => (
-                           <div key={proj.id} onClick={() => setSelectedProject(proj)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-all hover:border-teal-500/50 flex flex-col h-full cursor-pointer">
-                               {/* ... Project Card Content ... */}
-                               <div className="flex justify-between items-start mb-4">
-                                   <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400">
-                                       <Layout size={24} />
-                                   </div>
-                                   <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${proj.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                       {proj.status}
-                                   </span>
-                               </div>
-                               <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2 line-clamp-1">{proj.name}</h3>
-                               <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 flex-1 line-clamp-3 leading-relaxed">{proj.description}</p>
-                               
-                               <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-700">
-                                   <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-                                       <Clock size={14} />
-                                       <span>{proj.dueDate || 'No Deadline'}</span>
-                                   </div>
-                                   {isPowerUser && (
-                                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                           <button onClick={(e) => { e.stopPropagation(); setEditingProject(proj); setProjectForm(proj as any); setShowProjectModal(true); }} className="p-2 text-slate-400 hover:text-blue-600 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-blue-50 transition-colors"><Edit2 size={14} /></button>
-                                           <button onClick={(e) => { e.stopPropagation(); if(window.confirm('Delete project?')) deleteProject(proj.id); }} className="p-2 text-slate-400 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
-                                       </div>
-                                   )}
-                               </div>
-                           </div>
-                       ))}
-                       {isPowerUser && (
-                           <button onClick={() => setShowProjectModal(true)} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-slate-400 hover:text-teal-600 hover:border-teal-200 hover:bg-teal-50/30 transition-all group min-h-[250px]">
-                               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full mb-3 group-hover:bg-white shadow-sm transition-colors">
-                                   <Plus size={32} />
-                               </div>
-                               <span className="font-bold text-sm">Launch New Project</span>
-                           </button>
-                       )}
-                   </div>
-               ) : (
-                   <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                       <div className="overflow-x-auto">
-                           <table className="w-full text-left">
-                               <thead>
-                                   <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b dark:border-slate-700">
-                                       <th className="px-6 py-4">Project Name</th>
-                                       <th className="px-6 py-4">Status</th>
-                                       <th className="px-6 py-4">Tasks</th>
-                                       <th className="px-6 py-4">Due Date</th>
-                                       <th className="px-6 py-4">Description</th>
-                                       {isPowerUser && <th className="px-6 py-4 text-right">Actions</th>}
-                                   </tr>
-                               </thead>
-                               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                   {filteredProjects.map(proj => (
-                                       <tr key={proj.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors text-sm cursor-pointer" onClick={() => setSelectedProject(proj)}>
-                                           {/* ... List Rows ... */}
-                                           <td className="px-6 py-4 font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                                               <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
-                                                   <Layout size={16} />
-                                               </div>
-                                               {proj.name}
-                                           </td>
-                                           <td className="px-6 py-4">
-                                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${proj.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                   {proj.status}
-                                               </span>
-                                           </td>
-                                           <td className="px-6 py-4 text-slate-600 dark:text-slate-400 font-medium text-xs">
-                                               {Array.isArray(proj.tasks) ? proj.tasks.length : 0} defined
-                                           </td>
-                                           <td className="px-6 py-4 font-mono text-xs text-slate-500">{proj.dueDate || 'N/A'}</td>
-                                           <td className="px-6 py-4 text-slate-500 dark:text-slate-400 max-w-xs truncate" title={proj.description}>{proj.description}</td>
-                                           {isPowerUser && (
-                                               <td className="px-6 py-4 text-right">
-                                                   <div className="flex justify-end gap-2">
-                                                       <button onClick={(e) => { e.stopPropagation(); setEditingProject(proj); setProjectForm(proj as any); setShowProjectModal(true); }} className="p-2 text-slate-400 hover:text-blue-600 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-blue-200 transition-all"><Edit2 size={14} /></button>
-                                                       <button onClick={(e) => { e.stopPropagation(); if(window.confirm('Delete project?')) deleteProject(proj.id); }} className="p-2 text-slate-400 hover:text-red-600 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-red-200 transition-all"><Trash2 size={14} /></button>
-                                                   </div>
-                                               </td>
-                                           )}
-                                       </tr>
-                                   ))}
-                                   {filteredProjects.length === 0 && (
-                                       <tr>
-                                           <td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">No projects found.</td>
-                                       </tr>
-                                   )}
-                               </tbody>
-                           </table>
-                       </div>
-                   </div>
-               )}
-           </div>
-       )}
-
-       {/* ... Selected Project Details View ... */}
-       {activeTab === 'projects' && selectedProject && projectDetails && (
-           <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-               {/* ... (Project detail rendering) ... */}
-               <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                   <button onClick={() => setSelectedProject(null)} className="hover:text-teal-600 hover:underline">Projects</button>
-                   <ChevronRight size={14} />
-                   <span className="font-bold text-slate-800 dark:text-white truncate">{selectedProject.name}</span>
-               </div>
-
-               <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 dark:bg-teal-900/10 rounded-bl-full -mr-8 -mt-8"></div>
-                   
-                   <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                       <div className="space-y-2">
-                           <div className="flex items-center gap-3">
-                               <div className="p-3 bg-teal-50 dark:bg-teal-900/30 rounded-xl text-teal-600 dark:text-teal-400">
-                                   <Layout size={28} />
-                               </div>
-                               <div>
-                                   <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">{selectedProject.name}</h2>
-                                   <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${selectedProject.status === 'Active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
-                                       {selectedProject.status}
-                                   </span>
-                               </div>
-                           </div>
-                           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-2xl leading-relaxed">
-                               {selectedProject.description || 'No specific description provided for this project.'}
-                           </p>
-                           <div className="flex items-center gap-4 pt-2">
-                               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                   <Clock size={14} />
-                                   <span>Due: {selectedProject.dueDate || 'No Deadline'}</span>
-                               </div>
-                           </div>
-                       </div>
-
-                       <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700 text-right min-w-[140px]">
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Effort</p>
-                           <p className="text-3xl font-black text-slate-800 dark:text-white">{projectDetails.totalHours} <span className="text-sm font-bold text-slate-400">hrs</span></p>
-                       </div>
-                   </div>
-               </div>
-
-               <div className="flex border-b border-slate-200 dark:border-slate-700">
-                   {['tasks', 'team', 'logs'].map(tab => (
-                       <button
-                           key={tab}
-                           onClick={() => setProjectDetailTab(tab as any)}
-                           className={`px-6 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${projectDetailTab === tab ? 'border-teal-500 text-teal-600 dark:text-teal-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                       >
-                           {tab === 'logs' ? 'Activity Log' : tab === 'team' ? 'Project Team' : 'Tasks Overview'}
-                       </button>
-                   ))}
-               </div>
-
-               <div className="min-h-[400px]">
-                   {projectDetailTab === 'tasks' && (
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                           {projectDetails.taskStats.length > 0 ? (
-                               projectDetails.taskStats.map((stat, idx) => (
-                                   <div key={idx} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                                       <div className="flex items-start justify-between mb-4">
-                                           <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
-                                               <Target size={20} />
-                                           </div>
-                                           <span className="text-2xl font-black text-slate-800 dark:text-white">{stat.hours}h</span>
-                                       </div>
-                                       <div>
-                                           <h4 className="font-bold text-slate-700 dark:text-slate-200 text-sm mb-1">{stat.name}</h4>
-                                           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (stat.hours / (projectDetails.totalHours || 1)) * 100)}%` }}></div>
-                                           </div>
-                                       </div>
-                                   </div>
-                               ))
-                           ) : (
-                               <div className="col-span-full py-12 text-center text-slate-400 italic">No tasks tracked yet.</div>
-                           )}
-                       </div>
-                   )}
-
-                   {projectDetailTab === 'team' && (
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           {projectDetails.team.map(member => (
-                               <div key={member.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-                                   <div className="flex items-center gap-3">
-                                       <img src={member.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
-                                       <div>
-                                           <p className="font-bold text-slate-800 dark:text-white text-sm">{member.firstName} {member.lastName}</p>
-                                           <p className="text-xs text-slate-500 dark:text-slate-400">{member.position}</p>
-                                       </div>
-                                   </div>
-                                   {isPowerUser && (
-                                       <button onClick={() => handleRemoveMemberFromProject(member.id)} className="text-slate-400 hover:text-red-600 p-2"><UserMinus size={16} /></button>
-                                   )}
-                               </div>
-                           ))}
-                           {isPowerUser && (
-                               <button onClick={() => setShowAddMemberModal(true)} className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-teal-600 hover:border-teal-300 transition-all">
-                                   <UserPlus size={20} />
-                                   <span className="font-bold text-sm">Add Member</span>
-                               </button>
-                           )}
-                       </div>
-                   )}
-
-                   {projectDetailTab === 'logs' && (
-                       <div className="space-y-3">
-                           {projectDetails.logs.map(log => (
-                               <div key={log.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-                                   <div>
-                                       <p className="font-bold text-slate-800 dark:text-white text-sm">{log.task}</p>
-                                       <p className="text-xs text-slate-500 dark:text-slate-400">{log.description}</p>
-                                   </div>
-                                   <div className="text-right">
-                                       <p className="font-mono font-bold text-slate-700 dark:text-slate-200">{(log.durationMinutes / 60).toFixed(1)}h</p>
-                                       <p className="text-[10px] text-slate-400">{log.date}</p>
-                                   </div>
-                               </div>
-                           ))}
-                           {projectDetails.logs.length === 0 && <div className="text-center py-12 text-slate-400 italic">No activity logged.</div>}
-                       </div>
-                   )}
-               </div>
-           </div>
-       )}
-
-       {/* Modals Section */}
-       {/* ... Project Modal, Add Member Modal, Position Modal ... */}
-       <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? 'Edit Project' : 'New Project'} width="max-w-md">
-           <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
-               <div>
-                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label>
-                   <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} />
-               </div>
-               <div>
-                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
-                   <textarea rows={3} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} />
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                   <div>
-                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                       <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status: e.target.value as any})}>
-                           <option value="Active">Active</option>
-                           <option value="On Hold">On Hold</option>
-                           <option value="Completed">Completed</option>
-                       </select>
-                   </div>
-                   <div>
-                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Due Date</label>
-                       <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={projectForm.dueDate} onChange={e => setProjectForm({...projectForm, dueDate: e.target.value})} />
-                   </div>
-               </div>
-               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
-                   <button type="button" onClick={() => setShowProjectModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
-                   <button type="submit" disabled={isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition flex items-center gap-2">
-                       {isProcessing && <Loader2 size={14} className="animate-spin" />} Save Project
-                   </button>
-               </div>
-           </form>
-       </DraggableModal>
-
-       <DraggableModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Add Team Members" width="max-w-md">
-           <div className="space-y-4">
-               <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl">
-                   {availableEmployeesForProject.length === 0 ? (
-                       <p className="p-4 text-center text-slate-400 text-sm">No available employees to add.</p>
-                   ) : (
-                       availableEmployeesForProject.map(emp => (
-                           <div key={emp.id} onClick={() => setMembersToAdd(prev => prev.includes(String(emp.id)) ? prev.filter(id => id !== String(emp.id)) : [...prev, String(emp.id)])} className={`flex items-center gap-3 p-3 cursor-pointer border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700 ${membersToAdd.includes(String(emp.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
-                               <div className={`w-4 h-4 rounded border flex items-center justify-center ${membersToAdd.includes(String(emp.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-300'}`}>
-                                   {membersToAdd.includes(String(emp.id)) && <CheckCircle2 size={10} className="text-white" />}
-                               </div>
-                               <div>
-                                   <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{emp.firstName} {emp.lastName}</p>
-                                   <p className="text-xs text-slate-500">{emp.position}</p>
-                               </div>
-                           </div>
-                       ))
-                   )}
-               </div>
-               <div className="flex justify-end gap-3">
-                   <button onClick={() => setShowAddMemberModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
-                   <button onClick={handleAddMembersToProject} disabled={membersToAdd.length === 0 || isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition disabled:opacity-50">
-                       {isProcessing ? 'Adding...' : 'Add Selected'}
-                   </button>
-               </div>
-           </div>
-       </DraggableModal>
-
-       <DraggableModal isOpen={showPositionModal} onClose={() => setShowPositionModal(false)} title={editingPosition ? 'Edit Position' : 'New Position'} width="max-w-sm">
-           <form onSubmit={handlePositionSubmit} className="space-y-4">
-               <div>
-                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
-                   <input required type="text" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={positionForm.title} onChange={e => setPositionForm({...positionForm, title: e.target.value})} />
-               </div>
-               <div>
-                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
-                   <textarea rows={3} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={positionForm.description} onChange={e => setPositionForm({...positionForm, description: e.target.value})} />
-               </div>
-               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
-                   <button type="button" onClick={() => setShowPositionModal(false)} className="px-4 py-2 text-slate-500 font-bold text-xs uppercase">Cancel</button>
-                   <button type="submit" disabled={isProcessing} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-xs uppercase shadow-lg hover:bg-teal-700 transition">Save</button>
-               </div>
-           </form>
-       </DraggableModal>
-
-       {/* Org Chart View */}
-       {activeTab === 'chart' && (
-           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 overflow-x-auto min-h-[600px] flex justify-center">
-               <ul className="flex flex-row justify-center">
-                   {tree.map(root => (
-                       <OrgChartNode key={root.id} node={root} />
-                   ))}
-               </ul>
-           </div>
-       )}
-
-       {/* Manage Employees (Sync) Modal */}
-       <DraggableModal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title="Directory Management" width="max-w-md">
-           <div className="space-y-6 text-center py-6">
-               <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center text-blue-600 mb-4">
-                   <RefreshCw size={32} className={isSyncing ? "animate-spin" : ""} />
-               </div>
-               <h3 className="text-xl font-bold text-slate-800 dark:text-white">Azure Active Directory Sync</h3>
-               <p className="text-sm text-slate-500 dark:text-slate-400">
-                   Synchronize your local employee database with Microsoft Azure AD to keep records up-to-date.
-               </p>
-               <button onClick={handleSync} disabled={isSyncing} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold uppercase tracking-widest shadow-lg hover:bg-blue-700 transition disabled:opacity-50">
-                   {isSyncing ? 'Syncing Records...' : 'Start Synchronization'}
-               </button>
-           </div>
-       </DraggableModal>
-
-       {/* Employee Edit/Add Modal with Map */}
-       {(showAddModalQuick || editingEmployee) && (
-           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-               <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex overflow-hidden">
-                   {/* Left Panel - Form */}
-                   <div className="w-1/2 p-8 overflow-y-auto border-r border-slate-200 dark:border-slate-700">
-                       <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-3">
-                           {editingEmployee ? <Edit2 size={24} className="text-teal-600"/> : <UserPlus size={24} className="text-teal-600"/>}
-                           {editingEmployee ? 'Edit Employee Profile' : 'New Employee Entry'}
-                       </h3>
-                       
-                       <form onSubmit={handleUpdateEmployee} className="space-y-5">
-                           <div className="grid grid-cols-2 gap-4">
-                               <div className="space-y-1.5">
-                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">First Name</label>
-                                   <input required type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.firstName} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} />
-                               </div>
-                               <div className="space-y-1.5">
-                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Last Name</label>
-                                   <input required type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.lastName} onChange={e => setEmployeeFormData({...employeeFormData, lastName: e.target.value})} />
-                               </div>
-                           </div>
-
-                           <div className="space-y-1.5">
-                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Email Address</label>
-                               <input required type="email" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.email} onChange={e => setEmployeeFormData({...employeeFormData, email: e.target.value})} />
-                           </div>
-
-                           <div className="grid grid-cols-2 gap-4">
-                               <div className="space-y-1.5">
-                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Role</label>
-                                   <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.role} onChange={e => setEmployeeFormData({...employeeFormData, role: e.target.value})}>
-                                       <option value={UserRole.EMPLOYEE}>Employee</option>
-                                       <option value={UserRole.MANAGER}>Team Manager</option>
-                                       <option value={UserRole.HR}>HR Manager</option>
-                                       <option value={UserRole.ADMIN}>Admin</option>
-                                   </select>
-                               </div>
-                               <div className="space-y-1.5">
-                                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Designation</label>
-                                   <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.position} onChange={e => setEmployeeFormData({...employeeFormData, position: e.target.value})}>
-                                       <option value="" disabled>Select...</option>
-                                       {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
-                                   </select>
-                               </div>
-                           </div>
-
-                           <div className="space-y-1.5">
-                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Reporting Manager</label>
-                               <select className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.managerId || ''} onChange={e => setEmployeeFormData({...employeeFormData, managerId: e.target.value})}>
-                                   <option value="">No Manager (Top Level)</option>
-                                   {potentialManagers.map(m => <option key={m.id} value={m.id}>{m.firstName} {m.lastName} - {m.position}</option>)}
-                               </select>
-                           </div>
-
-                           <div className="space-y-1.5">
-                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Work Location Name</label>
-                               <input type="text" className="w-full px-4 py-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={employeeFormData?.workLocation || ''} onChange={e => setEmployeeFormData({...employeeFormData, workLocation: e.target.value})} placeholder="e.g. London Office" />
-                           </div>
-
-                           <MultiSelectProject 
-                               options={projects} 
-                               selectedIds={employeeFormData?.projectIds || []} 
-                               onChange={(ids) => setEmployeeFormData({...employeeFormData, projectIds: ids})} 
-                           />
-
-                           {!editingEmployee && (
-                               <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
-                                   <input type="checkbox" id="provAzure" checked={employeeFormData?.provisionInAzure} onChange={e => setEmployeeFormData({...employeeFormData, provisionInAzure: e.target.checked})} className="w-5 h-5 text-teal-600 rounded" />
-                                   <label htmlFor="provAzure" className="text-sm font-bold text-slate-700 dark:text-white">Auto-create Azure AD Account</label>
-                               </div>
-                           )}
-
-                           <div className="flex gap-3 pt-6 mt-4 border-t dark:border-slate-700">
-                               <button type="button" onClick={() => { setEditingEmployee(null); setShowAddModalQuick(false); }} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 font-bold uppercase text-xs rounded-xl hover:bg-slate-200">Cancel</button>
-                               <button type="submit" className="flex-1 py-3 bg-teal-600 text-white font-bold uppercase text-xs rounded-xl shadow-lg hover:bg-teal-700 flex items-center justify-center gap-2">
-                                   {isProcessing ? <Loader2 className="animate-spin" /> : <Save size={16} />}
-                                   Save Record
-                               </button>
-                           </div>
-                       </form>
-                   </div>
-
-                   {/* Right Panel - Map */}
-                   <div className="w-1/2 relative bg-slate-100 dark:bg-slate-900">
-                       <div ref={editMapRef} className="w-full h-full" />
-                       
-                       <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10 pointer-events-none">
-                           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 pointer-events-auto">
-                               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Geotag Location</p>
-                               <p className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                                   <MapPin size={16} className="text-teal-600" />
-                                   Click map to pin address
-                               </p>
-                           </div>
-                           <div className="flex gap-2 pointer-events-auto">
-                               <button onClick={() => setIsEditImagery(!isEditImagery)} className="p-2.5 bg-white dark:bg-slate-800 rounded-lg shadow-md hover:bg-slate-50 text-slate-600 dark:text-slate-300">
-                                   <Layers size={20} />
-                               </button>
-                           </div>
-                       </div>
-
-                       <div className="absolute bottom-6 left-6 right-6 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-4 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center z-10">
-                           <div className="flex items-center gap-4">
-                               <div>
-                                   <p className="text-[10px] font-bold text-slate-400 uppercase">Latitude</p>
-                                   <p className="font-mono font-bold text-slate-800 dark:text-white">{employeeFormData?.location?.latitude?.toFixed(6) || '---'}</p>
-                               </div>
-                               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
-                               <div>
-                                   <p className="text-[10px] font-bold text-slate-400 uppercase">Longitude</p>
-                                   <p className="font-mono font-bold text-slate-800 dark:text-white">{employeeFormData?.location?.longitude?.toFixed(6) || '---'}</p>
-                               </div>
-                           </div>
-                           <div className="text-right">
-                               <p className="text-[10px] font-bold text-slate-400 uppercase">Address</p>
-                               <input 
-                                   type="text" 
-                                   className="bg-transparent border-b border-slate-300 dark:border-slate-600 text-sm font-medium outline-none focus:border-teal-500 w-48 text-right"
-                                   placeholder="Type address..."
-                                   value={employeeFormData?.location?.address || ''}
-                                   onChange={e => setEmployeeFormData({
-                                       ...employeeFormData, 
-                                       location: { ...employeeFormData.location, address: e.target.value }
-                                   })}
-                               />
-                           </div>
-                       </div>
-                   </div>
-               </div>
            </div>
        )}
     </div>
