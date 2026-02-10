@@ -41,6 +41,28 @@ const getSafeProjectIds = (emp: any): (string | number)[] => {
     return [emp.projectIds];
 };
 
+// --- Helper for Robust Location Parsing ---
+const parseLocation = (loc: any) => {
+    const defaultLoc = { latitude: 20.5937, longitude: 78.9629, address: '' };
+    if (!loc) return defaultLoc;
+    
+    let parsed = loc;
+    if (typeof loc === 'string') {
+        try {
+            parsed = JSON.parse(loc);
+        } catch (e) {
+            return defaultLoc;
+        }
+    }
+    
+    // Ensure we have numbers
+    return {
+        latitude: parseFloat(parsed.latitude) || defaultLoc.latitude,
+        longitude: parseFloat(parsed.longitude) || defaultLoc.longitude,
+        address: parsed.address || ''
+    };
+};
+
 const sanitizeEmployeePayload = (data: any): Partial<Employee> => {
     // Whitelist allowed DB columns to prevent "Invalid column name" errors
     const allowedKeys = [
@@ -462,9 +484,10 @@ const Organization = () => {
         const initialBasemap = isEditImagery ? "satellite" : (theme === 'light' ? 'topo-vector' : 'dark-gray-vector');
         const map = new EsriMap({ basemap: initialBasemap });
         
-        // Safety check for location data
-        const centerLon = employeeFormData?.location?.longitude || 78.9629;
-        const centerLat = employeeFormData?.location?.latitude || 20.5937;
+        // Safety check for location data - use parseLocation
+        const loc = parseLocation(employeeFormData.location);
+        const centerLon = loc.longitude;
+        const centerLat = loc.latitude;
 
         const view = new MapView({
           container: editMapRef.current!,
@@ -496,15 +519,15 @@ const Organization = () => {
             }));
         };
 
-        if (employeeFormData?.location?.latitude) {
-            updateMarker(employeeFormData.location.longitude, employeeFormData.location.latitude);
+        if (loc.latitude) {
+            updateMarker(loc.longitude, loc.latitude);
         }
 
         view.on("click", (e: any) => {
             const { longitude, latitude } = e.mapPoint;
             updateMarker(longitude, latitude);
             setEmployeeFormData((prev: any) => {
-                const currentLocation = prev?.location && typeof prev.location === 'object' ? prev.location : {};
+                const currentLocation = parseLocation(prev.location);
                 return { ...prev, location: { ...currentLocation, latitude, longitude } };
             });
         });
@@ -535,8 +558,9 @@ const Organization = () => {
       if (!graphicsLayerRef.current) return;
       graphicsLayerRef.current.removeAll();
       list.forEach(emp => {
-          const lat = parseFloat(String(emp.location?.latitude));
-          const lon = parseFloat(String(emp.location?.longitude));
+          const loc = parseLocation(emp.location);
+          const lat = parseFloat(String(loc.latitude));
+          const lon = parseFloat(String(loc.longitude));
           if (!isNaN(lat) && !isNaN(lon)) {
               const avatarUrl = emp.avatar && emp.avatar.startsWith('http') 
                         ? emp.avatar 
@@ -563,11 +587,12 @@ const Organization = () => {
   };
 
   const focusEmployeeOnMap = (emp: Employee) => {
-      if (!viewInstanceRef.current || !emp.location) {
-          showToast(`No location set for ${emp.firstName}.`, "warning");
+      const loc = parseLocation(emp.location);
+      if (!viewInstanceRef.current || !loc || isNaN(loc.latitude) || isNaN(loc.longitude)) {
+          showToast(`No valid location set for ${emp.firstName}.`, "warning");
           return;
       }
-      viewInstanceRef.current.goTo({ target: [emp.location.longitude, emp.location.latitude], zoom: 12 }, { duration: 1500, easing: "ease-in-out" });
+      viewInstanceRef.current.goTo({ target: [loc.longitude, loc.latitude], zoom: 12 }, { duration: 1500, easing: "ease-in-out" });
   };
 
   const handleEditClick = (emp: Employee) => {
@@ -576,7 +601,8 @@ const Organization = () => {
       setEmployeeFormData({
           ...emp,
           projectIds: getSafeProjectIds(emp),
-          location: emp.location || { latitude: 20.5937, longitude: 78.9629, address: '' },
+          // Use helper to parse properly
+          location: parseLocation(emp.location),
           role: emp.role || UserRole.EMPLOYEE,
           salary: emp.salary || 0,
           position: emp.position || '',
