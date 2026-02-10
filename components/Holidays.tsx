@@ -174,6 +174,7 @@ const Holidays = () => {
   const { holidays, addHoliday, addHolidays, deleteHoliday, currentUser, showToast } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [viewHoliday, setViewHoliday] = useState<Holiday | null>(null);
+  const [filterModal, setFilterModal] = useState<{ isOpen: boolean; title: string; list: Holiday[] }>({ isOpen: false, title: '', list: [] });
   
   const [newHoliday, setNewHoliday] = useState({ name: '', date: '', type: 'Public' as 'Public' | 'Company' });
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
@@ -224,6 +225,16 @@ const Holidays = () => {
     
     const yearHolidays = holidays.filter(h => new Date(h.date).getFullYear() === targetYearNum);
     
+    const weekdayList = yearHolidays.filter(h => {
+        const day = new Date(h.date).getDay();
+        return day >= 1 && day <= 5;
+    });
+
+    const weekendList = yearHolidays.filter(h => {
+        const day = new Date(h.date).getDay();
+        return day === 0 || day === 6;
+    });
+
     return {
       year: analyticsYear,
       total: yearHolidays.length,
@@ -232,14 +243,10 @@ const Holidays = () => {
         const d = new Date(h.date);
         return d.getMonth() === currentMonth;
       }).length,
-      weekdays: yearHolidays.filter(h => {
-        const day = new Date(h.date).getDay();
-        return day >= 1 && day <= 5;
-      }).length,
-      weekends: yearHolidays.filter(h => {
-        const day = new Date(h.date).getDay();
-        return day === 0 || day === 6;
-      }).length
+      weekdays: weekdayList.length,
+      weekends: weekendList.length,
+      weekdayList,
+      weekendList
     };
   }, [holidays, analyticsYear]);
 
@@ -295,6 +302,10 @@ const Holidays = () => {
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const openFilterModal = (title: string, list: Holiday[]) => {
+      setFilterModal({ isOpen: true, title, list });
   };
 
   return (
@@ -421,18 +432,24 @@ const Holidays = () => {
 
                {/* Weekday vs Weekend cards */}
                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30 p-5 shadow-sm">
+                  <div 
+                    onClick={() => openFilterModal('Weekdays', currentYearStats.weekdayList)}
+                    className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30 p-5 shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-95 group"
+                  >
                       <div className="flex items-center gap-2 mb-2">
                           <CalendarDays size={16} className="text-blue-600 dark:text-blue-400" />
-                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-tighter">Weekdays</span>
+                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-tighter group-hover:underline">Weekdays</span>
                       </div>
                       <div className="text-2xl font-bold text-blue-800 dark:text-blue-100">{currentYearStats.weekdays}</div>
                       <p className="text-[10px] text-blue-600/60 dark:text-blue-400/60 mt-1 font-medium">Mon - Fri</p>
                   </div>
-                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-900/30 p-5 shadow-sm">
+                  <div 
+                    onClick={() => openFilterModal('Weekends', currentYearStats.weekendList)}
+                    className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-900/30 p-5 shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-95 group"
+                  >
                       <div className="flex items-center gap-2 mb-2">
                           <CalendarRange size={16} className="text-amber-600 dark:text-amber-400" />
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tighter">Weekends</span>
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-tighter group-hover:underline">Weekends</span>
                       </div>
                       <div className="text-2xl font-bold text-amber-800 dark:text-amber-100">{currentYearStats.weekends}</div>
                       <p className="text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1 font-medium">Sat & Sun</p>
@@ -508,6 +525,22 @@ const Holidays = () => {
                   <button type="submit" className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-emerald-700 transition">Save Holiday</button>
                 </div>
             </form>
+       </DraggableModal>
+
+       {/* Filter List Modal (Weekdays/Weekends) */}
+       <DraggableModal isOpen={filterModal.isOpen} onClose={() => setFilterModal({ ...filterModal, isOpen: false })} title={`${filterModal.title} (${filterModal.list.length})`} width="max-w-lg">
+            <div className="space-y-3">
+                {filterModal.list.length > 0 ? (
+                    filterModal.list.map(h => (
+                        <HolidayCard key={h.id} holiday={h} isHR={isHR} compact={true} onDelete={() => {}} />
+                    ))
+                ) : (
+                    <div className="text-center py-8 text-slate-400">
+                        <CalendarRange size={32} className="mx-auto mb-2 opacity-50" />
+                        <p>No {filterModal.title.toLowerCase()} found for {selectedYear}.</p>
+                    </div>
+                )}
+            </div>
        </DraggableModal>
 
        {/* View Holiday Image Modal - Retained but hidden by state logic */}
