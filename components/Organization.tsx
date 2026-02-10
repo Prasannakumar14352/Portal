@@ -712,7 +712,10 @@ const Organization = () => {
           const newProjectIds = employeeFormData.projectIds || [];
           const addedIds = newProjectIds.filter((id: string|number) => !oldProjectIds.includes(id));
 
-          await updateEmployee(employeeFormData);
+          // Remove provisionInAzure before updating to prevent DB errors (column likely missing in SQL)
+          const { provisionInAzure, ...updateData } = employeeFormData;
+
+          await updateEmployee(updateData);
           
           // Send Notifications
           if (addedIds.length > 0) {
