@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, LogOut, ChevronDown, User as UserIcon, Info, AlertTriangle, CheckCircle, XCircle, Menu, Moon, Sun, Settings } from 'lucide-react';
 import { User } from '../types';
@@ -58,9 +59,16 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
         >
             <Menu size={24} />
         </button>
-        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 truncate">
-            <span className="hidden sm:inline">Welcome, </span>{user.name.split(' ')[0]}
-        </h2>
+        
+        {/* Welcome Message Section */}
+        <div>
+            <h1 className="text-lg font-bold text-slate-800 dark:text-white leading-tight">
+                Welcome, {user.name.split(' ')[0]}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+        </div>
       </div>
 
       <div className="flex items-center space-x-3 md:space-x-4">
