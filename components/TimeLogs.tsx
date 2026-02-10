@@ -132,10 +132,6 @@ const TimeLogs = () => {
       setViewDate(newDate);
   };
 
-  // ... (Rest of the component logic remains mostly the same, ensuring UI consistency) ...
-  // Skipping redundant parts to focus on the requested change in availableTasks logic
-  // and ensuring the rest of the component renders correctly.
-
   // --- Data Logic ---
   const visibleEntries = useMemo(() => {
     let entries = [...timeEntries];

@@ -194,81 +194,6 @@ const MultiSelectProject = ({ options, selectedIds, onChange }: { options: Proje
   );
 };
 
-// --- MultiSelectUser Component ---
-const MultiSelectUser = ({ 
-  options, 
-  selectedIds, 
-  onChange, 
-  label 
-}: { 
-  options: Employee[], 
-  selectedIds: (string | number)[], 
-  onChange: (ids: (string | number)[]) => void, 
-  label: string 
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleSelect = (id: string | number) => {
-    const idStr = String(id);
-    if (selectedIds.map(String).includes(idStr)) {
-      onChange(selectedIds.filter(sid => String(sid) !== idStr));
-    } else {
-      onChange([...selectedIds, id]);
-    }
-  };
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">{label}</label>
-      <div 
-        className="w-full min-h-[46px] border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 cursor-pointer bg-white dark:bg-slate-700 shadow-sm transition-all"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        {selectedIds.length === 0 && <span className="text-slate-400 text-sm ml-1">Select employees...</span>}
-        <div className="flex flex-wrap gap-1.5 flex-1">
-          {selectedIds.map(id => {
-            const user = options.find(u => String(u.id) === String(id));
-            return (
-              <span key={String(id)} className="bg-slate-100 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-bold uppercase px-2 py-1 rounded flex items-center gap-1.5 border border-slate-200 dark:border-slate-500">
-                {user?.firstName} {user?.lastName}
-                <X size={10} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleSelect(id); }} />
-              </span>
-            );
-          })}
-        </div>
-        <ChevronDown size={14} className="ml-auto text-slate-400" />
-      </div>
-      {isOpen && (
-        <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-[60] p-2">
-            {options.length === 0 && <p className="text-xs text-slate-400 p-2 text-center">No employees found</p>}
-            {options.map(user => (
-              <div key={user.id} onClick={() => handleSelect(user.id)} className={`flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-50 dark:bg-teal-900/20' : ''}`}>
-                <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${selectedIds.map(String).includes(String(user.id)) ? 'bg-teal-600 border-teal-600' : 'border-slate-200'}`}>
-                  {selectedIds.map(String).includes(String(user.id)) && <CheckCircle2 size={10} className="text-white" />}
-                </div>
-                <div className="flex items-center gap-2">
-                    <img src={user.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />
-                    <span className="text-sm font-bold text-slate-700 dark:text-white">{user.firstName} {user.lastName}</span>
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // --- Main Component ---
 
 const Organization = () => {
@@ -308,7 +233,6 @@ const Organization = () => {
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [employeeFormData, setEmployeeFormData] = useState<any>(null);
-  const [projectTeamIds, setProjectTeamIds] = useState<(string | number)[]>([]);
   
   // Forms
   const [projectForm, setProjectForm] = useState<Partial<Project>>({ name: '', description: '', status: 'Active', tasks: [], dueDate: '' });
@@ -323,6 +247,19 @@ const Organization = () => {
   const isPowerUser = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   const canManageProject = isPowerUser || currentUser?.role === UserRole.MANAGER;
   const tree = useMemo(() => buildOrgTree(employees), [employees]);
+
+  // Ensure tasks are parsed correctly from string if needed
+  const projectTasks = useMemo(() => {
+      if (!selectedProject?.tasks) return [];
+      if (Array.isArray(selectedProject.tasks)) return selectedProject.tasks;
+      if (typeof selectedProject.tasks === 'string') {
+          try {
+              const parsed = JSON.parse(selectedProject.tasks);
+              return Array.isArray(parsed) ? parsed : [];
+          } catch { return []; }
+      }
+      return [];
+  }, [selectedProject]);
 
   // -- Filters --
   const filteredDirectoryEmployees = useMemo(() => {
@@ -479,21 +416,10 @@ const Organization = () => {
   const handleCreateProject = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsProcessing(true);
-      const newProjectId = Math.random().toString(36).substr(2, 9);
-      await addProject({ ...projectForm, id: newProjectId } as Project);
-      
-      // Update employees with the new project assignment
-      const employeesToUpdate = employees.filter(emp => projectTeamIds.map(String).includes(String(emp.id)));
-      for (const emp of employeesToUpdate) {
-          const currentIds = getSafeProjectIds(emp);
-          if (!currentIds.map(String).includes(String(newProjectId))) {
-              await updateEmployee({ ...emp, projectIds: [...currentIds, newProjectId] });
-          }
-      }
-
+      await addProject({ ...projectForm, id: Math.random().toString(36).substr(2, 9) } as Project);
       setIsProcessing(false);
       setShowProjectModal(false);
-      showToast("Project created successfully", "success");
+      showToast("Project created", "success");
   };
 
   const handleUpdateProject = async (e: React.FormEvent) => {
@@ -501,29 +427,9 @@ const Organization = () => {
       if (!editingProject) return;
       setIsProcessing(true);
       await updateProject(editingProject.id, projectForm);
-
-      // Handle team changes (Add/Remove)
-      const currentTeam = employees.filter(e => getSafeProjectIds(e).map(String).includes(String(editingProject.id)));
-      const currentTeamIds = currentTeam.map(e => String(e.id));
-      const selectedIds = projectTeamIds.map(String);
-
-      // Add new members
-      const toAdd = employees.filter(e => selectedIds.includes(String(e.id)) && !currentTeamIds.includes(String(e.id)));
-      for (const emp of toAdd) {
-          const ids = getSafeProjectIds(emp);
-          await updateEmployee({ ...emp, projectIds: [...ids, editingProject.id] });
-      }
-
-      // Remove removed members
-      const toRemove = currentTeam.filter(e => !selectedIds.includes(String(e.id)));
-      for (const emp of toRemove) {
-          const ids = getSafeProjectIds(emp);
-          await updateEmployee({ ...emp, projectIds: ids.filter(pid => String(pid) !== String(editingProject.id)) });
-      }
-
       setIsProcessing(false);
       setShowProjectModal(false);
-      showToast("Project updated successfully", "success");
+      showToast("Project updated", "success");
   };
 
   const handleUpdateEmployee = async (e: React.FormEvent) => {
@@ -570,32 +476,45 @@ const Organization = () => {
       }
   };
 
-  // --- Task Management Handlers ---
   const handleAddTask = async () => {
       if (!selectedProject || !newTaskName.trim()) return;
-      const currentTasks = Array.isArray(selectedProject.tasks) ? selectedProject.tasks : [];
+      
+      let currentTasks = selectedProject.tasks || [];
+      // Handle string type just in case
+      if (typeof currentTasks === 'string') {
+          try { currentTasks = JSON.parse(currentTasks); } catch { currentTasks = []; }
+      }
+      
       if (currentTasks.includes(newTaskName.trim())) {
           showToast("Task already exists", "warning");
           return;
       }
-      const updatedTasks = [...currentTasks, newTaskName.trim()];
-      await updateProject(selectedProject.id, { tasks: updatedTasks });
       
-      // Update local state to reflect change immediately without reload
+      const updatedTasks = [...currentTasks, newTaskName.trim()];
+      
+      // Update local state immediately
       setSelectedProject({ ...selectedProject, tasks: updatedTasks });
       setNewTaskName('');
+      
+      await updateProject(selectedProject.id, { tasks: updatedTasks });
       showToast("Task added", "success");
   };
 
-  const handleDeleteTask = async (taskToDelete: string) => {
+  const handleDeleteTask = async (taskName: string) => {
       if (!selectedProject) return;
-      if (!window.confirm(`Delete task "${taskToDelete}"?`)) return;
-      const currentTasks = Array.isArray(selectedProject.tasks) ? selectedProject.tasks : [];
-      const updatedTasks = currentTasks.filter(t => t !== taskToDelete);
-      await updateProject(selectedProject.id, { tasks: updatedTasks });
+      if (!window.confirm(`Delete task "${taskName}"?`)) return;
+
+      let currentTasks = selectedProject.tasks || [];
+      if (typeof currentTasks === 'string') {
+          try { currentTasks = JSON.parse(currentTasks); } catch { currentTasks = []; }
+      }
+
+      const updatedTasks = currentTasks.filter(t => t !== taskName);
       
-      // Update local state to reflect change immediately
+      // Update local state immediately
       setSelectedProject({ ...selectedProject, tasks: updatedTasks });
+      
+      await updateProject(selectedProject.id, { tasks: updatedTasks });
       showToast("Task removed", "info");
   };
 
@@ -611,15 +530,6 @@ const Organization = () => {
           });
       }
       setShowEmployeeModal(true);
-  };
-
-  const openEditProjectModal = (proj: Project) => {
-      setEditingProject(proj);
-      setProjectForm(proj);
-      // Initialize team IDs for multi-select
-      const team = employees.filter(e => getSafeProjectIds(e).map(String).includes(String(proj.id)));
-      setProjectTeamIds(team.map(e => e.id));
-      setShowProjectModal(true);
   };
 
   return (
@@ -664,7 +574,7 @@ const Organization = () => {
                                    <option value="Completed">Completed</option>
                                </select>
                                {isPowerUser && (
-                                   <button onClick={() => { setEditingProject(null); setProjectForm({name:'', description:'', status:'Active', tasks:[], dueDate:''}); setProjectTeamIds([]); setShowProjectModal(true); }} className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-teal-700">
+                                   <button onClick={() => { setEditingProject(null); setProjectForm({name:'', description:'', status:'Active', tasks:[], dueDate:''}); setShowProjectModal(true); }} className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-teal-700">
                                        <Plus size={16} /> New Project
                                    </button>
                                )}
@@ -685,7 +595,7 @@ const Organization = () => {
                                             </div>
                                             {isPowerUser && (
                                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={(e) => { e.stopPropagation(); openEditProjectModal(project); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400"><Edit2 size={16}/></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); setProjectForm(project as any); setShowProjectModal(true); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400"><Edit2 size={16}/></button>
                                                     <button onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-600"><Trash2 size={16}/></button>
                                                 </div>
                                             )}
@@ -747,15 +657,15 @@ const Organization = () => {
                                         </div>
                                     )}
                                     <div className="space-y-3">
-                                        {selectedProject.tasks && selectedProject.tasks.length > 0 ? (
-                                            (Array.isArray(selectedProject.tasks) ? selectedProject.tasks : []).map((task, i) => (
+                                        {projectTasks && projectTasks.length > 0 ? (
+                                            projectTasks.map((task, i) => (
                                                 <div key={i} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800 group">
                                                     <span className="font-bold text-slate-700 dark:text-slate-200">{task}</span>
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-xs font-bold text-slate-400">{projectDetails?.taskStats.find(t => t.name === task)?.hours.toFixed(1) || 0} hrs</span>
                                                         {canManageProject && (
-                                                            <button
-                                                                onClick={() => handleDeleteTask(task)}
+                                                            <button 
+                                                                onClick={() => handleDeleteTask(task)} 
                                                                 className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                                                 title="Remove Task"
                                                             >
@@ -809,27 +719,17 @@ const Organization = () => {
         )}
 
         {/* ... (rest of the component logic) ... */}
-        
         {/* --- MODALS --- */}
-        <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? 'Edit Project' : 'New Project'} width="max-w-xl">
+        <DraggableModal isOpen={showProjectModal} onClose={() => setShowProjectModal(false)} title={editingProject ? 'Edit Project' : 'New Project'} width="max-w-lg">
             <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
                 <div><label className="block text-xs font-bold uppercase mb-1">Name</label><input required className="w-full border p-2 rounded" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name:e.target.value})} /></div>
                 <div><label className="block text-xs font-bold uppercase mb-1">Description</label><textarea className="w-full border p-2 rounded" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description:e.target.value})} /></div>
                 <div><label className="block text-xs font-bold uppercase mb-1">Status</label><select className="w-full border p-2 rounded" value={projectForm.status} onChange={e => setProjectForm({...projectForm, status:e.target.value as any})}><option>Active</option><option>On Hold</option><option>Completed</option></select></div>
-                
-                {/* Team Selection Component */}
-                <MultiSelectUser 
-                    label="Project Team" 
-                    options={employees} 
-                    selectedIds={projectTeamIds} 
-                    onChange={setProjectTeamIds} 
-                />
-
                 <div className="flex justify-end pt-4"><button type="submit" className="bg-teal-600 text-white px-6 py-2 rounded font-bold">{isProcessing ? 'Saving...' : 'Save Project'}</button></div>
             </form>
         </DraggableModal>
 
-        {/* ... (Other modals) ... */}
+        {/* ... (Other modals for Position and Employee) ... */}
         <DraggableModal isOpen={showPositionModal} onClose={() => setShowPositionModal(false)} title="Manage Position" width="max-w-sm">
             <form onSubmit={async (e) => { e.preventDefault(); if(editingPosition) await updatePosition(editingPosition.id, positionForm); else await addPosition({ ...positionForm, id: Math.random() } as Position); setShowPositionModal(false); }} className="space-y-4">
                 <div><label className="block text-xs font-bold uppercase mb-1">Title</label><input required className="w-full border p-2 rounded" value={positionForm.title} onChange={e => setPositionForm({...positionForm, title:e.target.value})} /></div>
@@ -845,7 +745,6 @@ const Organization = () => {
                    <div className="w-1/2 p-8 overflow-y-auto border-r border-slate-200 dark:border-slate-700">
                        <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-3">{editingEmployee ? 'Edit Profile' : 'New Employee'}</h3>
                        <form onSubmit={handleUpdateEmployee} className="space-y-5">
-                           {/* ... Employee Form Fields ... */}
                            <div className="grid grid-cols-2 gap-4">
                                <div className="space-y-1.5"><label className="text-[10px] font-bold uppercase">First Name</label><input required type="text" className="w-full px-4 py-2 border rounded-xl" value={employeeFormData.firstName} onChange={e => setEmployeeFormData({...employeeFormData, firstName: e.target.value})} /></div>
                                <div className="space-y-1.5"><label className="text-[10px] font-bold uppercase">Last Name</label><input required type="text" className="w-full px-4 py-2 border rounded-xl" value={employeeFormData.lastName} onChange={e => setEmployeeFormData({...employeeFormData, lastName: e.target.value})} /></div>
