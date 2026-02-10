@@ -246,7 +246,8 @@ const Holidays = () => {
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       addHoliday({
-        ...newHoliday
+        ...newHoliday,
+        id: Math.random().toString(36).substr(2, 9)
       });
       setShowModal(false);
       setNewHoliday({ name: '', date: '', type: 'Public' });
@@ -262,7 +263,7 @@ const Holidays = () => {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json(worksheet) as any[];
 
-      const mappedHolidays = jsonData.map(row => {
+      const mappedHolidays: Holiday[] = jsonData.map(row => {
         let dateValue = row.Date;
         if (typeof dateValue === 'number') {
             const date = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
@@ -275,6 +276,7 @@ const Holidays = () => {
         }
 
         return {
+          id: Math.random().toString(36).substr(2, 9),
           name: row.Holiday || 'Unnamed Holiday',
           date: dateValue || new Date().toISOString().split('T')[0],
           type: 'Public' as const
