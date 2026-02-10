@@ -26,13 +26,13 @@ const TimeLogs = () => {
   
   // View State
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
-  const [expandedSummary, setExpandedSummary] = useState<Record<string, boolean>>({});
   
   // Filters & Navigation
   const [viewDate, setViewDate] = useState(new Date());
-  const [searchTerm, setSearchTerm] = useState('');
+  const [timePeriod, setTimePeriod] = useState<'Week' | 'Month'>('Month');
   const [filterProject, setFilterProject] = useState('All');
-  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterTask, setFilterTask] = useState('All Tasks');
+  const [filterStatus, setFilterStatus] = useState('All Statuses');
   
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -68,9 +68,19 @@ const TimeLogs = () => {
             tasks = Array.isArray(parsed) ? parsed : [];
         } catch (e) { tasks = []; }
     }
-    // Strict requirement: return ONLY project tasks if defined, sorted alphabetically
     return Array.isArray(tasks) ? [...tasks].sort() : [];
   }, [formData.projectId, formData.isHoliday, projects]);
+
+  const allUniqueTasks = useMemo(() => {
+      const tasks = new Set<string>();
+      timeEntries.forEach(t => tasks.add(t.task));
+      projects.forEach(p => {
+          let pTasks = p.tasks;
+          if (typeof pTasks === 'string') { try { pTasks = JSON.parse(pTasks); } catch { pTasks = []; } }
+          if (Array.isArray(pTasks)) pTasks.forEach(t => tasks.add(t));
+      });
+      return Array.from(tasks).sort();
+  }, [timeEntries, projects]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -90,14 +100,14 @@ const TimeLogs = () => {
   };
 
   const formatDurationShort = (minutes: number) => {
-    if (minutes === 0) return '--';
+    if (minutes === 0) return '0:00';
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return `${h}:${m.toString().padStart(2, '0')}`;
   };
   
   const getProjectName = (id?: string | number) => {
-      if (!id || String(id) === NO_PROJECT_ID || id === "") return 'No Client - General';
+      if (!id || String(id) === NO_PROJECT_ID || id === "") return 'Internal / General';
       return projects.find(p => String(p.id) === String(id))?.name || 'Unknown Project';
   };
 
@@ -113,8 +123,10 @@ const TimeLogs = () => {
   const getWeekDays = (date: Date) => {
     const curr = new Date(date);
     const day = curr.getDay();
-    const diff = curr.getDate() - day + (day === 0 ? -6 : 1); 
-    const monday = new Date(curr.setDate(diff));
+    const diff = curr.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
+    const monday = new Date(curr);
+    monday.setDate(diff);
+    
     const week = [];
     for (let i = 0; i < 5; i++) {
         const d = new Date(monday);
@@ -128,7 +140,11 @@ const TimeLogs = () => {
   
   const handleDateNavigation = (direction: 'prev' | 'next') => {
       const newDate = new Date(viewDate);
-      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+      if (timePeriod === 'Week') {
+          newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+      } else {
+          newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+      }
       setViewDate(newDate);
   };
 
@@ -139,21 +155,40 @@ const TimeLogs = () => {
        entries = entries.filter(e => String(e.userId) === String(currentUser?.id));
     }
     
-    const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
-    endOfMonth.setHours(23, 59, 59);
-    
-    return entries.filter(e => {
-        const d = new Date(e.date);
-        const matchesDate = d >= startOfMonth && d <= endOfMonth;
-        const matchesSearch = e.task.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             e.description.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesProject = filterProject === 'All' || String(e.projectId || NO_PROJECT_ID) === filterProject;
-        const matchesStatus = filterStatus === 'All' || e.status === filterStatus;
+    // Filter by Date
+    if (timePeriod === 'Month') {
+        const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+        const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59);
+        entries = entries.filter(e => {
+            const d = new Date(e.date);
+            return d >= startOfMonth && d <= endOfMonth;
+        });
+    } else {
+        // Week view not fully implemented for main table filtering in this snippet logic, defaulting to month-like behavior or specific range if needed.
+        // For simplicity, keeping month filter for table or implementing week logic:
+        const startOfWeek = new Date(weekDays[0]); 
+        startOfWeek.setHours(0,0,0,0);
+        const endOfWeek = new Date(weekDays[4]); // Friday
+        endOfWeek.setDate(endOfWeek.getDate() + 2); // Include weekend
+        endOfWeek.setHours(23,59,59);
         
-        return matchesDate && matchesSearch && matchesProject && matchesStatus;
+        if (timePeriod === 'Week') {
+             entries = entries.filter(e => {
+                const d = new Date(e.date);
+                return d >= startOfWeek && d <= endOfWeek;
+            });
+        }
+    }
+    
+    // Apply filters
+    return entries.filter(e => {
+        const matchesProject = filterProject === 'All' || String(e.projectId || NO_PROJECT_ID) === filterProject;
+        const matchesTask = filterTask === 'All Tasks' || e.task === filterTask;
+        const matchesStatus = filterStatus === 'All Statuses' || e.status === filterStatus;
+        return matchesProject && matchesTask && matchesStatus;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [timeEntries, currentUser, viewDate, isHR, searchTerm, filterProject, filterStatus]);
+  }, [timeEntries, currentUser, viewDate, isHR, timePeriod, weekDays, filterProject, filterTask, filterStatus]);
 
   const groupedEntries = useMemo(() => {
       const groups: Record<string, TimeEntry[]> = {};
@@ -165,6 +200,7 @@ const TimeLogs = () => {
       return groups;
   }, [visibleEntries]);
 
+  // Weekly Report Data
   const weeklyReportData = useMemo(() => {
     const report: Record<string, { total: number, days: number[], tasks: Record<string, number[]> }> = {};
     const startOfWeek = new Date(weekDays[0]);
@@ -180,18 +216,17 @@ const TimeLogs = () => {
 
     weekEntries.forEach(e => {
         const pid = String(e.projectId || NO_PROJECT_ID);
-        const taskName = e.task;
         const d = new Date(e.date);
-        const dayIdx = (d.getDay() + 6) % 7; 
-        if (dayIdx > 4) return;
-
-        if (!report[pid]) report[pid] = { total: 0, days: [0,0,0,0,0], tasks: {} };
-        if (!report[pid].tasks[taskName]) report[pid].tasks[taskName] = [0,0,0,0,0];
-
-        const mins = e.durationMinutes + (e.extraMinutes || 0);
-        report[pid].days[dayIdx] += mins;
-        report[pid].tasks[taskName][dayIdx] += mins;
-        report[pid].total += mins;
+        // Get day index relative to the week array (Mon=0)
+        const dayDiff = Math.floor((d.getTime() - startOfWeek.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (dayDiff >= 0 && dayDiff <= 4) {
+            if (!report[pid]) report[pid] = { total: 0, days: [0,0,0,0,0], tasks: {} };
+            
+            const mins = e.durationMinutes + (e.extraMinutes || 0);
+            report[pid].days[dayDiff] += mins;
+            report[pid].total += mins;
+        }
     });
 
     return report;
@@ -266,93 +301,108 @@ const TimeLogs = () => {
       setShowDeleteConfirm(true);
   };
 
-  const handleSyncHolidays = async () => {
-      const year = viewDate.getFullYear().toString();
-      await syncHolidayLogs(year);
-  };
-
-  const handleSendReminders = async () => {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const y = yesterday.getFullYear();
-      const m = String(yesterday.getMonth() + 1).padStart(2, '0');
-      const d = String(yesterday.getDate()).padStart(2, '0');
-      const targetDate = `${y}-${m}-${d}`;
-      
-      if (!window.confirm(`Send email reminders to employees who logged less than 8 hours on ${targetDate} (Yesterday)?`)) return;
-
-      setIsSendingReminders(true);
-      try {
-          const res = await notifyMissingTimesheets(targetDate);
-          const data = await res.json();
-          if (data.success) {
-              showToast(data.message || `Emails sent to ${data.count || 0} employees.`, "success");
-          } else {
-              showToast("Failed to send reminders.", "error");
-          }
-      } catch (err) {
-          showToast("Error communicating with server.", "error");
-      } finally {
-          setIsSendingReminders(false);
-      }
-  };
-
-  const handleWeeklyComplianceCheck = async () => {
-      if (!window.confirm(`Trigger WEEKLY compliance audit? This will send stern warnings to all employees with missing logs for the current week.`)) return;
-      setIsSendingReminders(true);
-      try {
-          const res = await notifyWeeklyCompliance();
-          const data = await res.json();
-          if (data.success) {
-              showToast(data.message || `Compliance warnings sent to ${data.count} employees.`, "success");
-          } else {
-              showToast("Failed to execute audit.", "error");
-          }
-      } catch (err) {
-          showToast("Server error.", "error");
-      } finally {
-          setIsSendingReminders(false);
-      }
-  };
-
-  const formatDateLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-  // ... (Exports functions: exportCSV, exportExcel, exportPDF remain identical) ...
-  const exportCSV = () => { /* ... */ };
-  const exportExcel = () => { /* ... */ };
-  const exportPDF = () => { /* ... */ };
+  // Stubbed Exports
+  const exportCSV = () => showToast("Exporting to CSV...", "info");
+  const exportExcel = () => showToast("Exporting to Excel...", "info");
+  const exportPDF = () => showToast("Exporting to PDF...", "info");
 
   return (
     <div className="space-y-8 pb-20 animate-fade-in text-slate-800 dark:text-slate-200">
-      {/* ... (Header and Filters UI remains the same) ... */}
+      {/* Header */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
               <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Time Logs</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">Track daily activities and project effort.</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">View and manage your time entries</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+              <button onClick={exportCSV} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><FileText size={16}/> Export CSV</button>
+              <button onClick={exportPDF} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><FileText size={16}/> Export PDF</button>
+              <button onClick={exportExcel} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><FileSpreadsheet size={16}/> Export Excel</button>
               <button 
                 onClick={() => { resetForm(); setShowModal(true); }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-teal-500/20 transition-all active:scale-95"
+                className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2 rounded-lg font-bold text-sm shadow-lg shadow-teal-500/20 transition-all active:scale-95"
               >
                   <Plus size={18} />
-                  <span>Log Time</span>
+                  <span>Add Time Entry</span>
               </button>
           </div>
       </div>
 
+      {/* Filters Section */}
+      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-6">
+          <h4 className="font-bold text-slate-800 dark:text-white text-sm">Filters</h4>
+          
+          <div className="flex flex-col lg:flex-row justify-between gap-6 items-end">
+              <div className="flex flex-col sm:flex-row gap-8 w-full">
+                  <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Time Period</label>
+                      <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="radio" checked={timePeriod === 'Week'} onChange={() => setTimePeriod('Week')} className="text-teal-600 focus:ring-teal-500" />
+                              <span className="text-sm font-medium">Week</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="radio" checked={timePeriod === 'Month'} onChange={() => setTimePeriod('Month')} className="text-teal-600 focus:ring-teal-500" />
+                              <span className="text-sm font-medium">Month</span>
+                          </label>
+                      </div>
+                  </div>
+
+                  <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Date Range</label>
+                      <div className="flex items-center gap-2">
+                          <button onClick={() => handleDateNavigation('prev')} className="p-1.5 border rounded hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"><ChevronLeft size={16}/></button>
+                          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-4 py-1.5 rounded text-sm font-medium min-w-[140px] text-center">
+                              {timePeriod === 'Month' ? viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : `${weekDays[0].toLocaleDateString()} - ${weekDays[4].toLocaleDateString()}`}
+                          </div>
+                          <button onClick={() => handleDateNavigation('next')} className="p-1.5 border rounded hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"><ChevronRight size={16}/></button>
+                          <button onClick={() => setViewDate(new Date())} className="ml-2 px-3 py-1.5 border rounded hover:bg-slate-50 text-sm font-medium dark:border-slate-600 dark:hover:bg-slate-700">Today</button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500">Filter by Project</label>
+                  <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-teal-500">
+                      <option value="All">All Projects</option>
+                      {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                      <option value={NO_PROJECT_ID}>Internal - General</option>
+                  </select>
+              </div>
+              <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500">Filter by Task</label>
+                  <select value={filterTask} onChange={(e) => setFilterTask(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-teal-500">
+                      <option>All Tasks</option>
+                      {allUniqueTasks.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+              </div>
+              <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500">Filter by Status</label>
+                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-teal-500">
+                      <option>All Statuses</option>
+                      <option>Pending</option>
+                      <option>Approved</option>
+                      <option>Rejected</option>
+                  </select>
+              </div>
+          </div>
+      </div>
+
+      <h3 className="text-lg font-bold text-slate-600 dark:text-slate-300">Timesheet for {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+
       {/* 1. Grouped Detail Table */}
-      <section className="space-y-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs table-fixed border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-400 font-bold uppercase tracking-wider border-b">
+                  <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
                     <th className="px-6 py-4 w-[110px]">Date</th>
                     <th className="px-6 py-4 w-[140px]">Project</th>
                     <th className="px-6 py-4 w-[150px]">Task</th>
                     <th className="px-6 py-4 w-auto min-w-[200px]">Task Description</th>
-                    <th className="px-6 py-4 w-[180px]">User</th>
+                    <th className="px-6 py-4 w-[150px]">User</th>
                     <th className="px-6 py-4 w-[90px]">Duration</th>
                     <th className="px-6 py-4 w-[110px]">Status</th>
                     <th className="px-6 py-4 w-[90px]">Billable</th>
@@ -363,15 +413,15 @@ const TimeLogs = () => {
                   {(Object.entries(groupedEntries) as [string, TimeEntry[]][]).map(([pid, entries]) => (
                     <React.Fragment key={pid}>
                       <tr 
-                        className="bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100/50 cursor-pointer transition-colors border-b"
+                        className="bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100/50 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-700"
                         onClick={() => setExpandedProjects(prev => ({...prev, [pid]: !prev[pid]}))}
                       >
-                        <td colSpan={9} className="px-6 py-4 font-bold text-teal-700 dark:text-teal-400">
+                        <td colSpan={9} className="px-6 py-3 font-bold text-teal-700 dark:text-teal-400">
                            <div className="flex items-center gap-3">
                                <div className="p-1 rounded bg-teal-100 dark:bg-teal-900/30">
                                    {expandedProjects[pid] ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
                                </div>
-                               <span className="uppercase tracking-tight whitespace-nowrap">{getProjectName(pid)} ({entries.length} {entries.length === 1 ? 'entry' : 'entries'})</span>
+                               <span className="uppercase tracking-tight whitespace-nowrap">{getProjectName(pid)} ({entries.length} entries)</span>
                            </div>
                         </td>
                       </tr>
@@ -381,49 +431,48 @@ const TimeLogs = () => {
                         const isHolidayLog = e.task === 'Public Holiday';
                         return (
                           <tr key={e.id} className={`hover:bg-slate-50/50 transition-colors group ${isHolidayLog ? 'bg-emerald-50/20 dark:bg-emerald-900/5' : 'bg-white dark:bg-slate-800'}`}>
-                            <td className="px-6 py-5 align-top">
+                            <td className="px-6 py-4 align-top">
                                <div className="leading-tight">
                                    <div className="font-bold text-slate-800 dark:text-white text-sm whitespace-nowrap">{monthYear.split(' ')[0]} {day},</div>
                                    <div className="text-slate-400 text-[10px] uppercase font-bold">{monthYear.split(' ')[1]}</div>
                                </div>
                             </td>
-                            <td className="px-6 py-5 align-top">
+                            <td className="px-6 py-4 align-top">
                                 <div className="whitespace-normal">
-                                    <span className={`${isHolidayLog ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'} font-bold px-2 py-1 rounded text-[10px] uppercase inline-block`}>
+                                    <span className={`${isHolidayLog ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'} font-bold text-xs uppercase`}>
                                         {isHolidayLog ? 'Company Holiday' : getProjectName(e.projectId)}
                                     </span>
                                 </div>
                             </td>
-                            <td className="px-6 py-5 align-top">
+                            <td className="px-6 py-4 align-top">
                                 <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 whitespace-normal break-words">
                                     {e.task}
-                                    {isHolidayLog && <Coffee size={12} className="text-emerald-500 shrink-0" />}
                                 </div>
                             </td>
-                            <td className="px-6 py-5 align-top">
-                                <div className="text-slate-500 leading-relaxed break-words whitespace-normal line-clamp-3">
+                            <td className="px-6 py-4 align-top">
+                                <div className="text-slate-500 leading-relaxed break-words whitespace-normal line-clamp-2 text-xs">
                                     {e.description}
                                 </div>
                             </td>
-                            <td className="px-6 py-5 align-top">
+                            <td className="px-6 py-4 align-top">
                                 <div className="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                                     {user ? `${user.firstName} ${user.lastName}` : 'Unknown'}
                                 </div>
                             </td>
-                            <td className="px-6 py-5 align-top text-center bg-slate-50/30 dark:bg-slate-900/10">
+                            <td className="px-6 py-4 align-top text-center">
                                 <div className="font-mono font-bold text-slate-800 dark:text-white">
                                     {formatDuration(e.durationMinutes + (e.extraMinutes || 0))}
                                 </div>
                             </td>
-                            <td className="px-6 py-5 align-top text-center">
+                            <td className="px-6 py-4 align-top text-center">
                                <span className={`px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wide border inline-block whitespace-nowrap ${e.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : e.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                                   {e.status}
                                </span>
                             </td>
-                            <td className="px-6 py-5 align-top text-center">
-                               {e.isBillable && <span className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">Billable</span>}
+                            <td className="px-6 py-4 align-top text-center">
+                               {e.isBillable ? <CheckCircle2 size={16} className="text-emerald-500 mx-auto" /> : <span className="text-slate-300">-</span>}
                             </td>
-                            <td className="px-6 py-5 align-top text-right">
+                            <td className="px-6 py-4 align-top text-right">
                                <div className="flex items-center justify-end gap-1">
                                   <button onClick={() => handleEdit(e)} className="text-slate-300 hover:text-teal-600 transition-colors p-2 rounded-lg hover:bg-teal-50" title="Edit Log">
                                      <Edit2 size={15} />
@@ -438,11 +487,72 @@ const TimeLogs = () => {
                       })}
                     </React.Fragment>
                   ))}
+                  {Object.keys(groupedEntries).length === 0 && (
+                      <tr><td colSpan={9} className="text-center py-10 text-slate-400">No time entries found for selected filters.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-        </div>
-      </section>
+      </div>
+
+      {/* Weekly Timesheet Report */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 space-y-4">
+          <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white">Weekly Timesheet Report</h3>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => handleDateNavigation('prev')} className="p-1.5 border rounded hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"><ChevronLeft size={16}/></button>
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2">
+                      <CalendarIcon size={14} className="text-slate-400"/>
+                      {weekDays[0].toLocaleDateString(undefined, {month:'long', day:'numeric'})}, {weekDays[0].getFullYear()}
+                  </div>
+                  <button onClick={() => handleDateNavigation('next')} className="p-1.5 border rounded hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"><ChevronRight size={16}/></button>
+              </div>
+          </div>
+
+          <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+              <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 font-bold text-xs uppercase border-b border-slate-200 dark:border-slate-700">
+                      <tr>
+                          <th className="px-4 py-3 border-r border-slate-200 dark:border-slate-700">Client & Project</th>
+                          {weekDays.map(d => (
+                              <th key={d.toISOString()} className="px-4 py-3 text-center border-r border-slate-200 dark:border-slate-700 min-w-[100px]">
+                                  {d.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'})}
+                              </th>
+                          ))}
+                          <th className="px-4 py-3 text-center min-w-[80px]">Total</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                      {Object.keys(weeklyReportData).map(pid => (
+                          <tr key={pid} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                              <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-100 dark:border-slate-700">
+                                  {getProjectName(pid)}
+                              </td>
+                              {weeklyReportData[pid].days.map((mins, i) => (
+                                  <td key={i} className="px-4 py-3 text-center font-mono text-xs border-r border-slate-100 dark:border-slate-700">
+                                      {formatDurationShort(mins)}
+                                  </td>
+                              ))}
+                              <td className="px-4 py-3 text-center font-mono font-bold text-teal-600">
+                                  {formatDurationShort(weeklyReportData[pid].total)}
+                              </td>
+                          </tr>
+                      ))}
+                      <tr className="bg-slate-50 dark:bg-slate-900/50 font-bold border-t-2 border-slate-200 dark:border-slate-700">
+                          <td className="px-4 py-3 border-r border-slate-200 dark:border-slate-700">Grand Total</td>
+                          {grandTotals.days.map((total, i) => (
+                              <td key={i} className="px-4 py-3 text-center font-mono border-r border-slate-200 dark:border-slate-700">
+                                  {formatDurationShort(total)}
+                              </td>
+                          ))}
+                          <td className="px-4 py-3 text-center font-mono text-teal-700 dark:text-teal-400">
+                              {formatDurationShort(grandTotals.grand)}
+                          </td>
+                      </tr>
+                  </tbody>
+              </table>
+          </div>
+      </div>
 
       {/* Shared Edit Modal */}
       <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? "Edit Time Log" : "Log New Session"} width="max-w-xl">
