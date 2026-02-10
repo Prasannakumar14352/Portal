@@ -165,8 +165,7 @@ const TimeLogs = () => {
             return d >= startOfMonth && d <= endOfMonth;
         });
     } else {
-        // Week view not fully implemented for main table filtering in this snippet logic, defaulting to month-like behavior or specific range if needed.
-        // For simplicity, keeping month filter for table or implementing week logic:
+        // Week view filtering
         const startOfWeek = new Date(weekDays[0]); 
         startOfWeek.setHours(0,0,0,0);
         const endOfWeek = new Date(weekDays[4]); // Friday
@@ -301,10 +300,92 @@ const TimeLogs = () => {
       setShowDeleteConfirm(true);
   };
 
-  // Stubbed Exports
-  const exportCSV = () => showToast("Exporting to CSV...", "info");
-  const exportExcel = () => showToast("Exporting to Excel...", "info");
-  const exportPDF = () => showToast("Exporting to PDF...", "info");
+  const prepareExportData = () => {
+    return visibleEntries.map(e => {
+        const user = employees.find(u => String(u.id) === String(e.userId));
+        return {
+            Date: e.date,
+            Project: getProjectName(e.projectId),
+            Task: e.task,
+            Description: e.description,
+            User: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+            Duration: formatDuration(e.durationMinutes + (e.extraMinutes || 0)),
+            Status: e.status,
+            Billable: e.isBillable ? 'Yes' : 'No'
+        };
+    });
+  };
+
+  const exportCSV = () => {
+      const data = prepareExportData();
+      if (data.length === 0) {
+          showToast("No data to export", "warning");
+          return;
+      }
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+      const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `timelogs_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("CSV Exported successfully", "success");
+  };
+
+  const exportExcel = () => {
+      const data = prepareExportData();
+      if (data.length === 0) {
+          showToast("No data to export", "warning");
+          return;
+      }
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "TimeLogs");
+      XLSX.writeFile(workbook, `timelogs_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showToast("Excel Exported successfully", "success");
+  };
+
+  const exportPDF = () => {
+      if (visibleEntries.length === 0) {
+          showToast("No data to export", "warning");
+          return;
+      }
+      const doc = new jsPDF();
+      
+      const tableColumn = ["Date", "Project", "Task", "User", "Duration", "Status"];
+      const tableRows: any[] = [];
+
+      visibleEntries.forEach(entry => {
+        const user = employees.find(u => String(u.id) === String(entry.userId));
+        const ticketData = [
+          entry.date,
+          getProjectName(entry.projectId),
+          entry.task,
+          user ? `${user.firstName} ${user.lastName}` : 'Unknown',
+          formatDuration(entry.durationMinutes + (entry.extraMinutes || 0)),
+          entry.status,
+        ];
+        tableRows.push(ticketData);
+      });
+
+      doc.text("Time Logs Report", 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 22);
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 30,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [13, 148, 136] }
+      });
+
+      doc.save(`timelogs_${new Date().toISOString().split('T')[0]}.pdf`);
+      showToast("PDF Exported successfully", "success");
+  };
 
   return (
     <div className="space-y-8 pb-20 animate-fade-in text-slate-800 dark:text-slate-200">
