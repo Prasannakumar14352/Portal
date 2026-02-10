@@ -305,7 +305,8 @@ const Holidays = () => {
   };
 
   const openFilterModal = (title: string, list: Holiday[]) => {
-      setFilterModal({ isOpen: true, title, list });
+      const sortedList = [...list].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setFilterModal({ isOpen: true, title, list: sortedList });
   };
 
   return (
