@@ -570,6 +570,7 @@ const Organization = () => {
       }
   };
 
+  // --- Task Management Handlers ---
   const handleAddTask = async () => {
       if (!selectedProject || !newTaskName.trim()) return;
       const currentTasks = Array.isArray(selectedProject.tasks) ? selectedProject.tasks : [];
@@ -579,6 +580,8 @@ const Organization = () => {
       }
       const updatedTasks = [...currentTasks, newTaskName.trim()];
       await updateProject(selectedProject.id, { tasks: updatedTasks });
+      
+      // Update local state to reflect change immediately without reload
       setSelectedProject({ ...selectedProject, tasks: updatedTasks });
       setNewTaskName('');
       showToast("Task added", "success");
@@ -590,6 +593,8 @@ const Organization = () => {
       const currentTasks = Array.isArray(selectedProject.tasks) ? selectedProject.tasks : [];
       const updatedTasks = currentTasks.filter(t => t !== taskToDelete);
       await updateProject(selectedProject.id, { tasks: updatedTasks });
+      
+      // Update local state to reflect change immediately
       setSelectedProject({ ...selectedProject, tasks: updatedTasks });
       showToast("Task removed", "info");
   };
@@ -721,6 +726,7 @@ const Organization = () => {
                         <div className="p-6">
                             {projectDetailTab === 'tasks' && (
                                 <div className="space-y-4">
+                                    {/* Task Management UI */}
                                     {canManageProject && (
                                         <div className="flex gap-2 mb-4">
                                             <input

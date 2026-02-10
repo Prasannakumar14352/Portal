@@ -77,7 +77,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   // Dynamic Subtasks logic shared with TimeLogs
   const availableTasks = useMemo(() => {
     if (!logFormData.projectId || logFormData.projectId === NO_PROJECT_ID) {
-      return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training'];
+      return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training'].sort();
     }
     const project = projects.find(p => String(p.id) === String(logFormData.projectId));
     if (!project) return [];
@@ -89,7 +89,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             tasks = Array.isArray(parsed) ? parsed : [];
         } catch (e) { tasks = []; }
     }
-    return Array.isArray(tasks) ? tasks : [];
+    // Strict match, sorted
+    return Array.isArray(tasks) ? [...tasks].sort() : [];
   }, [logFormData.projectId, projects]);
 
   // Strict check for HR or Admin roles
@@ -520,6 +521,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           <button onClick={handleResetFilters} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg shrink-0 h-[42px]"><RotateCcw size={14} /> Reset</button>
       </div>
 
+      {/* Table view remains mostly unchanged, skipping for brevity but assuming implementation matches existing */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
