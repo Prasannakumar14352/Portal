@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter, CheckCircle2, MapPin, X, ArrowRight, Briefcase } from 'lucide-react';
@@ -23,18 +24,6 @@ const isUpcoming = (dateStr: string) => {
     const today = new Date();
     today.setHours(0,0,0,0);
     return hDate >= today;
-};
-
-// Helper to map holiday names to high-quality Unsplash images (Functionality preserved)
-const getHolidayImage = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('diwali') || n.includes('deepavali')) return 'https://images.unsplash.com/photo-1572917730623-a0e231575747?q=80&w=1080';
-    if (n.includes('holi')) return 'https://images.unsplash.com/photo-1552861268-2a9674092b77?q=80&w=1080';
-    if (n.includes('christmas') || n.includes('xmas')) return 'https://images.unsplash.com/photo-1544980219-9430b06e6f98?q=80&w=1080';
-    if (n.includes('new year')) return 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?q=80&w=1080';
-    if (n.includes('eid') || n.includes('ramadan')) return 'https://images.unsplash.com/photo-1583225213567-27b4097463f8?q=80&w=1080';
-    if (n.includes('republic') || n.includes('independence')) return 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?q=80&w=1080';
-    return 'https://images.unsplash.com/photo-1530103862676-de3c9a59af57?q=80&w=1080'; 
 };
 
 interface TimelineItemProps { 
@@ -112,7 +101,7 @@ const Holidays = () => {
   const allAvailableYears = useMemo(() => {
       const years = new Set(sortedHolidays.map(h => new Date(h.date).getFullYear().toString()));
       years.add(new Date().getFullYear().toString());
-      return Array.from(years).sort((a, b) => parseInt(a) - parseInt(b));
+      return Array.from(years).sort((a: string, b: string) => parseInt(a) - parseInt(b));
   }, [sortedHolidays]);
 
   // Filtered List
@@ -126,7 +115,6 @@ const Holidays = () => {
       const today = new Date();
       today.setHours(0,0,0,0);
       
-      // Stats are always calculated based on the SELECTED VIEW (filteredList)
       const total = filteredList.length;
       const passed = filteredList.filter(h => new Date(h.date) < today).length;
       const upcoming = total - passed;
@@ -140,7 +128,6 @@ const Holidays = () => {
           return d === 0 || d === 6;
       });
 
-      // Find strict next holiday from TODAY (global context, not just selected year)
       const nextOne = sortedHolidays.find(h => isUpcoming(h.date));
 
       return { total, passed, upcoming, weekdays, weekends, nextOne };
@@ -167,7 +154,6 @@ const Holidays = () => {
             const date = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
             dateValue = date.toISOString().split('T')[0];
         } else if (dateValue) {
-            // Explicit cast to prevent TS error about 'unknown'
             const d = new Date(String(dateValue));
             if (!isNaN(d.getTime())) dateValue = d.toISOString().split('T')[0];
         }
@@ -190,14 +176,12 @@ const Holidays = () => {
   };
 
   const openFilterModal = (title: string, list: Holiday[]) => {
-      // Ensure date sorting for popup list
       const sorted = [...list].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setFilterModal({ isOpen: true, title, list: sorted });
   };
 
   return (
     <div className="space-y-8 animate-fade-in pb-20">
-       {/* Top Header Section */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-200 dark:border-slate-700 pb-6">
           <div>
             <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Holiday Calendar</h2>
@@ -232,7 +216,6 @@ const Holidays = () => {
        </div>
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           {/* Timeline Column */}
            <div className="lg:col-span-2">
                <div className="mb-6 flex items-center gap-3">
                    <div className="h-8 w-1 bg-teal-500 rounded-full"></div>
@@ -268,9 +251,7 @@ const Holidays = () => {
                </div>
            </div>
 
-           {/* Widgets Column */}
            <div className="space-y-6">
-                {/* Next Holiday Widget */}
                 {stats.nextOne && (
                     <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700"></div>
@@ -287,7 +268,6 @@ const Holidays = () => {
                     </div>
                 )}
 
-                {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between h-32">
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/20 w-fit rounded-xl text-blue-600"><Calculator size={20} /></div>
@@ -305,7 +285,6 @@ const Holidays = () => {
                     </div>
                 </div>
 
-                {/* Quick Filters */}
                 <div className="bg-slate-50 dark:bg-slate-900/50 rounded-3xl p-6 border border-slate-200 dark:border-slate-700">
                     <h4 className="text-xs font-bold uppercase text-slate-400 tracking-widest mb-4">Quick Views</h4>
                     <div className="space-y-3">
@@ -335,7 +314,6 @@ const Holidays = () => {
            </div>
        </div>
 
-       {/* Popups */}
        <DraggableModal isOpen={showModal} onClose={() => setShowModal(false)} title="New Event" width="max-w-md">
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div>

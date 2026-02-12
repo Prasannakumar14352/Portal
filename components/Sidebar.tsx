@@ -56,8 +56,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
 
   return (
     <>
-        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl`}>
-            <div className="flex items-center justify-between h-20 px-6 border-b border-slate-100 dark:border-slate-800/50">
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl flex flex-col h-full`}>
+            {/* Header - Fixed at Top */}
+            <div className="flex items-center justify-between h-20 px-6 border-b border-slate-100 dark:border-slate-800/50 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-800 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary-600/30">
                         <span className="font-black text-lg tracking-tighter">EC</span>
@@ -72,7 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
                 </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+            {/* Scrollable Navigation Area */}
+            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
                 <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Main Menu</p>
                 {menuItems.map((item) => {
                     const Icon = item.icon;
@@ -95,19 +97,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
                 })}
             </nav>
 
-            <div className="p-4 m-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 text-white relative overflow-hidden shadow-lg">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
-                <div className="relative z-10">
-                    <p className="text-xs font-medium text-slate-300 mb-1">Need Help?</p>
-                    <p className="text-xs text-slate-400 mb-3">Contact support for assistance.</p>
-                    <button className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors border border-white/10">
-                        Support Center
-                    </button>
+            {/* Footer Section - Pinned to Bottom */}
+            <div className="flex-shrink-0 p-4">
+                <div className="px-2 pt-2 pb-2 text-center">
+                   <p className="text-[10px] text-slate-400 font-medium">© 2025 EmpowerCorp</p>
                 </div>
-            </div>
-            
-            <div className="px-6 pb-6 text-center">
-               <p className="text-[10px] text-slate-400 font-medium">© 2025 EmpowerCorp</p>
             </div>
         </div>
         {isOpen && <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 md:hidden" onClick={onClose}></div>}
