@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -42,7 +43,7 @@ const ToastContainer = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3">
       {toasts.map(toast => {
          let bgColor = 'bg-slate-800';
          let Icon = Info;
@@ -52,10 +53,10 @@ const ToastContainer = () => {
          else if (toast.type === 'warning') { bgColor = 'bg-amber-500'; Icon = AlertTriangle; }
 
          return (
-            <div key={toast.id} className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-in slide-in-from-right-10 duration-300`}>
+            <div key={toast.id} className={`${bgColor} text-white px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 min-w-[320px] animate-in slide-in-from-right-10 duration-300 border border-white/10`}>
                <Icon size={20} />
                <p className="text-sm font-medium flex-1">{toast.message}</p>
-               <button onClick={() => removeToast(toast.id)} className="text-white/80 hover:text-white p-1">
+               <button onClick={() => removeToast(toast.id)} className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
                  <X size={16} />
                </button>
             </div>
@@ -87,7 +88,6 @@ const App: React.FC = () => {
     deleteLeaveType
   } = useAppContext();
 
-  // --- Routing Logic ---
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace(/^#\/?/, '');
@@ -111,9 +111,7 @@ const App: React.FC = () => {
     setIsSidebarOpen(false);
   }, []);
 
-  // Map backend employees to standard UI Users with strict Role checking
   const users: User[] = employees.map(emp => {
-    // Direct mapping of role strings to Enum values
     let roleEnum = UserRole.EMPLOYEE;
     const dbRole = (emp.role || '').toLowerCase();
     if (dbRole.includes('admin')) roleEnum = UserRole.ADMIN;
@@ -125,7 +123,7 @@ const App: React.FC = () => {
       employeeId: emp.employeeId,
       name: `${emp.firstName} ${emp.lastName}`,
       role: roleEnum,
-      position: emp.position, // Important for Approval dropdown filtering
+      position: emp.position, 
       avatar: emp.avatar,
       managerId: emp.managerId,
       jobTitle: emp.jobTitle || emp.position || emp.role
@@ -164,10 +162,10 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-        <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-            <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading Portal...</p>
+        <div className="h-screen w-full flex items-center justify-center bg-gray-50 dark:bg-slate-950">
+            <div className="flex flex-col items-center gap-6">
+                <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-slate-500 dark:text-slate-400 font-bold animate-pulse tracking-widest uppercase text-xs">Initializing Portal...</p>
             </div>
         </div>
     );
@@ -217,9 +215,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden transition-colors duration-200">
+    <div className="flex h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden transition-colors duration-300">
       <ToastContainer />
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
+      {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 md:hidden transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
       <Sidebar 
         currentView={currentView} 
         onChangeView={handleViewChange} 
@@ -227,15 +225,15 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      <div className="flex-1 flex flex-col h-full md:ml-64 transition-all duration-300">
+      <div className="flex-1 flex flex-col h-full md:pl-72 transition-all duration-300">
         <Header 
           user={currentUser} 
           onLogout={handleLogout} 
           onChangeView={handleViewChange}
           onMenuClick={() => setIsSidebarOpen(true)}
         />
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto mt-16 scrollbar-hide">
-          <div className="max-w-7xl mx-auto pb-10">{renderContent()}</div>
+        <main className="flex-1 px-6 py-8 md:px-10 overflow-y-auto mt-20 custom-scrollbar">
+          <div className="max-w-7xl mx-auto pb-12">{renderContent()}</div>
         </main>
       </div>
     </div>

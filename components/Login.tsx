@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { Lock, Mail, ChevronRight, Loader2, CheckCircle2, Layout, User as UserIcon, Building2, Users, Clock, Sparkles, X, ShieldCheck, FileText, ArrowLeft, Key } from 'lucide-react';
@@ -14,23 +15,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showFeaturesModal, setShowFeaturesModal] = useState(false);
   
-  // View State: 'login' | 'reset-password'
   const [viewMode, setViewMode] = useState<'login' | 'reset-password'>('login');
   
-  // Forgot Password State
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isResetting, setIsResetting] = useState(false);
 
-  // Reset Password Form State
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Check if Mock Data is enabled
   const showDemoAccess = process.env.VITE_USE_MOCK_DATA !== 'false';
 
-  // Check URL for Reset Token on mount
   useEffect(() => {
       const path = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
@@ -57,7 +53,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const trimmedEmail = email.trim();
     const targetUser = employees.find(emp => emp.email.toLowerCase() === trimmedEmail.toLowerCase());
 
-    // Priority 1: If a password is provided and the user isn't strictly an SSO-only user, try local login first.
     if (password && (!targetUser || targetUser.password !== 'ms-auth-user')) {
         const success = await login(trimmedEmail, password);
         if (success) {
@@ -66,7 +61,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
     }
 
-    // Priority 2: SSO Flow
     const isMSAccount = (targetUser && targetUser.password === 'ms-auth-user') || isMicrosoftDomain(trimmedEmail);
     
     if (isMSAccount) {
@@ -117,7 +111,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       if (success) {
           setViewMode('login');
-          // Clean URL
           window.history.pushState({}, '', '/');
       }
   };
@@ -141,39 +134,39 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 font-sans">
+    <div className="min-h-screen flex bg-slate-50 font-sans selection:bg-primary-500 selection:text-white">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 bg-white animate-in slide-in-from-left-5 duration-500">
-        <div className="max-w-md w-full space-y-8">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 bg-white animate-in slide-in-from-left-5 duration-500 relative">
+        <div className="max-w-md w-full space-y-8 relative z-10">
             {/* Brand Header */}
-            <div className="flex items-center gap-2 mb-8">
-                <div className="bg-teal-700 p-1.5 rounded-lg">
+            <div className="flex items-center gap-3 mb-10">
+                <div className="bg-gradient-to-br from-primary-600 to-primary-800 p-2 rounded-xl shadow-lg shadow-primary-500/20">
                     <Layout className="text-white w-6 h-6" />
                 </div>
-                <span className="text-xl font-bold text-teal-800">EmpowerCorp HR</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight">EmpowerCorp</span>
             </div>
 
             {viewMode === 'login' ? (
                 <>
                     <div>
-                        <h2 className="text-3xl font-bold text-slate-900">
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">
                             Welcome back
                         </h2>
-                        <p className="text-slate-500 mt-2">
-                            Sign in with your organizational email to access the platform.
+                        <p className="text-slate-500 mt-2 font-medium">
+                            Sign in to access your dashboard.
                         </p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Username or Email</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Email Address</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                                 <input 
                                     type="text"
                                     required
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                                    placeholder="Your email address"
+                                    className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-100 rounded-xl focus:border-primary-500 focus:ring-0 outline-none transition-all bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 font-medium"
+                                    placeholder="name@company.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
@@ -181,64 +174,64 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Password</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                                 <input 
                                     type="password" 
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                                    placeholder={isMicrosoftDomain(email) ? "Optional for Microsoft SSO" : "Your password"}
+                                    className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-100 rounded-xl focus:border-primary-500 focus:ring-0 outline-none transition-all bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 font-medium"
+                                    placeholder={isMicrosoftDomain(email) ? "Optional for Microsoft SSO" : "••••••••"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                 />
                             </div>
                             {isMicrosoftDomain(email) && (
-                                <p className="text-[10px] text-teal-600 font-bold mt-1.5 uppercase tracking-tight flex items-center gap-1">
-                                    <Sparkles size={10}/> Tip: Leave password blank to sign in via Microsoft 365
+                                <p className="text-[10px] text-primary-600 font-bold mt-2 uppercase tracking-tight flex items-center gap-1 animate-pulse">
+                                    <Sparkles size={12}/> Microsoft 365 SSO Enabled
                                 </p>
                             )}
                         </div>
 
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between pt-2">
                             <label className="flex items-center space-x-2 cursor-pointer">
-                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500" />
-                                <span className="text-sm text-slate-600">Remember me</span>
+                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                                <span className="text-sm text-slate-600 font-medium">Remember me</span>
                             </label>
-                            <button type="button" onClick={openForgotPassword} className="text-sm font-medium text-teal-700 hover:text-teal-800">
-                                Forgot your password?
+                            <button type="button" onClick={openForgotPassword} className="text-sm font-bold text-primary-600 hover:text-primary-700">
+                                Recover Password
                             </button>
                         </div>
 
                         <button 
                             type="submit" 
                             disabled={isLoading}
-                            className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                            className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-xl shadow-primary-500/20 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95"
                         >
                             {isLoading ? (
                                 <Loader2 className="animate-spin" size={20} />
                             ) : (
-                                'Login'
+                                'Sign In Account'
                             )}
                         </button>
                     </form>
 
-                    <div className="pt-4 flex items-center gap-2 text-xs text-slate-400 justify-center">
-                        <ShieldCheck size={14} className="text-teal-600" />
-                        <span>Encrypted connection with Microsoft 365 Bridge</span>
+                    <div className="pt-6 flex items-center gap-2 text-xs text-slate-400 justify-center font-medium">
+                        <ShieldCheck size={14} className="text-emerald-500" />
+                        <span>Secure 256-bit Encrypted Connection</span>
                     </div>
 
                     {showDemoAccess && (
-                        <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs text-center text-slate-400 mb-2 uppercase font-bold tracking-wider">Quick Demo Access</p>
+                        <div className="mt-10 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] text-center text-slate-400 mb-3 uppercase font-black tracking-widest">Instant Access</p>
                             <div className="flex gap-2 justify-center flex-wrap">
-                                <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
-                                    Fill Admin
+                                <button onClick={() => fillDemoCreds('admin')} className="text-xs bg-white border border-slate-200 hover:border-primary-500 hover:text-primary-600 text-slate-600 px-4 py-2 rounded-lg transition-all shadow-sm font-bold">
+                                    Admin
                                 </button>
-                                <button onClick={() => fillDemoCreds('manager')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
-                                    Fill Manager
+                                <button onClick={() => fillDemoCreds('manager')} className="text-xs bg-white border border-slate-200 hover:border-primary-500 hover:text-primary-600 text-slate-600 px-4 py-2 rounded-lg transition-all shadow-sm font-bold">
+                                    Manager
                                 </button>
-                                <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-300 hover:border-teal-500 text-slate-700 px-3 py-1.5 rounded transition shadow-sm font-medium">
-                                    Fill Employee
+                                <button onClick={() => fillDemoCreds('employee')} className="text-xs bg-white border border-slate-200 hover:border-primary-500 hover:text-primary-600 text-slate-600 px-4 py-2 rounded-lg transition-all shadow-sm font-bold">
+                                    Employee
                                 </button>
                             </div>
                         </div>
@@ -248,25 +241,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 /* Reset Password View */
                 <>
                     <div>
-                        <h2 className="text-3xl font-bold text-slate-900">
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">
                             Reset Password
                         </h2>
-                        <p className="text-slate-500 mt-2">
-                            Create a new, strong password for your account.
+                        <p className="text-slate-500 mt-2 font-medium">
+                            Create a strong new password for your account.
                         </p>
                     </div>
 
                     <form onSubmit={handlePasswordResetSubmit} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">New Password</label>
-                            <div className="relative">
-                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">New Password</label>
+                            <div className="relative group">
+                                <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                                 <input 
                                     type="password"
                                     required
                                     minLength={6}
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition-all bg-white text-slate-900"
-                                    placeholder="New password"
+                                    className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-100 rounded-xl focus:border-primary-500 focus:ring-0 outline-none transition-all bg-slate-50 focus:bg-white text-slate-900 font-medium"
+                                    placeholder="Minimum 6 characters"
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                 />
@@ -274,14 +267,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Confirm Password</label>
-                            <div className="relative">
-                                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Confirm Password</label>
+                            <div className="relative group">
+                                <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                                 <input 
                                     type="password" 
                                     required
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition-all bg-white text-slate-900"
-                                    placeholder="Confirm new password"
+                                    className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-100 rounded-xl focus:border-primary-500 focus:ring-0 outline-none transition-all bg-slate-50 focus:bg-white text-slate-900 font-medium"
+                                    placeholder="Repeat password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                 />
@@ -291,15 +284,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         <button 
                             type="submit" 
                             disabled={isLoading}
-                            className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-4 rounded-lg transition-all shadow-lg flex items-center justify-center disabled:opacity-70"
+                            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex items-center justify-center disabled:opacity-70 mt-4"
                         >
-                            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Change Password'}
+                            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Update Password'}
                         </button>
 
                         <button 
                             type="button" 
                             onClick={() => setViewMode('login')}
-                            className="w-full text-center text-sm text-slate-500 hover:text-teal-700"
+                            className="w-full text-center text-sm font-bold text-slate-500 hover:text-primary-600 mt-4"
                         >
                             Back to Login
                         </button>
@@ -310,44 +303,40 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       </div>
 
       {/* Right Side - Brand/Info */}
-      <div className="hidden lg:flex lg:w-1/2 bg-teal-800 text-white p-16 flex-col justify-center relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-96 h-96 bg-teal-700 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2"></div>
-         <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-900 rounded-full mix-blend-multiply filter blur-3xl opacity-50 translate-y-1/2 -translate-x-1/2"></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-slate-900 text-white p-16 flex-col justify-center relative overflow-hidden">
+         {/* Abstract Background Shapes */}
+         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 mix-blend-screen"></div>
+         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 mix-blend-screen"></div>
+         
+         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
 
          <div className="relative z-10 max-w-lg">
-            <h1 className="text-4xl font-bold mb-6 leading-tight">Enterprise HR Management</h1>
-            <p className="text-teal-100 text-lg mb-10 leading-relaxed">
-                EmpowerCorp HR Portal helps teams organize employees, track attendance, and manage HR operations in a collaborative environment.
+            <h1 className="text-5xl font-black mb-8 leading-tight tracking-tight">
+                Enterprise Grade <br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-300 to-indigo-300">HR Management</span>
+            </h1>
+            <p className="text-slate-300 text-lg mb-12 leading-relaxed font-medium">
+                EmpowerCorp combines AI-driven insights with robust workforce tools to streamline your daily operations.
             </p>
 
-            <div className="space-y-8">
-                <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-full bg-teal-700/50 flex items-center justify-center flex-shrink-0 border border-teal-600">
-                        <CheckCircle2 className="text-teal-300" size={24} />
+            <div className="space-y-6">
+                <div className="flex items-center gap-5 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                    <div className="w-12 h-12 rounded-xl bg-primary-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30">
+                        <Sparkles className="text-white" size={24} />
                     </div>
                     <div>
-                        <h3 className="font-bold text-lg mb-1">Intuitive Employee Management</h3>
-                        <p className="text-teal-200 text-sm">Organize employee records, monitor status, and manage departments all in one place.</p>
+                        <h3 className="font-bold text-white text-lg">Gemini AI Assistant</h3>
+                        <p className="text-slate-400 text-sm">Automated policy drafting and HR queries.</p>
                     </div>
                 </div>
 
-                <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-full bg-teal-700/50 flex items-center justify-center flex-shrink-0 border border-teal-600">
-                        <Sparkles className="text-teal-300" size={24} />
+                <div className="flex items-center gap-5 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30">
+                        <Clock className="text-white" size={24} />
                     </div>
                     <div>
-                        <h3 className="font-bold text-lg mb-1">AI-Powered HR Assistant</h3>
-                        <p className="text-teal-200 text-sm">Let our Gemini AI help optimize your HR queries and policy drafting for maximum efficiency.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-full bg-teal-700/50 flex items-center justify-center flex-shrink-0 border border-teal-600">
-                        <Clock className="text-teal-300" size={24} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-lg mb-1">Attendance & Leave Tracking</h3>
-                        <p className="text-teal-200 text-sm">Work together seamlessly with real-time updates on attendance and leave requests.</p>
+                        <h3 className="font-bold text-white text-lg">Smart Attendance</h3>
+                        <p className="text-slate-400 text-sm">Geolocation tracking & biometric integration.</p>
                     </div>
                 </div>
             </div>
@@ -356,9 +345,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <button 
                     type="button"
                     onClick={() => setShowFeaturesModal(true)}
-                    className="text-teal-300 hover:text-white font-medium flex items-center gap-2 transition-colors focus:outline-none"
+                    className="text-white/80 hover:text-white font-bold flex items-center gap-2 transition-colors group text-sm uppercase tracking-widest"
                 >
-                    Learn more about our features <ChevronRight size={16} />
+                    Explore Features <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
                 </button>
             </div>
          </div>
@@ -366,84 +355,75 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       {/* Forgot Password Modal */}
       {showForgotPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
                 
-                {/* Left Side - Reset Form */}
-                <div className="w-full md:w-1/2 p-8 md:p-12 relative flex flex-col justify-center">
-                    <div className="flex items-center gap-2 mb-6">
-                        <button onClick={() => setShowForgotPasswordModal(false)} className="text-slate-400 hover:text-slate-600 transition">
-                            <ArrowLeft size={20} />
-                        </button>
-                        <h3 className="text-xl font-bold text-slate-800">Forgot Password</h3>
-                    </div>
+                <div className="w-full md:w-1/2 p-12 relative flex flex-col justify-center">
+                    <button onClick={() => setShowForgotPasswordModal(false)} className="absolute top-8 left-8 text-slate-400 hover:text-slate-700 transition">
+                        <ArrowLeft size={24} />
+                    </button>
                     
-                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                        Enter your registered email address to request a secure password reset. An email with reset instructions will be sent immediately.
-                    </p>
+                    <div className="mb-8">
+                        <h3 className="text-2xl font-black text-slate-800">Account Recovery</h3>
+                        <p className="text-slate-500 text-sm mt-2 font-medium">
+                            Enter your verified email to receive a password reset link.
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
+                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Email Address</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Email Address</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
                                 <input 
                                     type="email"
                                     required
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-slate-900 placeholder-slate-400 shadow-sm"
-                                    placeholder="yourname@empower.com"
+                                    className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-100 rounded-xl focus:border-primary-500 focus:ring-0 outline-none transition-all bg-slate-50 focus:bg-white text-slate-900 font-medium"
+                                    placeholder="name@company.com"
                                     value={resetEmail}
                                     onChange={(e) => setResetEmail(e.target.value)}
                                 />
                             </div>
                         </div>
 
-                        <div className="pt-2 flex gap-3 justify-end">
+                        <div className="flex gap-4 justify-end pt-4">
                             <button 
                                 type="button" 
                                 onClick={() => setShowForgotPasswordModal(false)}
-                                className="px-4 py-3 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                                className="px-6 py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button 
                                 type="submit" 
                                 disabled={isResetting}
-                                className="px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg transition-all shadow-md flex items-center justify-center min-w-[140px]"
+                                className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center min-w-[160px]"
                             >
-                                {isResetting ? <Loader2 className="animate-spin" size={20} /> : 'Send Reset Link'}
+                                {isResetting ? <Loader2 className="animate-spin" size={20} /> : 'Send Link'}
                             </button>
                         </div>
                     </form>
                 </div>
 
-                {/* Right Side - Information */}
-                <div className="w-full md:w-1/2 bg-teal-700 p-8 md:p-12 text-white flex flex-col justify-center">
-                    <h3 className="text-2xl font-bold mb-4">Reset Your Password</h3>
-                    <p className="text-teal-100 text-sm mb-8 leading-relaxed">
-                        We use a multi-layered security approach for account recovery. If you use a Microsoft account, you should follow the standard Microsoft password reset procedure.
-                    </p>
-                    
-                    <ul className="space-y-6">
-                        <li className="flex items-start gap-3">
-                            <ShieldCheck className="text-teal-300 flex-shrink-0" size={24} />
-                            <div>
-                                <h4 className="font-semibold text-sm">Security-focused reset process</h4>
-                            </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                            <Users className="text-teal-300 flex-shrink-0" size={24} />
-                            <div>
-                                <h4 className="font-semibold text-sm">Automated Link Generation</h4>
-                            </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                            <Mail className="text-teal-300 flex-shrink-0" size={24} />
-                            <div>
-                                <h4 className="font-semibold text-sm">Direct SMTP delivery</h4>
-                            </div>
-                        </li>
-                    </ul>
+                <div className="w-full md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/30 rounded-full blur-3xl"></div>
+                    <div className="relative z-10">
+                        <h3 className="text-2xl font-bold mb-4">Secure Reset</h3>
+                        <p className="text-slate-300 text-sm mb-8 leading-relaxed">
+                            We use industry-standard encryption. If you use Microsoft SSO, please reset your password through the Microsoft portal instead.
+                        </p>
+                        
+                        <ul className="space-y-4">
+                            <li className="flex items-center gap-3 text-sm font-medium text-slate-200">
+                                <ShieldCheck className="text-emerald-400" size={20} />
+                                <span>End-to-end encryption</span>
+                            </li>
+                            <li className="flex items-center gap-3 text-sm font-medium text-slate-200">
+                                <Clock className="text-emerald-400" size={20} />
+                                <span>15-minute token validity</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
 
             </div>
@@ -452,74 +432,48 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       {/* Features Modal */}
       {showFeaturesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[80vh] overflow-hidden relative flex flex-col md:flex-row">
                <button 
                  onClick={() => setShowFeaturesModal(false)}
-                 className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 hover:text-slate-800 transition z-10"
+                 className="absolute top-6 right-6 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 hover:text-slate-900 transition z-50"
                >
                  <X size={20} />
                </button>
                
-               {/* Modal Content - Left (Image/Color) */}
-               <div className="w-full md:w-1/3 bg-teal-800 p-8 text-white flex flex-col justify-center relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-64 h-64 bg-teal-700 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -translate-x-1/2 -translate-y-1/2"></div>
+               <div className="w-full md:w-1/3 bg-slate-900 p-10 text-white flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
                   <div className="relative z-10">
-                    <Layout className="w-12 h-12 mb-4 text-teal-300" />
-                    <h3 className="text-2xl font-bold mb-2">EmpowerCorp</h3>
-                    <p className="text-teal-100 text-sm">Comprehensive Human Resource Management Solution.</p>
+                    <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/20 mb-6">
+                        <Layout className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-3xl font-black mb-3">Platform <br/> Capabilities</h3>
+                    <p className="text-slate-400 text-sm font-medium">Explore the tools that drive efficiency.</p>
+                  </div>
+                  <div className="relative z-10 text-xs text-slate-500 font-bold uppercase tracking-widest">
+                      v2.5 Enterprise Edition
                   </div>
                </div>
 
-               {/* Modal Content - Right (Features List) */}
-               <div className="w-full md:w-2/3 p-8 md:p-10 bg-white">
-                  <h3 className="text-2xl font-bold text-slate-800 mb-6">Platform Features</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                          <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-2">
-                             <Users size={20} />
+               <div className="w-full md:w-2/3 p-10 bg-white overflow-y-auto">
+                  <h3 className="text-xl font-bold text-slate-900 mb-8">Core Modules</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                      {[
+                          { icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', title: 'People Directory', desc: 'Centralized employee database with hierarchy mapping.' },
+                          { icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50', title: 'Time Tracking', desc: 'Precision attendance logging with geo-fencing.' },
+                          { icon: Sparkles, color: 'text-purple-600', bg: 'bg-purple-50', title: 'AI Assistant', desc: 'Gemini-powered HR policy and content generation.' },
+                          { icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50', title: 'Leave & Payroll', desc: 'Automated leave workflows and payslip distribution.' },
+                          { icon: ShieldCheck, color: 'text-indigo-600', bg: 'bg-indigo-50', title: 'Access Control', desc: 'Role-based permissions (RBAC) for data security.' },
+                          { icon: Building2, color: 'text-teal-600', bg: 'bg-teal-50', title: 'Org Chart', desc: 'Interactive visual hierarchy of departments.' }
+                      ].map((feature, idx) => (
+                          <div key={idx} className="group">
+                              <div className={`w-12 h-12 ${feature.bg} ${feature.color} rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}>
+                                 <feature.icon size={24} />
+                              </div>
+                              <h4 className="font-bold text-slate-800 mb-1">{feature.title}</h4>
+                              <p className="text-sm text-slate-500 leading-relaxed">{feature.desc}</p>
                           </div>
-                          <h4 className="font-bold text-slate-700">Employee Directory</h4>
-                          <p className="text-xs text-slate-500">Centralized database for all employee records, roles, and department info.</p>
-                      </div>
-                      <div className="space-y-2">
-                          <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center mb-2">
-                             <Clock size={20} />
-                          </div>
-                          <h4 className="font-bold text-slate-700">Smart Attendance</h4>
-                          <p className="text-xs text-slate-500">Real-time check-in/out tracking with geolocation and status updates.</p>
-                      </div>
-                      <div className="space-y-2">
-                          <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center mb-2">
-                             <Sparkles size={20} />
-                          </div>
-                          <h4 className="font-bold text-slate-700">AI HR Assistant</h4>
-                          <p className="text-xs text-slate-500">Powered by Gemini AI to answer policy questions and draft documents.</p>
-                      </div>
-                      <div className="space-y-2">
-                          <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mb-2">
-                             <FileText size={20} />
-                          </div>
-                          <h4 className="font-bold text-slate-700">Leave Management</h4>
-                          <p className="text-xs text-slate-500">Streamlined leave requests, approvals, and balance tracking.</p>
-                      </div>
-                      <div className="space-y-2">
-                          <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mb-2">
-                             <ShieldCheck size={20} />
-                          </div>
-                          <h4 className="font-bold text-slate-700">Role-Based Access</h4>
-                          <p className="text-xs text-slate-500">Secure access controls for Admins, HR Managers, and Employees.</p>
-                      </div>
-                      <div className="space-y-2">
-                          <div className="w-10 h-10 bg-teal-50 text-teal-600 rounded-lg flex items-center justify-center mb-2">
-                             <Building2 size={20} />
-                          </div>
-                          <h4 className="font-bold text-slate-700">Organization Chart</h4>
-                          <p className="text-xs text-slate-500">Visual hierarchy of departments and project allocations.</p>
-                      </div>
-                  </div>
-                  <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
-                      <button onClick={() => setShowFeaturesModal(false)} className="px-6 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition">Close</button>
+                      ))}
                   </div>
                </div>
             </div>

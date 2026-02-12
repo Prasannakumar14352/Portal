@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Calendar, Trash2, Plus, Info, Clock, PartyPopper, Calculator, CalendarDays, CalendarRange, FileSpreadsheet, UploadCloud, ChevronRight, Hash, Filter, CheckCircle2, MapPin, X, ArrowRight, Briefcase } from 'lucide-react';
@@ -161,20 +160,21 @@ const Holidays = () => {
       const data = await file.arrayBuffer();
       const workbook = read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json(worksheet) as any[];
+      const jsonData = utils.sheet_to_json(worksheet as any) as any[];
       const mappedHolidays: Holiday[] = jsonData.map(row => {
         let dateValue = row.Date;
         if (typeof dateValue === 'number') {
             const date = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
             dateValue = date.toISOString().split('T')[0];
         } else if (dateValue) {
-            const d = new Date(dateValue);
+            // Explicit cast to prevent TS error about 'unknown'
+            const d = new Date(String(dateValue));
             if (!isNaN(d.getTime())) dateValue = d.toISOString().split('T')[0];
         }
         return {
           id: Math.random().toString(36).substr(2, 9),
           name: row.Holiday || 'Unnamed Holiday',
-          date: dateValue || new Date().toISOString().split('T')[0],
+          date: (typeof dateValue === 'string' ? dateValue : new Date().toISOString().split('T')[0]),
           type: 'Public' as const
         };
       });

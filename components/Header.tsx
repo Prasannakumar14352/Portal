@@ -31,7 +31,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter notifications for the current user
   const myNotifications = notifications
     .filter(n => String(n.userId) === String(user.id))
     .sort((a, b) => {
@@ -45,38 +44,35 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
     switch(type) {
         case 'success': return <CheckCircle size={16} className="text-emerald-500" />;
         case 'error': return <XCircle size={16} className="text-red-500" />;
-        case 'warning': return <AlertTriangle size={16} className="text-orange-500" />;
-        default: return <Info size={16} className="text-teal-500" />;
+        case 'warning': return <AlertTriangle size={16} className="text-amber-500" />;
+        default: return <Info size={16} className="text-primary-500" />;
     }
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-800 dark:border-slate-700 border-b border-slate-200 fixed top-0 right-0 left-0 md:left-64 z-40 flex items-center justify-between px-4 md:px-8 shadow-sm transition-all duration-300">
-      <div className="flex items-center gap-3">
+    <header className="h-20 fixed top-0 right-0 left-0 md:left-72 z-40 flex items-center justify-between px-6 md:px-10 transition-all duration-300 glass">
+      <div className="flex items-center gap-4">
         <button 
             onClick={onMenuClick}
-            className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-xl transition-colors"
         >
             <Menu size={24} />
         </button>
         
-        {/* Welcome Message Section */}
         <div>
-            <h1 className="text-lg font-bold text-slate-800 dark:text-white leading-tight">
-                Welcome, {user.name.split(' ')[0]}
+            <h1 className="text-xl font-bold text-slate-800 dark:text-white leading-tight tracking-tight">
+                Hello, {user.name.split(' ')[0]} 👋
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Here's what's happening with your team today.
             </p>
         </div>
       </div>
 
-      <div className="flex items-center space-x-3 md:space-x-4">
-        {/* Theme Toggle */}
+      <div className="flex items-center gap-3 md:gap-5">
         <button 
           onClick={toggleTheme}
-          className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-          title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          className="p-2.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
         >
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
@@ -85,54 +81,58 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
         <div className="relative" ref={notifRef}>
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`relative p-2 rounded-full transition-colors ${showNotifications ? 'bg-teal-50 text-teal-600 dark:bg-slate-700 dark:text-teal-400' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'}`}
+            className={`relative p-2.5 rounded-full transition-colors ${showNotifications ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-200'}`}
           >
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 shadow-sm"></span>
             )}
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-3 w-72 md:w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-200 z-50">
-              <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Notifications</h3>
+            <div className="absolute right-0 mt-4 w-80 md:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right z-50">
+              <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800 dark:text-white">Notifications</h3>
                 <div className="flex items-center gap-3">
                     {unreadCount > 0 && (
-                      <button onClick={() => markAllRead(user.id)} className="text-xs text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 font-medium cursor-pointer">
-                        Mark read
+                      <button onClick={() => markAllRead(user.id)} className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 font-bold">
+                        Mark all read
                       </button>
                     )}
                     {myNotifications.length > 0 && (
-                      <button onClick={() => clearAllNotifications(user.id)} className="text-xs text-slate-400 hover:text-red-600 font-medium cursor-pointer">
-                        Clear all
+                      <button onClick={() => clearAllNotifications(user.id)} className="text-xs text-slate-400 hover:text-red-600 font-bold transition-colors">
+                        Clear
                       </button>
                     )}
                 </div>
               </div>
-              <div className="max-h-80 overflow-y-auto scrollbar-hide">
+              <div className="max-h-[20rem] overflow-y-auto custom-scrollbar">
                 {myNotifications.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
+                    <div className="p-8 text-center flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-700/50 flex items-center justify-center text-slate-300">
+                            <Bell size={20} />
+                        </div>
+                        <p className="text-slate-400 text-sm font-medium">All caught up!</p>
+                    </div>
                 ) : (
                     myNotifications.map(notif => (
                     <div 
                         key={notif.id} 
                         onClick={() => markNotificationRead(notif.id)}
-                        className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors ${!notif.read ? 'bg-teal-50/40 dark:bg-teal-900/10' : ''}`}
+                        className={`px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer border-b border-slate-50 dark:border-slate-700/50 last:border-0 transition-colors ${!notif.read ? 'bg-primary-50/30 dark:bg-primary-900/10' : ''}`}
                     >
-                        <div className="flex justify-between items-start mb-1 gap-2">
-                        <div className="flex items-center gap-2">
-                            {getIcon(notif.type)}
-                            <span className={`text-sm font-medium ${!notif.read ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>{notif.title}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap">{notif.time}</span>
-                        </div>
-                        <p className={`text-xs ${!notif.read ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'} line-clamp-2 pl-6`}>{notif.message}</p>
-                        {!notif.read && (
-                            <div className="flex justify-end mt-1">
-                                <span className="text-[10px] text-teal-500 font-medium">New</span>
+                        <div className="flex gap-3">
+                            <div className={`mt-0.5 p-1.5 rounded-full flex-shrink-0 ${!notif.read ? 'bg-white shadow-sm dark:bg-slate-700' : 'bg-transparent'}`}>
+                                {getIcon(notif.type)}
                             </div>
-                        )}
+                            <div className="flex-1 space-y-1">
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className={`text-sm font-semibold ${!notif.read ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>{notif.title}</span>
+                                    <span className="text-[10px] text-slate-400 whitespace-nowrap font-medium">{notif.time}</span>
+                                </div>
+                                <p className={`text-xs leading-relaxed ${!notif.read ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}>{notif.message}</p>
+                            </div>
+                        </div>
                     </div>
                     ))
                 )}
@@ -145,62 +145,39 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
         <div className="relative" ref={profileRef}>
           <button 
             onClick={() => setShowProfile(!showProfile)}
-            className="flex items-center space-x-2 md:space-x-3 hover:bg-slate-50 dark:hover:bg-slate-700 p-1.5 rounded-lg transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-600"
+            className="flex items-center gap-3 pl-1 pr-2 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary-200 dark:hover:border-primary-800 transition-all group"
           >
             <img 
               src={user.avatar} 
               alt={user.name} 
-              className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-600 object-cover flex-shrink-0" 
+              className="w-9 h-9 rounded-full object-cover border-2 border-white dark:border-slate-700 group-hover:border-primary-100 transition-colors" 
             />
-            <div className="hidden md:block text-left">
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{user.name}</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight">
-                {user.position || 'Team Member'} • <span className="text-teal-600 dark:text-teal-400">{user.role}</span>
-              </p>
+            <div className="hidden md:block text-left pr-1">
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-none group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">{user.name}</p>
+              <p className="text-[10px] text-slate-400 font-medium">{user.role}</p>
             </div>
-            <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+            <ChevronDown size={14} className="text-slate-400 group-hover:text-primary-500 transition-colors hidden sm:block" />
           </button>
 
           {showProfile && (
-            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 duration-200 z-50">
-              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 mb-1 bg-slate-50/50 dark:bg-slate-900/50">
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{user.name}</p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider mt-0.5">
-                  {user.position || 'Team Member'}
-                </p>
-                <p className="text-[9px] text-teal-600 dark:text-teal-400 font-bold uppercase tracking-widest mt-1">
-                  System {user.role}
-                </p>
+            <div className="absolute right-0 mt-3 w-64 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 p-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right z-50">
+              <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-2">
+                <p className="text-sm font-bold text-slate-800 dark:text-white">{user.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{user.email || 'No email'}</p>
               </div>
-              <button 
-                onClick={() => {
-                  onChangeView('profile');
-                  setShowProfile(false);
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-3"
-              >
-                <UserIcon size={16} />
-                <span>My Profile</span>
+              
+              <button onClick={() => { onChangeView('profile'); setShowProfile(false); }} className="w-full text-left px-3 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-3 transition-colors">
+                <UserIcon size={16} /> <span>My Profile</span>
               </button>
               
-              <button 
-                onClick={() => {
-                  onChangeView('settings');
-                  setShowProfile(false);
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-3"
-              >
-                <Settings size={16} />
-                <span>Notification Settings</span>
+              <button onClick={() => { onChangeView('settings'); setShowProfile(false); }} className="w-full text-left px-3 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-3 transition-colors">
+                <Settings size={16} /> <span>Settings</span>
               </button>
 
-              <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
-              <button 
-                onClick={onLogout}
-                className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-3"
-              >
-                <LogOut size={16} />
-                <span>Sign Out</span>
+              <div className="h-px bg-slate-100 dark:bg-slate-700 my-1 mx-2"></div>
+              
+              <button onClick={onLogout} className="w-full text-left px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg flex items-center gap-3 transition-colors font-medium">
+                <LogOut size={16} /> <span>Sign Out</span>
               </button>
             </div>
           )}

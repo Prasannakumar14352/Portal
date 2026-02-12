@@ -4,9 +4,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f766e" />
+    <meta name="theme-color" content="#7c3aed" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=EC&background=0f766e&color=fff&size=192&rounded=true">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=EC&background=7c3aed&color=fff&size=192&rounded=true">
     <title>EmpowerCorp HR Portal</title>
     <script>
       // Early polyfill for process.env
@@ -19,15 +19,33 @@
         theme: {
           extend: {
             colors: {
+              primary: {
+                50: '#f5f3ff',
+                100: '#ede9fe',
+                200: '#ddd6fe',
+                300: '#c4b5fd',
+                400: '#a78bfa',
+                500: '#8b5cf6',
+                600: '#7c3aed',
+                700: '#6d28d9',
+                800: '#5b21b6',
+                900: '#4c1d95',
+                950: '#2e1065',
+              },
               slate: {
                 850: '#1e293b', 
+                900: '#0f172a',
+                950: '#020617', // Deeper dark mode background
               }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
             }
           }
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- ArcGIS CSS -->
     <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
     
@@ -51,17 +69,36 @@
         background: transparent;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #e2e8f0;
+        background: #cbd5e1;
         border-radius: 10px;
       }
       .dark .custom-scrollbar::-webkit-scrollbar-thumb {
         background: #334155;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #cbd5e1;
+        background: #94a3b8;
       }
-      .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #475569;
+      
+      /* Glassmorphism Utilities */
+      .glass {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .dark .glass {
+        background: rgba(15, 23, 42, 0.85);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      /* Animation Utilities */
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+      }
+      .animate-float {
+        animation: float 6s ease-in-out infinite;
       }
 
       /* Modern ArcGIS UI Overrides */
@@ -125,52 +162,6 @@
       .esri-view-surface:focus::after {
         outline: none !important;
       }
-
-      /* Basemap Gallery Modernization */
-      .esri-basemap-gallery {
-        min-width: 300px !important;
-        max-width: 320px !important;
-        max-height: 500px !important;
-        background-color: white !important;
-        padding: 8px !important;
-      }
-      
-      .dark .esri-basemap-gallery {
-        background-color: #1e293b !important;
-        color: #f1f5f9 !important;
-      }
-      
-      .esri-basemap-gallery__item {
-        border-radius: 8px !important;
-        margin: 4px 0 !important;
-        transition: background 0.2s ease !important;
-        border: 1px solid transparent !important;
-      }
-      
-      .esri-basemap-gallery__item--selected {
-        background-color: #f0fdfa !important;
-        border-color: #5eead4 !important;
-      }
-      
-      .dark .esri-basemap-gallery__item--selected {
-        background-color: #134e4a !important;
-        border-color: #0d9488 !important;
-      }
-      
-      .esri-basemap-gallery__item-title {
-        font-size: 12px !important;
-        font-weight: 600 !important;
-      }
-      
-      .esri-basemap-gallery__item-thumbnail {
-        border-radius: 6px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-      }
-
-      .esri-expand__content--expanded {
-        border-radius: 12px !important;
-        overflow: hidden !important;
-      }
     </style>
   <script type="importmap">
 {
@@ -195,7 +186,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
+  <body class="bg-gray-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300 selection:bg-primary-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

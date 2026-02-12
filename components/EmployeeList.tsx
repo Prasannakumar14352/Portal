@@ -1,6 +1,7 @@
+
 import React, { useState, useRef } from 'react';
 import { Employee, EmployeeStatus, UserRole } from '../types';
-import { Edit2, Trash2, Search, UploadCloud, Plus, UserPlus, FileSpreadsheet, X, Download, Save, Loader2 } from 'lucide-react';
+import { Edit2, Trash2, Search, UploadCloud, Plus, UserPlus, FileSpreadsheet, X, Download, Save, Loader2, Mail } from 'lucide-react';
 import { read, utils } from 'xlsx';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
@@ -63,7 +64,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
              joinDate: row['JoinDate'] || now.toISOString().split('T')[0],
              status: EmployeeStatus.ACTIVE,
              salary: row['Salary'] || 0,
-             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((row['FirstName'] || 'U') + ' ' + (row['LastName'] || ''))}&background=0D9488&color=fff`,
+             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((row['FirstName'] || 'U') + ' ' + (row['LastName'] || ''))}&background=7c3aed&color=fff`,
              // Default location objects to prevent undefined errors in backend
              location: { latitude: 20.5937, longitude: 78.9629, address: 'Office HQ' },
              workLocation: 'Office HQ',
@@ -139,7 +140,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   salary: Number(newEmployee.salary) || 0,
                   joinDate: newEmployee.joinDate || new Date().toISOString().split('T')[0],
                   status: newEmployee.status || EmployeeStatus.ACTIVE,
-                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((newEmployee.firstName||'') + ' ' + (newEmployee.lastName||''))}&background=0D9488&color=fff`,
+                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent((newEmployee.firstName||'') + ' ' + (newEmployee.lastName||''))}&background=7c3aed&color=fff`,
                   projectIds: [],
                   location: { latitude: 20.5937, longitude: 78.9629, address: 'Office HQ' },
                   workLocation: 'Office HQ',
@@ -163,13 +164,13 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="relative w-full sm:w-64">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
                 placeholder="Search employees..." 
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 outline-none dark:text-slate-200"
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-primary-500 outline-none dark:text-slate-200 transition-all"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -178,35 +179,35 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               <button 
                 onClick={() => { setIsEditing(false); setShowAddModal(true); }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition shadow-sm font-medium text-sm"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 transition shadow-lg shadow-primary-500/20 font-bold text-sm active:scale-95"
               >
-                  <Plus size={16} /> <span>Add Employee</span>
+                  <Plus size={18} /> <span>Add Employee</span>
               </button>
 
               <input type="file" ref={fileInputRef} onChange={handleBulkImport} className="hidden" accept=".xlsx,.xls,.csv" />
               <button 
                 onClick={() => fileInputRef.current?.click()} 
                 disabled={isImporting}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm font-medium text-sm disabled:opacity-50"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm font-medium text-sm disabled:opacity-50"
               >
                   {isImporting ? <Loader2 size={16} className="animate-spin"/> : <UploadCloud size={16} />} 
                   <span>Import</span>
               </button>
               <button 
                  onClick={handleDownloadTemplate}
-                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm font-medium text-sm"
+                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm font-medium text-sm"
               >
                  <Download size={16} /> <span className="hidden md:inline">Template</span>
               </button>
           </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
                 <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-bold uppercase text-xs tracking-wider">
-                        <th className="px-6 py-4">Employee</th>
+                    <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-bold uppercase text-[10px] tracking-widest">
+                        <th className="px-6 py-4">Employee Profile</th>
                         <th className="px-6 py-4">Role & Position</th>
                         <th className="px-6 py-4">Department</th>
                         <th className="px-6 py-4 text-center">Status</th>
@@ -215,32 +216,34 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {filteredEmployees.map(emp => (
-                        <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                        <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
                             <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                    <img src={emp.avatar} alt="" className="w-8 h-8 rounded-full bg-slate-200 object-cover" />
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 overflow-hidden border-2 border-white dark:border-slate-700 shadow-sm">
+                                        <img src={emp.avatar} alt="" className="w-full h-full object-cover" />
+                                    </div>
                                     <div>
-                                        <p className="font-bold text-slate-800 dark:text-slate-200">{emp.firstName} {emp.lastName}</p>
-                                        <p className="text-xs text-slate-500">{emp.email}</p>
+                                        <p className="font-bold text-slate-800 dark:text-white text-sm">{emp.firstName} {emp.lastName}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5"><Mail size={10} /> {emp.email}</p>
                                     </div>
                                 </div>
                             </td>
                             <td className="px-6 py-4">
-                                <p className="font-medium text-slate-700 dark:text-slate-300">{emp.position}</p>
-                                <p className="text-xs text-slate-500">{emp.role}</p>
+                                <p className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase">{emp.position}</p>
+                                <p className="text-[10px] font-medium text-slate-400 mt-0.5 bg-slate-100 dark:bg-slate-700 w-fit px-2 py-0.5 rounded-full">{emp.role}</p>
                             </td>
-                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                                {emp.department}
+                            <td className="px-6 py-4">
+                                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{emp.department}</span>
                             </td>
                             <td className="px-6 py-4 text-center">
-                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${emp.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${emp.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
                                     {emp.status}
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                                <div className="flex justify-end gap-2">
+                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button 
-                                        className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                                         onClick={(e) => { 
                                             e.stopPropagation(); 
                                             handleEditClick(emp);
@@ -250,7 +253,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                                         <Edit2 size={16} />
                                     </button>
                                     <button 
-                                        className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                                         onClick={(e) => { e.stopPropagation(); onDeleteEmployee(emp.id); }}
                                         title="Delete Employee"
                                     >
@@ -261,7 +264,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                         </tr>
                     ))}
                     {filteredEmployees.length === 0 && (
-                        <tr><td colSpan={5} className="text-center py-8 text-slate-400">No employees found.</td></tr>
+                        <tr><td colSpan={5} className="text-center py-12 text-slate-400 italic">No employees found matching criteria.</td></tr>
                     )}
                 </tbody>
             </table>
@@ -274,23 +277,23 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">First Name</label>
-                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.firstName} onChange={e => setNewEmployee({...newEmployee, firstName: e.target.value})} />
+                      <input required type="text" className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.firstName} onChange={e => setNewEmployee({...newEmployee, firstName: e.target.value})} />
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Last Name</label>
-                      <input required type="text" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.lastName} onChange={e => setNewEmployee({...newEmployee, lastName: e.target.value})} />
+                      <input required type="text" className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.lastName} onChange={e => setNewEmployee({...newEmployee, lastName: e.target.value})} />
                   </div>
               </div>
               
               <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Email Address</label>
-                  <input required type="email" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})} />
+                  <input required type="email" className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Role / Access</label>
-                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.role} onChange={e => setNewEmployee({...newEmployee, role: e.target.value})}>
+                      <select required className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.role} onChange={e => setNewEmployee({...newEmployee, role: e.target.value})}>
                           <option value="Employee">Employee</option>
                           <option value="Team Manager">Team Manager</option>
                           <option value="HR Manager">HR Manager</option>
@@ -299,7 +302,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Designation</label>
-                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.position} onChange={e => setNewEmployee({...newEmployee, position: e.target.value})}>
+                      <select required className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.position} onChange={e => setNewEmployee({...newEmployee, position: e.target.value})}>
                           <option value="" disabled>Select Designation</option>
                           {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
                       </select>
@@ -309,7 +312,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Department</label>
-                      <select required className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.department} onChange={e => setNewEmployee({...newEmployee, department: e.target.value})}>
+                      <select required className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.department} onChange={e => setNewEmployee({...newEmployee, department: e.target.value})}>
                           <option value="" disabled>Select Dept</option>
                           {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                           <option value="General">General</option>
@@ -317,7 +320,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Join Date</label>
-                      <input type="date" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newEmployee.joinDate} onChange={e => setNewEmployee({...newEmployee, joinDate: e.target.value})} />
+                      <input type="date" className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={newEmployee.joinDate} onChange={e => setNewEmployee({...newEmployee, joinDate: e.target.value})} />
                   </div>
               </div>
 
@@ -325,7 +328,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Account Status</label>
                   <select 
                     required 
-                    className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" 
+                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 text-sm" 
                     value={newEmployee.status} 
                     onChange={e => setNewEmployee({...newEmployee, status: e.target.value as any})}
                   >
@@ -337,8 +340,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
-                  <button type="button" onClick={handleCloseModal} className="px-4 py-2 text-slate-500 font-bold hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">Cancel</button>
-                  <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold shadow-lg hover:bg-teal-700 transition active:scale-95 flex items-center gap-2">
+                  <button type="button" onClick={handleCloseModal} className="px-6 py-2.5 text-slate-500 font-bold hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors uppercase text-xs tracking-wider">Cancel</button>
+                  <button type="submit" disabled={isSubmitting} className="px-8 py-2.5 bg-primary-600 text-white rounded-xl font-bold shadow-lg shadow-primary-500/20 hover:bg-primary-700 transition active:scale-95 flex items-center gap-2 uppercase text-xs tracking-wider">
                       {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (isEditing ? 'Update Employee' : 'Create Employee')}
                   </button>
               </div>
