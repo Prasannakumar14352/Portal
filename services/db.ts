@@ -1,3 +1,4 @@
+
 import { Employee, LeaveRequest, LeaveTypeConfig, AttendanceRecord, Notification, Department, Project, TimeEntry, Payslip, Holiday, Role, Position, Invitation } from '../types';
 import { 
   mockEmployees, mockDepartments, mockProjects, mockLeaves, mockLeaveTypes, 
@@ -55,159 +56,194 @@ const api = {
     }
 };
 
-const store = {
-    employees: [...mockEmployees],
-    departments: [...mockDepartments],
-    roles: [...mockRoles],
-    positions: [] as Position[],
-    projects: [...mockProjects],
-    leaves: [...mockLeaves],
-    leaveTypes: [...mockLeaveTypes],
-    attendance: [...mockAttendance],
-    timeEntries: [...mockTimeEntries],
-    notifications: [...mockNotifications],
-    holidays: [...mockHolidays],
-    payslips: [...mockPayslips],
-    invitations: [] as Invitation[]
+// Initialize Mock Store from LocalStorage or Default Mock Data
+const loadMockStore = () => {
+    try {
+        const saved = localStorage.getItem('empower_mock_db');
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (e) {
+        console.warn("Failed to load mock DB from localStorage", e);
+    }
+    return {
+        employees: [...mockEmployees],
+        departments: [...mockDepartments],
+        roles: [...mockRoles],
+        positions: [] as Position[],
+        projects: [...mockProjects],
+        leaves: [...mockLeaves],
+        leaveTypes: [...mockLeaveTypes],
+        attendance: [...mockAttendance],
+        timeEntries: [...mockTimeEntries],
+        notifications: [...mockNotifications],
+        holidays: [...mockHolidays],
+        payslips: [...mockPayslips],
+        invitations: [] as Invitation[]
+    };
+};
+
+const store = loadMockStore();
+
+const saveMockStore = () => {
+    try {
+        localStorage.setItem('empower_mock_db', JSON.stringify(store));
+    } catch (e) {
+        console.error("Failed to save mock DB", e);
+    }
 };
 
 const mockDb = {
     getEmployees: async (): Promise<Employee[]> => Promise.resolve([...store.employees]),
-    addEmployee: async (emp: Employee) => { store.employees.push(emp); return Promise.resolve(emp); },
-    bulkAddEmployees: async (emps: Employee[]) => { store.employees.push(...emps); return Promise.resolve(); },
+    addEmployee: async (emp: Employee) => { store.employees.push(emp); saveMockStore(); return Promise.resolve(emp); },
+    bulkAddEmployees: async (emps: Employee[]) => { store.employees.push(...emps); saveMockStore(); return Promise.resolve(); },
     updateEmployee: async (emp: Employee) => {
         const idx = store.employees.findIndex(e => String(e.id) === String(emp.id));
-        if(idx !== -1) store.employees[idx] = emp;
+        if(idx !== -1) { store.employees[idx] = emp; saveMockStore(); }
         return Promise.resolve(emp);
     },
     deleteEmployee: async (id: string) => {
         store.employees = store.employees.filter(e => String(e.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getDepartments: async (): Promise<Department[]> => Promise.resolve([...store.departments]),
-    addDepartment: async (dept: Department) => { store.departments.push(dept); return Promise.resolve(dept); },
+    addDepartment: async (dept: Department) => { store.departments.push(dept); saveMockStore(); return Promise.resolve(dept); },
     updateDepartment: async (dept: Department) => {
         const idx = store.departments.findIndex(d => String(d.id) === String(dept.id));
-        if(idx !== -1) store.departments[idx] = dept;
+        if(idx !== -1) { store.departments[idx] = dept; saveMockStore(); }
         return Promise.resolve(dept);
     },
     deleteDepartment: async (id: string) => {
         store.departments = store.departments.filter(d => String(d.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getPositions: async (): Promise<Position[]> => Promise.resolve([...store.positions]),
-    addPosition: async (pos: Position) => { store.positions.push(pos); return Promise.resolve(pos); },
+    addPosition: async (pos: Position) => { store.positions.push(pos); saveMockStore(); return Promise.resolve(pos); },
     updatePosition: async (pos: Position) => {
         const idx = store.positions.findIndex(p => String(p.id) === String(pos.id));
-        if(idx !== -1) store.positions[idx] = pos;
+        if(idx !== -1) { store.positions[idx] = pos; saveMockStore(); }
         return Promise.resolve(pos);
     },
     deletePosition: async (id: string) => {
         store.positions = store.positions.filter(p => String(p.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getRoles: async (): Promise<Role[]> => Promise.resolve([...store.roles]),
-    addRole: async (role: Role) => { store.roles.push(role); return Promise.resolve(role); },
+    addRole: async (role: Role) => { store.roles.push(role); saveMockStore(); return Promise.resolve(role); },
     updateRole: async (role: Role) => {
         const idx = store.roles.findIndex(r => String(r.id) === String(role.id));
-        if(idx !== -1) store.roles[idx] = role;
+        if(idx !== -1) { store.roles[idx] = role; saveMockStore(); }
         return Promise.resolve(role);
     },
     deleteRole: async (id: string) => {
         store.roles = store.roles.filter(r => String(r.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getProjects: async (): Promise<Project[]> => Promise.resolve([...store.projects]),
-    addProject: async (proj: Project) => { store.projects.push(proj); return Promise.resolve(proj); },
+    addProject: async (proj: Project) => { store.projects.push(proj); saveMockStore(); return Promise.resolve(proj); },
     updateProject: async (proj: Project) => {
         const idx = store.projects.findIndex(p => String(p.id) === String(proj.id));
-        if(idx !== -1) store.projects[idx] = proj;
+        if(idx !== -1) { store.projects[idx] = proj; saveMockStore(); }
         return Promise.resolve(proj);
     },
     deleteProject: async (id: string) => {
         store.projects = store.projects.filter(p => String(p.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getLeaves: async (): Promise<LeaveRequest[]> => Promise.resolve([...store.leaves]),
-    addLeave: async (leave: LeaveRequest) => { store.leaves.push(leave); return Promise.resolve(leave); },
+    addLeave: async (leave: LeaveRequest) => { store.leaves.push(leave); saveMockStore(); return Promise.resolve(leave); },
     updateLeave: async (leave: LeaveRequest) => {
         const idx = store.leaves.findIndex(l => String(l.id) === String(leave.id));
-        if(idx !== -1) store.leaves[idx] = leave;
+        if(idx !== -1) { store.leaves[idx] = leave; saveMockStore(); }
         return Promise.resolve(leave);
     },
     deleteLeave: async (id: string) => {
         store.leaves = store.leaves.filter(l => String(l.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getLeaveTypes: async (): Promise<LeaveTypeConfig[]> => Promise.resolve([...store.leaveTypes]),
-    addLeaveType: async (type: LeaveTypeConfig) => { store.leaveTypes.push(type); return Promise.resolve(type); },
+    addLeaveType: async (type: LeaveTypeConfig) => { store.leaveTypes.push(type); saveMockStore(); return Promise.resolve(type); },
     updateLeaveType: async (type: LeaveTypeConfig) => {
         const idx = store.leaveTypes.findIndex(t => String(t.id) === String(type.id));
-        if(idx !== -1) store.leaveTypes[idx] = type;
+        if(idx !== -1) { store.leaveTypes[idx] = type; saveMockStore(); }
         return Promise.resolve(type);
     },
     deleteLeaveType: async (id: string) => {
         store.leaveTypes = store.leaveTypes.filter(t => String(t.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getAttendance: async (): Promise<AttendanceRecord[]> => Promise.resolve([...store.attendance]),
-    addAttendance: async (record: AttendanceRecord) => { store.attendance.push(record); return Promise.resolve(record); },
+    addAttendance: async (record: AttendanceRecord) => { store.attendance.push(record); saveMockStore(); return Promise.resolve(record); },
     updateAttendance: async (record: AttendanceRecord) => {
         const idx = store.attendance.findIndex(a => String(a.id) === String(record.id));
-        if(idx !== -1) store.attendance[idx] = record;
+        if(idx !== -1) { store.attendance[idx] = record; saveMockStore(); }
         return Promise.resolve(record);
     },
     deleteAttendance: async (id: string) => {
         store.attendance = store.attendance.filter(a => String(a.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getTimeEntries: async (): Promise<TimeEntry[]> => Promise.resolve([...store.timeEntries]),
-    addTimeEntry: async (entry: TimeEntry) => { store.timeEntries.push(entry); return Promise.resolve(entry); },
+    addTimeEntry: async (entry: TimeEntry) => { store.timeEntries.push(entry); saveMockStore(); return Promise.resolve(entry); },
     updateTimeEntry: async (entry: TimeEntry) => {
         const idx = store.timeEntries.findIndex(e => String(e.id) === String(entry.id));
-        if(idx !== -1) store.timeEntries[idx] = entry;
+        if(idx !== -1) { store.timeEntries[idx] = entry; saveMockStore(); }
         return Promise.resolve(entry);
     },
     deleteTimeEntry: async (id: string) => {
         store.timeEntries = store.timeEntries.filter(e => String(e.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getNotifications: async (): Promise<Notification[]> => Promise.resolve([...store.notifications]),
-    addNotification: async (notif: Notification) => { store.notifications.push(notif); return Promise.resolve(notif); },
+    addNotification: async (notif: Notification) => { store.notifications.push(notif); saveMockStore(); return Promise.resolve(notif); },
     markNotificationRead: async (id: string) => {
         const idx = store.notifications.findIndex(n => String(n.id) === String(id));
-        if(idx !== -1) store.notifications[idx].read = true;
+        if(idx !== -1) { store.notifications[idx].read = true; saveMockStore(); }
         return Promise.resolve();
     },
     markAllNotificationsRead: async (userId: string) => {
         store.notifications.forEach(n => { if(String(n.userId) === String(userId)) n.read = true; });
+        saveMockStore();
         return Promise.resolve();
     },
     clearAllNotifications: async (userId: string) => {
         store.notifications = store.notifications.filter(n => String(n.userId) !== String(userId));
+        saveMockStore();
         return Promise.resolve();
     },
     getHolidays: async (): Promise<Holiday[]> => Promise.resolve([...store.holidays]),
-    addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); return Promise.resolve(holiday); },
+    addHoliday: async (holiday: Holiday) => { store.holidays.push(holiday); saveMockStore(); return Promise.resolve(holiday); },
     deleteHoliday: async (id: string) => {
         store.holidays = store.holidays.filter(h => String(h.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getPayslips: async (): Promise<Payslip[]> => Promise.resolve([...store.payslips]),
-    addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); return Promise.resolve(payslip); },
+    addPayslip: async (payslip: Payslip) => { store.payslips.push(payslip); saveMockStore(); return Promise.resolve(payslip); },
     updatePayslip: async (payslip: Payslip) => {
         const idx = store.payslips.findIndex(p => String(p.id) === String(payslip.id));
-        if(idx !== -1) store.payslips[idx] = payslip;
+        if(idx !== -1) { store.payslips[idx] = payslip; saveMockStore(); }
         return Promise.resolve(payslip);
     },
     deletePayslip: async (id: string) => {
         store.payslips = store.payslips.filter(p => String(p.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     getInvitations: async (): Promise<Invitation[]> => Promise.resolve([...store.invitations]),
-    addInvitation: async (invite: Invitation) => { store.invitations.push(invite); return Promise.resolve(invite); },
+    addInvitation: async (invite: Invitation) => { store.invitations.push(invite); saveMockStore(); return Promise.resolve(invite); },
     deleteInvitation: async (id: string) => {
         store.invitations = store.invitations.filter(i => String(i.id) !== String(id));
+        saveMockStore();
         return Promise.resolve();
     },
     notifyMissingTimesheets: async (targetDate: string) => { 
@@ -217,7 +253,22 @@ const mockDb = {
 };
 
 const apiDb = {
-  getEmployees: () => api.get('/employees'),
+  getEmployees: async () => {
+      const users = await api.get('/employees');
+      // Fix for SQL/Backend potentially returning settings as string
+      return users.map((u: any) => {
+          if (u.settings && typeof u.settings === 'string') {
+              try { u.settings = JSON.parse(u.settings); } catch(e) {}
+          }
+          if (u.location && typeof u.location === 'string') {
+              try { u.location = JSON.parse(u.location); } catch(e) {}
+          }
+          if (u.projectIds && typeof u.projectIds === 'string') {
+              try { u.projectIds = JSON.parse(u.projectIds); } catch(e) {}
+          }
+          return u;
+      });
+  },
   addEmployee: (emp: Employee) => api.post('/employees', emp),
   bulkAddEmployees: (emps: Employee[]) => api.post('/employees/bulk', emps),
   updateEmployee: (emp: Employee) => api.put(`/employees/${emp.id}`, emp),

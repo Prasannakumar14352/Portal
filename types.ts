@@ -28,6 +28,9 @@ export interface UserSettings {
     azureSync: boolean;
     strictSso: boolean;
   };
+  branding?: {
+    primaryColor: string;
+  };
 }
 
 export interface Invitation {

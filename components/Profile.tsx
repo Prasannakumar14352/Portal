@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, User } from '../types';
@@ -216,7 +217,6 @@ const Profile = () => {
         
         await updateUser(profileUser.id, updates);
         
-        // Update initial data to current saved state
         setInitialData({ formData: { ...formData }, location: { ...location } });
         
         showToast("Profile records updated", "success");
@@ -232,7 +232,7 @@ const Profile = () => {
   const InputField = ({ label, icon: Icon, value, onChange, disabled, type = "text", placeholder = "" }: any) => (
     <div className="space-y-1.5">
       <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase ml-1">{label}</label>
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${disabled ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-teal-500/20 shadow-sm'}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${disabled ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-primary-500/20 shadow-sm'}`}>
         <Icon size={18} className={disabled ? 'text-slate-300' : 'text-slate-400'} />
         <input type={type} disabled={disabled} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`w-full bg-transparent outline-none text-sm font-medium ${disabled ? 'text-slate-500' : 'text-slate-700 dark:text-slate-200'}`} />
       </div>
@@ -253,9 +253,8 @@ const Profile = () => {
                 <button onClick={handleCancel} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-6 py-3 rounded-2xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                     Cancel
                 </button>
-                {/* Save Button Condition: Only visible when dirty */}
                 {isDirty && (
-                    <button onClick={() => setShowConfirm(true)} disabled={isSaving} className="flex items-center gap-2 bg-teal-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-teal-500/20 hover:bg-teal-700 transition-all animate-in fade-in zoom-in duration-300">
+                    <button onClick={() => setShowConfirm(true)} disabled={isSaving} className="flex items-center gap-2 bg-primary-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all animate-in fade-in zoom-in duration-300">
                         {isSaving ? <Clock className="animate-spin" size={18} /> : <Save size={18} />}<span>Save Changes</span>
                     </button>
                 )}
@@ -267,8 +266,8 @@ const Profile = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 flex flex-col items-center text-center">
-            <div className="relative group mb-6"><div className={`w-32 h-32 rounded-full border-4 ${isEditMode ? 'border-teal-500/50 scale-105' : 'border-white dark:border-slate-900'} shadow-2xl overflow-hidden bg-slate-100 dark:bg-slate-700`}><img src={formData.avatar} alt="" className="w-full h-full object-cover" /></div>{isEditMode && (<button onClick={() => fileInputRef.current?.click()} className="absolute bottom-1 right-1 bg-teal-600 text-white p-2.5 rounded-full shadow-lg transition-transform z-10"><Camera size={18} /></button>)}<input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} /></div>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-white leading-tight mb-1">{formData.firstName} {formData.lastName}</h3><p className="text-teal-600 dark:text-teal-400 font-bold text-xs uppercase tracking-widest mb-4">{formData.position || 'Team Member'}</p>
+            <div className="relative group mb-6"><div className={`w-32 h-32 rounded-full border-4 ${isEditMode ? 'border-primary-500/50 scale-105' : 'border-white dark:border-slate-900'} shadow-2xl overflow-hidden bg-slate-100 dark:bg-slate-700`}><img src={formData.avatar} alt="" className="w-full h-full object-cover" /></div>{isEditMode && (<button onClick={() => fileInputRef.current?.click()} className="absolute bottom-1 right-1 bg-primary-600 text-white p-2.5 rounded-full shadow-lg transition-transform z-10"><Camera size={18} /></button>)}<input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} /></div>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-white leading-tight mb-1">{formData.firstName} {formData.lastName}</h3><p className="text-primary-600 dark:text-primary-400 font-bold text-xs uppercase tracking-widest mb-4">{formData.position || 'Team Member'}</p>
             <div className="w-full space-y-4 pt-6 border-t border-slate-100 dark:border-slate-700 text-left"><div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Mail size={16} /><span className="text-sm font-medium truncate">{formData.email}</span></div><div className="flex items-center gap-3 text-slate-500 dark:text-slate-400"><Hash size={16} /><span className="text-sm font-medium">EMP ID: {profileUser?.employeeId}</span></div></div>
           </div>
         </div>
@@ -288,7 +287,7 @@ const Profile = () => {
                 <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl text-emerald-600"><Briefcase size={20} /></div><h3 className="text-xl font-bold text-slate-800 dark:text-white">Employment</h3></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputField label="Designation" icon={UserSquare} value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} disabled={!canEditAnyField} />
-                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Working Model</label><div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100' : 'bg-white dark:bg-slate-800 border-slate-200 focus-within:ring-2 focus-within:ring-teal-500/20'}`}><Clock size={18} className="text-slate-400" /><select disabled={!isEditMode} value={formData.workLocation} onChange={e => setFormData({...formData, workLocation: e.target.value})} className="w-full bg-transparent outline-none text-sm font-medium dark:text-slate-200 appearance-none">{WORK_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}</select></div></div>
+                    <div className="space-y-1.5"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Working Model</label><div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100' : 'bg-white dark:bg-slate-800 border-slate-200 focus-within:ring-2 focus-within:ring-primary-500/20'}`}><Clock size={18} className="text-slate-400" /><select disabled={!isEditMode} value={formData.workLocation} onChange={e => setFormData({...formData, workLocation: e.target.value})} className="w-full bg-transparent outline-none text-sm font-medium dark:text-slate-200 appearance-none">{WORK_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}</select></div></div>
                     <InputField label="Join Date" icon={Calendar} type="date" value={formData.hireDate} onChange={(v: string) => setFormData({...formData, hireDate: v})} disabled={!canEditAnyField} />
                 </div>
                 <div className="space-y-1.5 pt-2">
@@ -298,7 +297,7 @@ const Profile = () => {
                       value={formData.bio}
                       onChange={e => setFormData({...formData, bio: e.target.value})}
                       rows={4}
-                      className={`w-full p-4 rounded-xl border transition-all outline-none text-sm leading-relaxed ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 text-slate-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-teal-500/20 dark:text-slate-200'}`}
+                      className={`w-full p-4 rounded-xl border transition-all outline-none text-sm leading-relaxed ${!isEditMode ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 text-slate-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary-500/20 dark:text-slate-200'}`}
                       placeholder="Share your expertise and experience..."
                     />
                 </div>
@@ -311,7 +310,7 @@ const Profile = () => {
                         <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl text-indigo-600"><MapPin size={20} /></div>
                         <h3 className="text-xl font-bold text-slate-800 dark:text-white">Geographic Location</h3>
                     </div>
-                    {isEditMode && <span className="text-[10px] font-bold text-teal-500 uppercase tracking-widest animate-pulse flex items-center gap-1"><MapPin size={12}/> Tap map to update</span>}
+                    {isEditMode && <span className="text-[10px] font-bold text-primary-500 uppercase tracking-widest animate-pulse flex items-center gap-1"><MapPin size={12}/> Tap map to update</span>}
                 </div>
                 <div className="h-80 w-full rounded-2xl overflow-hidden relative border border-slate-200 dark:border-slate-700 shadow-inner bg-slate-50 dark:bg-slate-900">
                     <div ref={mapDiv} className="w-full h-full" />
@@ -324,7 +323,7 @@ const Profile = () => {
         </div>
       </div>
 
-      <DraggableModal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Verify Updates" width="max-w-md"><div className="text-center py-4"><div className="w-16 h-16 bg-teal-50 dark:bg-teal-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-teal-100"><BadgeCheck className="text-teal-600" size={32} /></div><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Sync Records?</h3><p className="text-slate-500 text-sm px-4">This will update your official employment file.</p></div><div className="flex gap-3 mt-6 pt-6 border-t border-slate-100"><button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-3 bg-slate-50 text-slate-400 rounded-xl font-black text-[10px] uppercase">Discard</button><button onClick={confirmSave} className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl font-black text-[10px] uppercase shadow-xl shadow-teal-500/20">Save Changes</button></div></DraggableModal>
+      <DraggableModal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Verify Updates" width="max-w-md"><div className="text-center py-4"><div className="w-16 h-16 bg-primary-50 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-primary-100"><BadgeCheck className="text-primary-600" size={32} /></div><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Sync Records?</h3><p className="text-slate-500 text-sm px-4">This will update your official employment file.</p></div><div className="flex gap-3 mt-6 pt-6 border-t border-slate-100"><button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-3 bg-slate-50 text-slate-400 rounded-xl font-black text-[10px] uppercase">Discard</button><button onClick={confirmSave} className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl font-black text-[10px] uppercase shadow-xl shadow-primary-500/20">Save Changes</button></div></DraggableModal>
     </div>
   );
 };

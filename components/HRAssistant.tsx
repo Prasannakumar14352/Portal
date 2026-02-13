@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, RefreshCw, Key } from 'lucide-react';
 import { getHRChatResponse, resetChatSession } from '../services/geminiService';
@@ -35,7 +36,6 @@ const HRAssistant: React.FC = () => {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Clean up chat session on unmount
   useEffect(() => {
     return () => {
       resetChatSession();
@@ -55,7 +55,6 @@ const HRAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Prepare the context object for Gemini
       const context = {
         currentUser,
         employees,
@@ -77,7 +76,6 @@ const HRAssistant: React.FC = () => {
 
       setMessages(prev => [...prev, botMessage]);
     } catch (error: any) {
-      // Error handling: Display user-friendly message instead of logging to console
       let errorMessage = 'Sorry, I encountered an issue. Please try again later.';
       
       if (error.message === "MISSING_API_KEY") {
@@ -112,14 +110,14 @@ const HRAssistant: React.FC = () => {
   return (
     <div className="h-[calc(100dvh-8rem)] flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in">
       {/* Header */}
-      <div className="bg-teal-700 p-4 flex items-center justify-between text-white shadow-md">
+      <div className="bg-primary-700 p-4 flex items-center justify-between text-white shadow-md">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-            <Sparkles size={20} className="text-teal-200" />
+            <Sparkles size={20} className="text-white" />
           </div>
           <div>
             <h2 className="font-bold text-lg">EC Intelligent Assistant</h2>
-            <p className="text-teal-100 text-[10px] uppercase tracking-widest font-bold">HR Context + General AI</p>
+            <p className="text-white/80 text-[10px] uppercase tracking-widest font-bold">HR Context + General AI</p>
           </div>
         </div>
         <button 
@@ -147,13 +145,13 @@ const HRAssistant: React.FC = () => {
           >
             <div className={`flex max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3`}>
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm
-                ${msg.role === 'user' ? 'bg-teal-600' : msg.isError ? 'bg-red-100' : 'bg-slate-700 dark:bg-slate-600'}`}>
+                ${msg.role === 'user' ? 'bg-primary-600' : msg.isError ? 'bg-red-100' : 'bg-slate-700 dark:bg-slate-600'}`}>
                 {msg.role === 'user' ? <User size={18} className="text-white" /> : msg.isError ? <AlertCircle size={18} className="text-red-600" /> : <Bot size={18} className="text-white" />}
               </div>
               
               <div className={`p-4 rounded-2xl shadow-sm border
                 ${msg.role === 'user' 
-                  ? 'bg-teal-600 text-white rounded-tr-none border-teal-500' 
+                  ? 'bg-primary-600 text-white rounded-tr-none border-primary-500' 
                   : msg.isError
                     ? 'bg-red-50 border-red-200 text-red-700 rounded-tl-none dark:bg-red-900/20 dark:border-red-800 dark:text-red-400'
                     : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-tl-none'}`}>
@@ -169,7 +167,7 @@ const HRAssistant: React.FC = () => {
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
                 </div>
 
-                <div className={`flex items-center gap-1.5 mt-3 text-[10px] font-medium opacity-60 ${msg.role === 'user' ? 'text-teal-50' : 'text-slate-400'}`}>
+                <div className={`flex items-center gap-1.5 mt-3 text-[10px] font-medium opacity-60 ${msg.role === 'user' ? 'text-white' : 'text-slate-400'}`}>
                    <span>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                    {msg.role === 'model' && !msg.isError && (
                        <>
@@ -189,9 +187,9 @@ const HRAssistant: React.FC = () => {
                  <Bot size={18} className="text-white" />
                </div>
                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-2">
-                 <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                 <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                 <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                 <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                 <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                 <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                  <span className="text-xs text-slate-400 ml-2 font-medium">Thinking...</span>
                </div>
             </div>
@@ -207,7 +205,7 @@ const HRAssistant: React.FC = () => {
                 <button 
                     key={idx} 
                     onClick={() => processMessage(prompt)}
-                    className="flex-shrink-0 bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-400 border border-teal-100 dark:border-slate-700 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                    className="flex-shrink-0 bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-400 border border-primary-100 dark:border-slate-700 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-primary-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
                 >
                     {prompt}
                 </button>
@@ -223,18 +221,18 @@ const HRAssistant: React.FC = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask anything (HR data, Coding, Writing, General)..."
-            className="flex-1 px-4 py-3.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all text-sm dark:text-white placeholder-slate-400"
+            className="flex-1 px-4 py-3.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-sm dark:text-white placeholder-slate-400"
           />
           <button 
             type="submit" 
             disabled={!input.trim() || isLoading}
-            className="bg-teal-700 text-white p-3.5 rounded-xl hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-teal-500/20 flex items-center justify-center shrink-0"
+            className="bg-primary-700 text-white p-3.5 rounded-xl hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-primary-500/20 flex items-center justify-center shrink-0"
           >
             <Send size={20} />
           </button>
         </form>
         <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 justify-center text-center uppercase tracking-widest font-bold">
-          <Sparkles size={12} className="shrink-0 text-teal-600" />
+          <Sparkles size={12} className="shrink-0 text-primary-600" />
           <span>Gemini 3 Pro Hybrid Intelligence</span>
         </div>
       </div>

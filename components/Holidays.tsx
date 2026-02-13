@@ -6,6 +6,7 @@ import { UserRole, Holiday } from '../types';
 import DraggableModal from './DraggableModal';
 import { read, utils } from 'xlsx';
 
+// ... (Keep Helper functions: getDateParts, isUpcoming) ...
 const getDateParts = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return { day: '?', month: '???', full: 'Invalid Date', dayName: '', dayOfWeek: -1, year: '?' };
@@ -40,17 +41,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ holiday, isHR, onDelete, is
 
     return (
         <div className={`relative pl-8 pb-8 ${isLast ? '' : 'border-l-2'} ${isPast ? 'border-slate-200 dark:border-slate-800' : 'border-emerald-500/30 dark:border-emerald-500/30'}`}>
-            {/* Timeline Dot */}
             <div className={`absolute -left-[9px] top-0 w-[18px] h-[18px] rounded-full border-4 ${isPast ? 'bg-slate-300 border-white dark:bg-slate-700 dark:border-slate-900' : 'bg-emerald-500 border-white dark:border-slate-900 shadow-lg shadow-emerald-500/40'}`}></div>
-            
             <div className={`group flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl border transition-all hover:shadow-md ${isPast ? 'bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 opacity-70 grayscale' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                {/* Date Box */}
                 <div className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl border ${isPast ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'}`}>
                     <span className="text-[10px] font-bold uppercase tracking-wider">{month}</span>
                     <span className="text-2xl font-black leading-none">{day}</span>
                 </div>
-
-                {/* Content */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <h4 className="text-lg font-bold text-slate-800 dark:text-white truncate">{holiday.name}</h4>
@@ -65,14 +61,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ holiday, isHR, onDelete, is
                         </span>
                     </div>
                 </div>
-
-                {/* Actions */}
                 {isHR && (
-                    <button 
-                        onClick={() => onDelete(holiday.id)} 
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        title="Delete Holiday"
-                    >
+                    <button onClick={() => onDelete(holiday.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" title="Delete Holiday">
                         <Trash2 size={18} />
                     </button>
                 )}
@@ -83,6 +73,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ holiday, isHR, onDelete, is
 
 const Holidays = () => {
   const { holidays, addHoliday, addHolidays, deleteHoliday, currentUser, showToast } = useAppContext();
+  // ... (Keep existing state) ...
   const [showModal, setShowModal] = useState(false);
   const [filterModal, setFilterModal] = useState<{ isOpen: boolean; title: string; list: Holiday[] }>({ isOpen: false, title: '', list: [] });
   
@@ -92,47 +83,35 @@ const Holidays = () => {
 
   const isHR = currentUser?.role === UserRole.HR;
 
-  // Sorting
+  // ... (Keep existing useMemos: sortedHolidays, allAvailableYears, filteredList, stats) ...
   const sortedHolidays = useMemo(() => {
       return [...holidays].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [holidays]);
 
-  // Year List
   const allAvailableYears = useMemo(() => {
       const years = new Set(sortedHolidays.map(h => new Date(h.date).getFullYear().toString()));
       years.add(new Date().getFullYear().toString());
       return Array.from(years).sort((a: string, b: string) => parseInt(a) - parseInt(b));
   }, [sortedHolidays]);
 
-  // Filtered List
   const filteredList = useMemo(() => {
       if (selectedYear === 'All') return sortedHolidays;
       return sortedHolidays.filter(h => new Date(h.date).getFullYear().toString() === selectedYear);
   }, [sortedHolidays, selectedYear]);
 
-  // Stats
   const stats = useMemo(() => {
       const today = new Date();
       today.setHours(0,0,0,0);
-      
       const total = filteredList.length;
       const passed = filteredList.filter(h => new Date(h.date) < today).length;
       const upcoming = total - passed;
-      
-      const weekdays = filteredList.filter(h => {
-          const d = new Date(h.date).getDay();
-          return d > 0 && d < 6;
-      });
-      const weekends = filteredList.filter(h => {
-          const d = new Date(h.date).getDay();
-          return d === 0 || d === 6;
-      });
-
+      const weekdays = filteredList.filter(h => { const d = new Date(h.date).getDay(); return d > 0 && d < 6; });
+      const weekends = filteredList.filter(h => { const d = new Date(h.date).getDay(); return d === 0 || d === 6; });
       const nextOne = sortedHolidays.find(h => isUpcoming(h.date));
-
       return { total, passed, upcoming, weekdays, weekends, nextOne };
   }, [filteredList, sortedHolidays]);
 
+  // ... (Keep Handlers) ...
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       addHoliday({ ...newHoliday, id: Math.random().toString(36).substr(2, 9) });
@@ -193,7 +172,7 @@ const Holidays = () => {
                   <select 
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
-                    className="w-full sm:w-auto pl-10 pr-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-teal-500 outline-none appearance-none cursor-pointer"
+                    className="w-full sm:w-auto pl-10 pr-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary-500 outline-none appearance-none cursor-pointer"
                   >
                       <option value="All">All Years</option>
                       {allAvailableYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -207,7 +186,7 @@ const Holidays = () => {
                     <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm transition-all shadow-sm">
                         <UploadCloud size={18} /> <span className="hidden sm:inline">Import</span>
                     </button>
-                    <button onClick={() => setShowModal(true)} className="flex items-center justify-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-teal-500/20 active:scale-95">
+                    <button onClick={() => setShowModal(true)} className="flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary-500/20 active:scale-95">
                         <Plus size={18} /> <span>Add Event</span>
                     </button>
                 </div>
@@ -215,10 +194,11 @@ const Holidays = () => {
           </div>
        </div>
 
+       {/* ... (Timeline and Stats display - keep structure, replace colors where necessary if hardcoded to teal/blue, mostly using semantic colors for status is fine) ... */}
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-2">
                <div className="mb-6 flex items-center gap-3">
-                   <div className="h-8 w-1 bg-teal-500 rounded-full"></div>
+                   <div className="h-8 w-1 bg-primary-500 rounded-full"></div>
                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">
                        {selectedYear === 'All' ? 'All Events' : `${selectedYear} Timeline`}
                    </h3>
@@ -253,21 +233,22 @@ const Holidays = () => {
 
            <div className="space-y-6">
                 {stats.nextOne && (
-                    <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden group">
+                    <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700"></div>
                         <div className="relative z-10">
                             <div className="flex items-center gap-2 mb-6">
                                 <span className="bg-white/20 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Next Up</span>
                             </div>
                             <h3 className="text-3xl font-black mb-1 leading-tight">{stats.nextOne.name}</h3>
-                            <div className="flex items-center gap-2 text-teal-100 font-medium mt-2">
+                            <div className="flex items-center gap-2 text-primary-100 font-medium mt-2">
                                 <Clock size={16} />
                                 <span>{new Date(stats.nextOne.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                             </div>
                         </div>
                     </div>
                 )}
-
+                
+                {/* ... Stats boxes (Total, Completed) - Semantic colors OK ... */}
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between h-32">
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/20 w-fit rounded-xl text-blue-600"><Calculator size={20} /></div>
@@ -285,28 +266,29 @@ const Holidays = () => {
                     </div>
                 </div>
 
+                {/* Quick Views */}
                 <div className="bg-slate-50 dark:bg-slate-900/50 rounded-3xl p-6 border border-slate-200 dark:border-slate-700">
                     <h4 className="text-xs font-bold uppercase text-slate-400 tracking-widest mb-4">Quick Views</h4>
                     <div className="space-y-3">
-                        <button onClick={() => openFilterModal(`Weekdays (${stats.weekdays.length})`, stats.weekdays)} className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-teal-500 transition-colors group">
+                        <button onClick={() => openFilterModal(`Weekdays (${stats.weekdays.length})`, stats.weekdays)} className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-primary-500 transition-colors group">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600"><CalendarDays size={18} /></div>
                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">Weekdays</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="font-black text-slate-800 dark:text-white">{stats.weekdays.length}</span>
-                                <ArrowRight size={14} className="text-slate-300 group-hover:text-teal-500 transition-colors" />
+                                <ArrowRight size={14} className="text-slate-300 group-hover:text-primary-500 transition-colors" />
                             </div>
                         </button>
                         
-                        <button onClick={() => openFilterModal(`Weekends (${stats.weekends.length})`, stats.weekends)} className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-teal-500 transition-colors group">
+                        <button onClick={() => openFilterModal(`Weekends (${stats.weekends.length})`, stats.weekends)} className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-primary-500 transition-colors group">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-amber-600"><CalendarRange size={18} /></div>
                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">Weekends</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="font-black text-slate-800 dark:text-white">{stats.weekends.length}</span>
-                                <ArrowRight size={14} className="text-slate-300 group-hover:text-teal-500 transition-colors" />
+                                <ArrowRight size={14} className="text-slate-300 group-hover:text-primary-500 transition-colors" />
                             </div>
                         </button>
                     </div>
@@ -318,22 +300,22 @@ const Holidays = () => {
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Event Name</label>
-                  <input required type="text" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" placeholder="e.g. Founder's Day" value={newHoliday.name} onChange={e => setNewHoliday({...newHoliday, name: e.target.value})} />
+                  <input required type="text" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" placeholder="e.g. Founder's Day" value={newHoliday.name} onChange={e => setNewHoliday({...newHoliday, name: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Date</label>
-                  <input required type="date" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newHoliday.date} onChange={e => setNewHoliday({...newHoliday, date: e.target.value})} />
+                  <input required type="date" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" value={newHoliday.date} onChange={e => setNewHoliday({...newHoliday, date: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Category</label>
-                  <select className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500" value={newHoliday.type} onChange={e => setNewHoliday({...newHoliday, type: e.target.value as any})}>
+                  <select className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" value={newHoliday.type} onChange={e => setNewHoliday({...newHoliday, type: e.target.value as any})}>
                     <option value="Public">Public Holiday</option>
                     <option value="Company">Company Event</option>
                   </select>
                 </div>
                 <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
                   <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2.5 text-slate-500 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 rounded-lg transition-colors">Cancel</button>
-                  <button type="submit" className="px-8 py-2.5 bg-teal-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-teal-500/20 hover:bg-teal-700 transition-all active:scale-95">Save</button>
+                  <button type="submit" className="px-8 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-primary-500/20 hover:bg-primary-700 transition-all active:scale-95">Save</button>
                 </div>
             </form>
        </DraggableModal>

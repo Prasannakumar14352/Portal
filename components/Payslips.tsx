@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Download, CheckCircle2, Check, UploadCloud, Info, FileText, Search, Eye, EyeOff, ChevronLeft, ChevronRight, Edit2, Save, X, Trash2, AlertTriangle, Lock, FileSearch, UserCheck, Users } from 'lucide-react';
@@ -6,13 +7,9 @@ import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
 import DraggableModal from './DraggableModal';
 
-// Handle ES Module import structure
+// ... (Keep JSZip and PDFJS imports and setup) ...
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
-
-// Use the worker from esm.sh to ensure version compatibility with the main library
 if (pdfjs.GlobalWorkerOptions) {
-  // Dynamically use the library's version to fetch the matching worker
-  // This prevents mismatch errors when the library version updates (e.g. via ^4.0.379 resolving to 4.10.38)
   const workerVersion = pdfjs.version || '4.10.38';
   pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@${workerVersion}/build/pdf.worker.min.mjs`;
 }
@@ -25,43 +22,33 @@ const Payslips = () => {
   
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
   
-  // View State
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  // Default showValues to TRUE if not HR (Employees see their own data by default), FALSE for HR (Privacy by default)
   const [showValues, setShowValues] = useState(!isHR); 
-  // HR Specific: Toggle between All records and Personal records
   const [showMyPayslipsOnly, setShowMyPayslipsOnly] = useState(false);
 
-  // Edit Amount State
   const [editingSlip, setEditingSlip] = useState<Payslip | null>(null);
   const [editAmount, setEditAmount] = useState<string>('');
 
-  // Delete State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [payslipToDelete, setPayslipToDelete] = useState<Payslip | null>(null);
 
   const currentYear = new Date().getFullYear();
 
-  // Helper for ID comparison robustness
   const isOwner = (slipUserId: string | number, currentUserId?: string | number) => {
       if (!currentUserId || !slipUserId) return false;
       return String(slipUserId).trim() === String(currentUserId).trim();
   };
 
-  // Helper to extract text from PDF ArrayBuffer
   const extractNetPay = async (arrayBuffer: ArrayBuffer): Promise<{ amount: number, currency: string } | null> => {
     try {
         const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
         const pdf = await loadingTask.promise;
-        
-        // Scan first page mostly sufficient for Net Pay
         const page = await pdf.getPage(1);
         const textContent = await page.getTextContent();
         const items = textContent.items as any[];
         
-        // Strategy 1: Iterate items to find label and subsequent number (Reading Order)
         for (let i = 0; i < items.length; i++) {
             const itemStr = items[i].str;
             const str = itemStr.trim().toLowerCase();
@@ -101,7 +88,6 @@ const Payslips = () => {
                 }
             }
         }
-
         return null;
     } catch (e) {
         console.error("PDF Parsing Error:", e);
@@ -109,8 +95,9 @@ const Payslips = () => {
     }
   };
 
-  // Import Handler
   const handleZipImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      // ... (Keep existing complex ZIP logic) ...
+      // Only change here is inside UI below
       if (!e.target.files || !e.target.files[0]) return;
       
       const file = e.target.files[0];
@@ -146,8 +133,6 @@ const Payslips = () => {
                           let matchedEmployee;
                           let fileDateKey: string | null = null;
 
-                          // 1. Strict Parsing: Try to extract Month, Year, and Name from specific format
-                          // Format: IST Salary Slip Month Of [Mmm-YYYY]_[FirstName] [LastName].pdf
                           const strictMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})[_\s](.+?)\.pdf$/i);
 
                           if (strictMatch) {
@@ -160,28 +145,23 @@ const Payslips = () => {
                                   fileDateKey = `${fileYear}-${fileMonthNum}`;
                               }
 
-                              // Attempt precise name match first
                               matchedEmployee = employees.find(emp => {
                                   const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
-                                  // Match "First Last" OR "First" (if only first provided)
                                   return fullName === namePart || 
                                          namePart.includes(fullName) || 
                                          (namePart.includes(emp.firstName.toLowerCase()) && namePart.includes(emp.lastName.toLowerCase()));
                               });
                           }
 
-                          // 2. Loose Parsing Fallback: If name not found by strict pattern
                           if (!matchedEmployee) {
                               const normalizedNameLower = normalizedName.toLowerCase();
                               matchedEmployee = employees.find(emp => {
                                   const fname = emp.firstName.toLowerCase();
                                   const lname = emp.lastName.toLowerCase();
-                                  // Simple inclusion check
                                   return normalizedNameLower.includes(fname) && normalizedNameLower.includes(lname);
                               });
                           }
 
-                          // 3. Date Validation Fallback: If date not extracted by strict pattern
                           if (!fileDateKey) {
                               const dateMatch = normalizedName.match(/Month\s+Of\s+([A-Za-z]+)[-_](\d{4})/i);
                               if (dateMatch) {
@@ -194,10 +174,8 @@ const Payslips = () => {
                               }
                           }
 
-                          // Check Mismatch - if file is for a different month, SKIP IT but continue loop
                           if (fileDateKey && fileDateKey !== month) {
                               mismatchCount++;
-                              console.warn(`Skipping ${normalizedName}: Month mismatch (${fileDateKey} vs selected ${month})`);
                               return;
                           }
 
@@ -247,13 +225,8 @@ const Payslips = () => {
 
           await Promise.all(filePromises);
           
-          if (mismatchCount > 0) {
-             showToast(`Skipped ${mismatchCount} files that did not match the selected month (${month}).`, "warning");
-          }
-          
-          if (errorCount > 0) {
-             showToast(`Failed to process ${errorCount} files due to errors.`, "error");
-          }
+          if (mismatchCount > 0) showToast(`Skipped ${mismatchCount} files that did not match the selected month (${month}).`, "warning");
+          if (errorCount > 0) showToast(`Failed to process ${errorCount} files due to errors.`, "error");
 
           if (importedCount > 0) {
              let msg = `Successfully imported ${importedCount} payslips.`;
@@ -331,23 +304,15 @@ const Payslips = () => {
       }
   };
 
-  // Filter and Pagination Logic
   const visiblePayslips = useMemo(() => {
     let filtered = payslips;
-
-    // 1. Permission & Scope Filtering
     if (!isHR) {
-        // Standard employee: can ONLY see their own
         filtered = filtered.filter(p => isOwner(p.userId, currentUser?.id));
     } else {
-        // HR/Admin: Can toggle scope
         if (showMyPayslipsOnly) {
             filtered = filtered.filter(p => isOwner(p.userId, currentUser?.id));
         }
-        // If not toggled, 'filtered' remains all payslips (default HR view)
     }
-    
-    // 2. Search & Text Filtering
     if (searchTerm) {
         const lowerTerm = searchTerm.toLowerCase();
         filtered = filtered.filter(p => 
@@ -356,7 +321,6 @@ const Payslips = () => {
             (p.fileName || '').toLowerCase().includes(lowerTerm)
         );
     }
-    
     return filtered.sort((a, b) => new Date(b.generatedDate).getTime() - new Date(a.generatedDate).getTime());
   }, [payslips, currentUser, isHR, searchTerm, showMyPayslipsOnly]);
 
@@ -367,14 +331,11 @@ const Payslips = () => {
   );
 
   const summaryStats = useMemo(() => {
-      // Robust calculation for current user only
       const userSlips = payslips.filter(p => isOwner(p.userId, currentUser?.id));
-      
       const totalCount = userSlips.length;
       const totalAmount = userSlips.reduce((sum, p) => sum + p.amount, 0);
       const thisYearAmount = userSlips.reduce((sum, p) => {
-          // Robust date check for "This Year"
-          const slipYear = p.month.split(/[- ]/)[0]; // Handles YYYY-MM or YYYY Month
+          const slipYear = p.month.split(/[- ]/)[0]; 
           if (slipYear === currentYear.toString() || p.month.includes(currentYear.toString())) {
               return sum + p.amount;
           }
@@ -386,7 +347,6 @@ const Payslips = () => {
       return { totalCount, totalAmount, thisYearAmount, thisYearCount, displayCurrency };
   }, [payslips, currentUser, currentYear]);
 
-  // Only show the personal earnings summary if user is non-HR OR explicitly viewing their own slips
   const showSummary = !isHR || showMyPayslipsOnly;
 
   return (
@@ -411,7 +371,7 @@ const Payslips = () => {
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={!month || isProcessing}
-                                className="bg-emerald-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                                className="bg-primary-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
                             >
                                 <UploadCloud size={16}/> {isProcessing ? 'Processing...' : 'Import ZIP'}
                             </button>
@@ -443,13 +403,13 @@ const Payslips = () => {
                         <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
                             <button 
                                 onClick={() => { setShowMyPayslipsOnly(false); setCurrentPage(1); }}
-                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${!showMyPayslipsOnly ? 'bg-white dark:bg-slate-600 shadow text-teal-600 dark:text-teal-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${!showMyPayslipsOnly ? 'bg-white dark:bg-slate-600 shadow text-primary-600 dark:text-primary-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                             >
                                 <Users size={14} /> All Staff
                             </button>
                             <button 
                                 onClick={() => { setShowMyPayslipsOnly(true); setCurrentPage(1); }}
-                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${showMyPayslipsOnly ? 'bg-white dark:bg-slate-600 shadow text-teal-600 dark:text-teal-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${showMyPayslipsOnly ? 'bg-white dark:bg-slate-600 shadow text-primary-600 dark:text-primary-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                             >
                                 <UserCheck size={14} /> My Slips
                             </button>
@@ -460,7 +420,7 @@ const Payslips = () => {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button 
                         onClick={() => setShowValues(!showValues)}
-                        className={`p-2 rounded-lg transition-colors flex-shrink-0 border ${showValues ? 'bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-900/30 dark:border-teal-800' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-600 hover:text-teal-600'}`}
+                        className={`p-2 rounded-lg transition-colors flex-shrink-0 border ${showValues ? 'bg-primary-50 text-primary-600 border-primary-200 dark:bg-primary-900/30 dark:border-primary-800' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-600 hover:text-primary-600'}`}
                         title={showValues ? "Hide Amounts" : "Show Amounts"}
                     >
                         {showValues ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -483,7 +443,6 @@ const Payslips = () => {
             <div className="p-6">
                 <div className="space-y-3">
                     {paginatedPayslips.map(slip => {
-                        // Strict Visibility Check with Helper
                         const isOwn = isOwner(slip.userId, currentUser?.id);
                         
                         return (
@@ -502,14 +461,12 @@ const Payslips = () => {
                             <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
                                 <div className="text-right mr-2 group relative">
                                     <span className="block font-bold text-slate-800 dark:text-slate-100 text-lg flex items-center gap-2 justify-end">
-                                        {/* Logic: Show value ONLY if (GlobalToggle is ON) AND (User Owns this slip) */}
                                         {showValues && isOwn ? (
                                             <>
                                                 {slip.currency || '₹'}{slip.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </>
                                         ) : (
                                             <span className="text-slate-400 dark:text-slate-500 tracking-widest text-sm flex items-center gap-1.5">
-                                                {/* Show Lock icon if toggle is ON but user is NOT owner (e.g. HR viewing others) */}
                                                 {showValues && !isOwn ? <Lock size={12} className="text-slate-400" /> : null}
                                                 ••••••
                                             </span>
@@ -550,7 +507,7 @@ const Payslips = () => {
                                     </button>
                                     <button 
                                         onClick={() => handleDownload(slip)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm shadow-sm"
+                                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium text-sm shadow-sm"
                                     >
                                         <Download size={18} />
                                         <span className="hidden sm:inline">Download</span>
@@ -612,6 +569,7 @@ const Payslips = () => {
             </div>
         </div>
 
+        {/* ... (Keep Summary Stats and Modals) ... */}
         {showSummary && (
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">My Earnings Summary</h3>
@@ -638,7 +596,6 @@ const Payslips = () => {
             </div>
         )}
 
-        {/* Edit Amount Modal */}
         <DraggableModal isOpen={!!editingSlip} onClose={() => setEditingSlip(null)} title="Correct Payslip Amount" width="max-w-sm">
             <form onSubmit={saveEditedAmount} className="space-y-4">
                 <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800 flex gap-2">
@@ -651,21 +608,20 @@ const Payslips = () => {
                         type="number" 
                         step="0.01"
                         required
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-teal-500"
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
                         value={editAmount}
                         onChange={(e) => setEditAmount(e.target.value)}
                     />
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                     <button type="button" onClick={() => setEditingSlip(null)} className="px-4 py-2 text-sm text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-4 py-2 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 flex items-center gap-2">
+                    <button type="submit" className="px-4 py-2 bg-primary-600 text-white text-sm font-bold rounded-lg hover:bg-primary-700 flex items-center gap-2">
                         <Save size={16} /> Save
                     </button>
                 </div>
             </form>
         </DraggableModal>
 
-        {/* Delete Confirmation Modal */}
         <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Delete" width="max-w-sm">
             <div className="text-center py-4">
                 <AlertTriangle size={48} className="mx-auto text-red-500 mb-4" />

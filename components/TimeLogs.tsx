@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { TimeEntry, Project, UserRole } from '../types';
@@ -401,7 +402,7 @@ const TimeLogs = () => {
               <button onClick={exportExcel} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><FileSpreadsheet size={16}/> Export Excel</button>
               <button 
                 onClick={() => { resetForm(); setShowModal(true); }}
-                className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2 rounded-lg font-bold text-sm shadow-lg shadow-teal-500/20 transition-all active:scale-95"
+                className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2 rounded-lg font-bold text-sm shadow-lg shadow-primary-500/20 transition-all active:scale-95"
               >
                   <Plus size={18} />
                   <span>Add Time Entry</span>
@@ -419,11 +420,11 @@ const TimeLogs = () => {
                       <label className="text-xs font-bold text-slate-500 uppercase">Time Period</label>
                       <div className="flex items-center gap-4">
                           <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="radio" checked={timePeriod === 'Week'} onChange={() => setTimePeriod('Week')} className="text-teal-600 focus:ring-teal-500" />
+                              <input type="radio" checked={timePeriod === 'Week'} onChange={() => setTimePeriod('Week')} className="text-primary-600 focus:ring-primary-500" />
                               <span className="text-sm font-medium">Week</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="radio" checked={timePeriod === 'Month'} onChange={() => setTimePeriod('Month')} className="text-teal-600 focus:ring-teal-500" />
+                              <input type="radio" checked={timePeriod === 'Month'} onChange={() => setTimePeriod('Month')} className="text-primary-600 focus:ring-primary-500" />
                               <span className="text-sm font-medium">Month</span>
                           </label>
                       </div>
@@ -446,7 +447,7 @@ const TimeLogs = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
               <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500">Filter by Project</label>
-                  <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-teal-500">
+                  <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-primary-500">
                       <option value="All">All Projects</option>
                       {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                       <option value={NO_PROJECT_ID}>Internal - General</option>
@@ -454,14 +455,14 @@ const TimeLogs = () => {
               </div>
               <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500">Filter by Task</label>
-                  <select value={filterTask} onChange={(e) => setFilterTask(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-teal-500">
+                  <select value={filterTask} onChange={(e) => setFilterTask(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-primary-500">
                       <option>All Tasks</option>
                       {allUniqueTasks.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
               </div>
               <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500">Filter by Status</label>
-                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-teal-500">
+                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-primary-500">
                       <option>All Statuses</option>
                       <option>Pending</option>
                       <option>Approved</option>
@@ -497,9 +498,9 @@ const TimeLogs = () => {
                         className="bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100/50 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-700"
                         onClick={() => setExpandedProjects(prev => ({...prev, [pid]: !prev[pid]}))}
                       >
-                        <td colSpan={9} className="px-6 py-3 font-bold text-teal-700 dark:text-teal-400">
+                        <td colSpan={9} className="px-6 py-3 font-bold text-primary-700 dark:text-primary-400">
                            <div className="flex items-center gap-3">
-                               <div className="p-1 rounded bg-teal-100 dark:bg-teal-900/30">
+                               <div className="p-1 rounded bg-primary-100 dark:bg-primary-900/30">
                                    {expandedProjects[pid] ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
                                </div>
                                <span className="uppercase tracking-tight whitespace-nowrap">{getProjectName(pid)} ({entries.length} entries)</span>
@@ -555,7 +556,7 @@ const TimeLogs = () => {
                             </td>
                             <td className="px-6 py-4 align-top text-right">
                                <div className="flex items-center justify-end gap-1">
-                                  <button onClick={() => handleEdit(e)} className="text-slate-300 hover:text-teal-600 transition-colors p-2 rounded-lg hover:bg-teal-50" title="Edit Log">
+                                  <button onClick={() => handleEdit(e)} className="text-slate-300 hover:text-primary-600 transition-colors p-2 rounded-lg hover:bg-primary-50" title="Edit Log">
                                      <Edit2 size={15} />
                                   </button>
                                   <button onClick={() => handleDeleteTrigger(e.id)} className="text-slate-300 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50" title="Delete Log">
@@ -614,7 +615,7 @@ const TimeLogs = () => {
                                       {formatDurationShort(mins)}
                                   </td>
                               ))}
-                              <td className="px-4 py-3 text-center font-mono font-bold text-teal-600">
+                              <td className="px-4 py-3 text-center font-mono font-bold text-primary-600">
                                   {formatDurationShort(weeklyReportData[pid].total)}
                               </td>
                           </tr>
@@ -626,7 +627,7 @@ const TimeLogs = () => {
                                   {formatDurationShort(total)}
                               </td>
                           ))}
-                          <td className="px-4 py-3 text-center font-mono text-teal-700 dark:text-teal-400">
+                          <td className="px-4 py-3 text-center font-mono text-primary-700 dark:text-primary-400">
                               {formatDurationShort(grandTotals.grand)}
                           </td>
                       </tr>
@@ -665,14 +666,14 @@ const TimeLogs = () => {
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div>
                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Date</label>
-                       <input required type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500" value={formData.date} onChange={e => setFormData({...formData,date: e.target.value})} />
+                       <input required type="date" className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-primary-500" value={formData.date} onChange={e => setFormData({...formData,date: e.target.value})} />
                    </div>
                    <div>
                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Project</label>
                        <select 
                         required 
                         disabled={formData.isHoliday}
-                        className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:bg-slate-50" 
+                        className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:bg-slate-50" 
                         value={formData.projectId} 
                         onChange={e => {
                          const pid = e.target.value;
@@ -689,7 +690,7 @@ const TimeLogs = () => {
                    <select 
                       required 
                       disabled={!formData.projectId || formData.isHoliday}
-                      className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:bg-slate-50 transition-all shadow-sm" 
+                      className="w-full px-3 py-2.5 border rounded-xl dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:bg-slate-50 transition-all shadow-sm" 
                       value={formData.task} 
                       onChange={e => setFormData({...formData, task: e.target.value})}
                    >
@@ -740,11 +741,11 @@ const TimeLogs = () => {
                </div>
                <div>
                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Detailed Notes</label>
-                   <textarea required rows={4} className="w-full px-4 py-3 border rounded-xl text-sm dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-teal-500" placeholder="What did you achieve? Provide bullet points if possible." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                   <textarea required rows={4} className="w-full px-4 py-3 border rounded-xl text-sm dark:bg-slate-700 bg-white outline-none focus:ring-2 focus:ring-primary-500" placeholder="What did you achieve? Provide bullet points if possible." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                </div>
                <div className="flex justify-end gap-3 pt-4 border-t dark:border-slate-700">
                   <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors">Cancel</button>
-                  <button type="submit" className="px-10 py-3 bg-teal-600 text-white rounded-2xl font-bold shadow-xl shadow-teal-500/20 hover:bg-teal-700 transition active:scale-95">
+                  <button type="submit" className="px-10 py-3 bg-primary-600 text-white rounded-2xl font-bold shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition active:scale-95">
                      {editingId ? 'Update Log' : 'Save Session'}
                   </button>
                </div>

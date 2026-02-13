@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Bell, Mail, Monitor, Shield, Eye, Database, Sparkles, Smartphone, Moon, Sun, Lock, Save, RotateCcw, Zap } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import { UserRole, UserSettings } from '../types';
+import ThemeCustomizer from './ThemeCustomizer';
 
 const DEFAULT_SETTINGS: UserSettings = {
   notifications: {
@@ -16,6 +17,9 @@ const DEFAULT_SETTINGS: UserSettings = {
     aiAssistant: true,
     azureSync: false,
     strictSso: false
+  },
+  branding: {
+    primaryColor: '#7c3aed'
   }
 };
 
@@ -61,9 +65,9 @@ const Settings = () => {
   };
 
   const Toggle = ({ enabled, onChange, label, sublabel, icon: Icon }: any) => (
-    <div className={`flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/20 rounded-2xl border transition-all group ${enabled ? 'border-teal-500/20 shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}>
+    <div className={`flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/20 rounded-2xl border transition-all group ${enabled ? 'border-primary-500/20 shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}>
       <div className="flex items-start gap-4">
-        <div className={`p-2 rounded-lg ${enabled ? 'bg-teal-50 text-teal-600 dark:bg-teal-900/30' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'} transition-colors`}>
+        <div className={`p-2 rounded-lg ${enabled ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'} transition-colors`}>
           <Icon size={20} />
         </div>
         <div>
@@ -73,7 +77,7 @@ const Settings = () => {
       </div>
       <button 
         onClick={() => onChange(!enabled)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-teal-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-700'}`}
       >
         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
       </button>
@@ -100,7 +104,7 @@ const Settings = () => {
                 disabled={isSaving || !isDirty}
                 className={`px-6 py-2.5 rounded-xl transition-all flex items-center space-x-2 text-sm font-black shadow-lg ${
                     isDirty 
-                    ? 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-500/30' 
+                    ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-primary-500/30' 
                     : 'bg-slate-100 text-slate-400 dark:bg-slate-800 cursor-not-allowed shadow-none border border-slate-200 dark:border-slate-700'
                 }`}
             >
@@ -111,6 +115,10 @@ const Settings = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-8">
+        
+        {/* Branding Config - Visible to Power Users Only */}
+        {isPowerUser && <ThemeCustomizer />}
+
         {/* Notification Preferences */}
         <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6">
           <div className="flex items-center gap-3 mb-2">
@@ -182,9 +190,9 @@ const Settings = () => {
 
         {/* Global Admin Config - Visible to Power Users Only */}
         {isPowerUser && (
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6 border-l-4 border-l-teal-600">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6 border-l-4 border-l-primary-600">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-teal-50 dark:bg-teal-900/30 rounded-xl text-teal-600">
+              <div className="p-2 bg-primary-50 dark:bg-primary-900/30 rounded-xl text-primary-600">
                 <Database size={20} />
               </div>
               <h3 className="text-xl font-bold text-slate-800 dark:text-white">Organizational Control</h3>

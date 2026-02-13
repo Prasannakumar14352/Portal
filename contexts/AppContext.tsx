@@ -134,8 +134,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (freshEmp) {
              const mappedUser = mapEmployeeToUser(freshEmp);
              setCurrentUser(mappedUser);
+             // Apply saved theme preference on load
+             if (mappedUser.settings?.branding?.primaryColor) {
+               applyThemeToRoot(mappedUser.settings.branding.primaryColor);
+             }
           } else {
              setCurrentUser(user);
+             if (user.settings?.branding?.primaryColor) {
+               applyThemeToRoot(user.settings.branding.primaryColor);
+             }
           }
         }
       } catch(e) {
@@ -156,6 +163,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [theme]);
 
+  // Apply theme when user updates settings
+  useEffect(() => {
+    if (currentUser?.settings?.branding?.primaryColor) {
+      applyThemeToRoot(currentUser.settings.branding.primaryColor);
+    }
+  }, [currentUser?.settings?.branding?.primaryColor]);
+
   // PWA Handler
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -170,6 +184,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
+
+  // -- Theme Helpers --
+  const applyThemeToRoot = (hex: string) => {
+    const hexToRgb = (h: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+    };
+    const mix = (c1: any, c2: any, w: number) => {
+        const r = Math.round(c1.r * (1 - w) + c2.r * w);
+        const g = Math.round(c1.g * (1 - w) + c2.g * w);
+        const b = Math.round(c1.b * (1 - w) + c2.b * w);
+        return `${r} ${g} ${b}`;
+    };
+
+    const rgb = hexToRgb(hex);
+    if (!rgb) return;
+
+    const root = document.documentElement;
+    root.style.setProperty('--primary-50', mix(rgb, {r:255,g:255,b:255}, 0.95));
+    root.style.setProperty('--primary-100', mix(rgb, {r:255,g:255,b:255}, 0.9));
+    root.style.setProperty('--primary-200', mix(rgb, {r:255,g:255,b:255}, 0.75));
+    root.style.setProperty('--primary-300', mix(rgb, {r:255,g:255,b:255}, 0.6));
+    root.style.setProperty('--primary-400', mix(rgb, {r:255,g:255,b:255}, 0.3));
+    root.style.setProperty('--primary-500', mix(rgb, {r:255,g:255,b:255}, 0.1));
+    root.style.setProperty('--primary-600', `${rgb.r} ${rgb.g} ${rgb.b}`);
+    root.style.setProperty('--primary-700', mix(rgb, {r:0,g:0,b:0}, 0.1));
+    root.style.setProperty('--primary-800', mix(rgb, {r:0,g:0,b:0}, 0.25));
+    root.style.setProperty('--primary-900', mix(rgb, {r:0,g:0,b:0}, 0.45));
+    root.style.setProperty('--primary-950', mix(rgb, {r:0,g:0,b:0}, 0.65));
+  };
 
   const installApp = async () => {
     if (!deferredPrompt) return;
@@ -251,6 +295,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const mapped = mapEmployeeToUser(user);
       setCurrentUser(mapped);
       localStorage.setItem('currentUser', JSON.stringify(mapped));
+      
+      // Apply theme on login
+      if (mapped.settings?.branding?.primaryColor) {
+          applyThemeToRoot(mapped.settings.branding.primaryColor);
+      }
+      
       return true;
     }
     showToast("User not found", "error");
@@ -275,6 +325,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const mapped = mapEmployeeToUser(user);
             setCurrentUser(mapped);
             localStorage.setItem('currentUser', JSON.stringify(mapped));
+            
+            // Apply theme on login
+            if (mapped.settings?.branding?.primaryColor) {
+               applyThemeToRoot(mapped.settings.branding.primaryColor);
+            }
+
             return true;
         }
     } catch (e) {
@@ -287,6 +343,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
+    // Reset theme to default on logout
+    applyThemeToRoot('#7c3aed');
   };
 
   const forgotPassword = async (email: string) => {

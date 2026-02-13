@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
 import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown, Zap } from 'lucide-react';
@@ -70,6 +71,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   });
   
   const [logDurationSplit, setLogDurationSplit] = useState({ standard: 0, extra: 0 });
+  const [includeExtraInLog, setIncludeExtraInLog] = useState(false);
 
   const NO_PROJECT_ID = "NO_PROJECT";
 
@@ -88,11 +90,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             tasks = Array.isArray(parsed) ? parsed : [];
         } catch (e) { tasks = []; }
     }
-    // Strict match, sorted
     return Array.isArray(tasks) ? [...tasks].sort() : [];
   }, [logFormData.projectId, projects]);
 
-  // Strict check for HR or Admin roles
   const isHR = currentUser?.role === UserRole.HR || currentUser?.role === UserRole.ADMIN;
 
   const pendingRecord = useMemo(() => {
@@ -136,20 +136,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const getDurationMs = (record: AttendanceRecord) => {
     const start = record.checkInTime ? new Date(record.checkInTime) : null;
     let end = record.checkOutTime ? new Date(record.checkOutTime) : null;
-    
-    // For sorting, we only calculate dynamic duration for the *current user's* active session.
-    // For others, an active session counts as 0 or undefined for sorting purposes to keep it stable.
     if (start && !end && String(record.employeeId) === String(currentUser?.id)) {
         end = currentTime;
     }
-    
-    if (!start || !end) return -1; // Treat undefined/incomplete durations as smallest
+    if (!start || !end) return -1;
     return end.getTime() - start.getTime();
   };
 
-  // --- Checkout Sequence Logic ---
-
-  // Step 1: Initial Click
   const handleCheckOutClick = () => {
     if (!currentUser || !pendingRecord) return;
     
@@ -161,8 +154,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         }
     }
     
-    // Check 1: Duration < 9 hours (Early Checkout)
-    // Only prompt for early checkout if duration is valid and less than 9h
     if (durationHrs > 0 && durationHrs < 9) {
       setShowEarlyReasonModal(true);
       return;
@@ -171,15 +162,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     proceedToLogCheck();
   };
 
-  // Step 2: Handle Early Reason Submit -> Go to Log Check
   const handleEarlyCheckoutSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setShowEarlyReasonModal(false);
-      // earlyReason is stored in state, proceed to next step
       proceedToLogCheck();
   };
 
-  // Step 3: Check for Time Log
   const proceedToLogCheck = () => {
       if (!currentUser || !pendingRecord) return;
 
@@ -187,15 +175,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       const hasLog = timeEntries.some(t => String(t.userId) === String(currentUser.id) && t.date === recordDate);
       
       if (!hasLog) {
-          // Reset log form for fresh entry
           setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
           
-          // Calculate split: Standard capped at 8h (480m)
-          // Extra is only provided if total exceeds 9 hours (540m)
           const totalMins = getDurationInMinutes(pendingRecord);
-          const standard = Math.min(totalMins, 480);
-          const extra = Math.max(0, totalMins - 540); // Only count time after 9 hours as extra
+          const standard = Math.min(totalMins, 480); // Cap standard at 8h
+          const extra = Math.max(0, totalMins - 480); // All time after 8h is potentially extra
+          
           setLogDurationSplit({ standard, extra });
+          setIncludeExtraInLog(totalMins > 480); // Default to true if over 8h
           
           setShowTimeLogModal(true);
           return;
@@ -204,20 +191,23 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       proceedToRetroCheck();
   };
 
-  // Step 4: Handle Log Submit -> Go to Retro Check
   const handleMandatoryLogSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!currentUser || !pendingRecord) return;
       
       setIsSubmittingLog(true);
       try {
+          // If checkbox unchecked, merge all time into durationMinutes
+          const finalDuration = includeExtraInLog ? logDurationSplit.standard : (logDurationSplit.standard + logDurationSplit.extra);
+          const finalExtra = includeExtraInLog ? logDurationSplit.extra : 0;
+
           await addTimeEntry({
               userId: currentUser.id,
               projectId: logFormData.projectId === NO_PROJECT_ID ? "" : logFormData.projectId,
               task: logFormData.task,
               date: pendingRecord.date,
-              durationMinutes: logDurationSplit.standard,
-              extraMinutes: logDurationSplit.extra,
+              durationMinutes: finalDuration,
+              extraMinutes: finalExtra,
               description: logFormData.description,
               status: 'Pending',
               isBillable: logFormData.isBillable
@@ -233,7 +223,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       }
   };
 
-  // Step 5: Check for Retroactive Date
   const proceedToRetroCheck = () => {
       if (!pendingRecord) return;
       const todayStr = formatDateISO(new Date());
@@ -247,17 +236,14 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         return;
       }
 
-      // Step 6: Final Checkout (Standard)
       checkOut(earlyReason);
-      setEarlyReason(''); // Reset reason after use
+      setEarlyReason('');
   };
 
-  // Handle Retro Submit (Final Step for Retro cases)
   const handleRetroSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingRecord) return;
 
-    // Validation: End Date/Time must be >= Start Date/Time
     const checkOutDate = new Date(`${retroForm.date}T${retroForm.time}:00`);
     let checkInDate = new Date();
     if (pendingRecord.checkInTime) checkInDate = new Date(pendingRecord.checkInTime);
@@ -277,8 +263,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     setEarlyReason('');
     showToast("Session closed successfully", "success");
   };
-
-  // --- End Checkout Sequence ---
 
   const openEditModal = (record: AttendanceRecord) => {
       setEditingRecord(record);
@@ -302,8 +286,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       if (editForm.checkOutDate && editForm.checkOutTime) {
           const outDt = new Date(`${editForm.checkOutDate}T${editForm.checkOutTime}:00`);
           const inDt = new Date(cinISO);
-          
-          // Validation: End Date/Time must be >= Start Date/Time
           if (outDt < inDt) {
               showToast("End date/time cannot be earlier than start date/time.", "error");
               return;
@@ -343,12 +325,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   const filteredRecords = useMemo(() => {
     let filtered = [...records];
-    
-    // Privacy Filter: Non-HR users see ONLY their own records
     if (!isHR && currentUser) {
         filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
     }
-    
     if (employeeSearch) {
         filtered = filtered.filter(r => r.employeeName.toLowerCase().includes(employeeSearch.toLowerCase()));
     }
@@ -372,7 +351,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
     } else {
         filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-
     return filtered;
   }, [records, startDate, endDate, employeeSearch, filterLocation, filterStatus, sortConfig, isHR, currentUser]); 
 
@@ -404,18 +382,19 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       );
   };
 
-  const isOvertimeSession = useMemo(() => {
-      if (!pendingRecord) return false;
-      const mins = getDurationInMinutes(pendingRecord);
-      return mins > 540; // 9 hours
+  const totalMinsForCurrent = useMemo(() => {
+      if (!pendingRecord) return 0;
+      return getDurationInMinutes(pendingRecord);
   }, [pendingRecord, currentTime]);
+
+  const isOver8Hours = totalMinsForCurrent > 480;
 
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col lg:flex-row justify-between items-center gap-8">
          <div className="text-center lg:text-left">
             <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Attendance</h2>
-            <div className="mt-1 text-3xl font-mono text-teal-600 dark:text-teal-400 font-black uppercase tracking-tight">
+            <div className="mt-1 text-3xl font-mono text-primary-600 dark:text-primary-400 font-black uppercase tracking-tight">
                {currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).toLowerCase()}
             </div>
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</p>
@@ -440,18 +419,17 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-[0.2em] flex items-center gap-2"><Clock size={14}/> Live Session</h4>
             <div className="space-y-3">
                <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Clock In</span><span className="text-xs font-black text-slate-800 dark:text-white uppercase">{pendingRecord?.checkIn || '--:--'}</span></div>
-               <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Total Logged</span><span className="text-sm font-black text-teal-600 dark:text-teal-400">{calculateDuration(pendingRecord || {id: 0, employeeId: 0, employeeName: '', date: '', checkIn: '', checkOut: '', status: 'Absent'})}</span></div>
+               <div className="flex justify-between items-center"><span className="text-xs text-slate-500 font-bold uppercase tracking-tighter">Total Logged</span><span className="text-sm font-black text-primary-600 dark:text-primary-400">{calculateDuration(pendingRecord || {id: 0, employeeId: 0, employeeName: '', date: '', checkIn: '', checkOut: '', status: 'Absent'})}</span></div>
             </div>
          </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col xl:flex-row gap-4 items-end">
-          {/* Only Show Search for HR */}
           {isHR && (
             <div className="space-y-1.5 flex-1 w-full xl:w-auto">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Search size={12} /> Search Employee</label>
                 <div className="relative">
-                    <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" />
+                    <input type="text" placeholder="Search by name..." value={employeeSearch} onChange={e => { setEmployeeSearch(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all dark:text-white font-medium" />
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                 </div>
             </div>
@@ -460,56 +438,22 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-[2] w-full">
               <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> From Date</label>
-                  <input 
-                    type="date" 
-                    value={startDate} 
-                    onChange={e => { 
-                        const newStartDate = e.target.value;
-                        if (newStartDate > endDate) {
-                             showToast("From date cannot be later than To date.", "warning");
-                             return;
-                        }
-                        setStartDate(newStartDate); 
-                        setCurrentPage(1); 
-                    }} 
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
-                  />
+                  <input type="date" value={startDate} onChange={e => { const nd = e.target.value; if (nd > endDate) { showToast("Invalid range", "warning"); return; } setStartDate(nd); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all dark:text-white font-medium" />
               </div>
               <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Calendar size={12} /> To Date</label>
-                  <input 
-                    type="date" 
-                    value={endDate} 
-                    onChange={e => { 
-                        const newEndDate = e.target.value;
-                        if (newEndDate < startDate) {
-                            showToast("End date cannot be earlier than From date.", "warning");
-                            return; 
-                        }
-                        setEndDate(newEndDate); 
-                        setCurrentPage(1); 
-                    }} 
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium" 
-                  />
+                  <input type="date" value={endDate} onChange={e => { const nd = e.target.value; if (nd < startDate) { showToast("Invalid range", "warning"); return; } setEndDate(nd); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all dark:text-white font-medium" />
               </div>
               <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><MapPin size={12} /> Work Location</label>
-                  <select 
-                    value={filterLocation} 
-                    onChange={e => { setFilterLocation(e.target.value); setCurrentPage(1); }} 
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
-                  >
+                  <select value={filterLocation} onChange={e => { setFilterLocation(e.target.value); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all dark:text-white font-medium">
                       <option value="All">All Locations</option>
                       {uniqueLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
                   </select>
               </div>
               <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Filter size={12} /> Status</label>
-                  <select 
-                    value={filterStatus} 
-                    onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }} 
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all dark:text-white font-medium"
-                  >
+                  <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all dark:text-white font-medium">
                       <option value="All">All Status</option>
                       <option value="Present">Present</option>
                       <option value="Absent">Absent</option>
@@ -517,10 +461,9 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </select>
               </div>
           </div>
-          <button onClick={handleResetFilters} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-teal-100 dark:hover:border-teal-900/30 rounded-lg shrink-0 h-[42px]"><RotateCcw size={14} /> Reset</button>
+          <button onClick={handleResetFilters} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-primary-600 transition-colors text-xs font-bold uppercase tracking-widest border border-transparent hover:border-primary-100 dark:hover:border-primary-900/30 rounded-lg shrink-0 h-[42px]"><RotateCcw size={14} /> Reset</button>
       </div>
 
-      {/* Table view remains mostly unchanged, skipping for brevity but assuming implementation matches existing */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
@@ -529,13 +472,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 <th className="px-8 py-5">Employee Detail</th>
                 <th className="px-6 py-5">Punch Date</th>
                 <th className="px-6 py-5">
-                    <button onClick={() => handleSort('checkIn')} className="flex items-center gap-2 hover:text-teal-600 transition-colors uppercase tracking-[0.15em]">
-                        Shift Session <ArrowUpDown size={12} className={sortConfig?.key === 'checkIn' ? 'text-teal-600' : 'text-slate-300'} />
+                    <button onClick={() => handleSort('checkIn')} className="flex items-center gap-2 hover:text-primary-600 transition-colors uppercase tracking-[0.15em]">
+                        Shift Session <ArrowUpDown size={12} className={sortConfig?.key === 'checkIn' ? 'text-primary-600' : 'text-slate-300'} />
                     </button>
                 </th>
                 <th className="px-6 py-5">
-                    <button onClick={() => handleSort('duration')} className="flex items-center gap-2 hover:text-teal-600 transition-colors uppercase tracking-[0.15em]">
-                        Duration <ArrowUpDown size={12} className={sortConfig?.key === 'duration' ? 'text-teal-600' : 'text-slate-300'} />
+                    <button onClick={() => handleSort('duration')} className="flex items-center gap-2 hover:text-primary-600 transition-colors uppercase tracking-[0.15em]">
+                        Duration <ArrowUpDown size={12} className={sortConfig?.key === 'duration' ? 'text-primary-600' : 'text-slate-300'} />
                     </button>
                 </th>
                 {isHR && <th className="px-8 py-5 text-center">Actions</th>}
@@ -546,7 +489,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                 <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
                   <td className="px-8 py-5">
                       <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5">{record.employeeName}</div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-1.5">ID: <span className="text-teal-600/70">{record.employeeId}</span></div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-1.5">ID: <span className="text-primary-600/70">{record.employeeId}</span></div>
                   </td>
                   <td className="px-6 py-5">
                       <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-black text-[11px] font-mono bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 w-fit shadow-sm">
@@ -554,12 +497,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                       </div>
                   </td>
                   <td className="px-6 py-5">{formatSessionString(record)}</td>
-                  <td className="px-6 py-5"><div className="font-mono text-sm font-black text-slate-800 dark:text-teal-400 flex items-center gap-2"><Clock size={14} className="text-slate-300" /> {calculateDuration(record)}</div></td>
-                  {/* Actions column remains visible ONLY to HR to prevent unauthorized edits */}
+                  <td className="px-6 py-5"><div className="font-mono text-sm font-black text-slate-800 dark:text-primary-400 flex items-center gap-2"><Clock size={14} className="text-slate-300" /> {calculateDuration(record)}</div></td>
                   {isHR && (
                     <td className="px-8 py-5">
                         <div className="flex justify-center gap-2">
-                           <button onClick={() => openEditModal(record)} className="p-2.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Edit Session"><Edit2 size={16} /></button>
+                           <button onClick={() => openEditModal(record)} className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Edit Session"><Edit2 size={16} /></button>
                            <button onClick={() => { setRecordToDelete(record); setShowDeleteConfirm(true); }} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Delete Session"><Trash2 size={16} /></button>
                         </div>
                     </td>
@@ -574,7 +516,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Mandatory Time Log Modal */}
       <DraggableModal isOpen={showTimeLogModal} onClose={() => setShowTimeLogModal(false)} title="Log Your Daily Activity" width="max-w-xl">
           <form onSubmit={handleMandatoryLogSubmit} className="space-y-6">
               <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/50 flex items-start gap-4">
@@ -590,33 +531,51 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
                   <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                           <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-teal-600"><Clock size={18}/></div>
+                           <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-primary-600"><Clock size={18}/></div>
                            <div>
                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Session</p>
                                <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{calculateDuration(pendingRecord || ({} as any))}</p>
                            </div>
                       </div>
-                      {isOvertimeSession && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Zap size={10}/> Overtime Detected</span>}
+                      {isOver8Hours && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Zap size={10}/> Overtime Detected</span>}
                   </div>
 
-                  <div className={`grid gap-4 ${isOvertimeSession ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {isOver8Hours && (
+                      <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-primary-100 dark:border-primary-900/30 transition-all shadow-sm">
+                          <input 
+                            type="checkbox" 
+                            id="chkExtraInLog" 
+                            checked={includeExtraInLog} 
+                            onChange={(e) => setIncludeExtraInLog(e.target.checked)}
+                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 border-slate-300"
+                          />
+                          <label htmlFor="chkExtraInLog" className="text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none flex items-center gap-2">
+                             Log remaining time as extra hours? <span className="text-[10px] font-medium text-slate-400 italic">(Only if checked)</span>
+                          </label>
+                      </div>
+                  )}
+
+                  <div className={`grid gap-4 ${includeExtraInLog ? 'grid-cols-2' : 'grid-cols-1'}`}>
                       <div>
-                          <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Standard (Max 8h)</label>
+                          <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Standard Duration</label>
                           <input 
                               type="text" 
                               className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold text-slate-500"
-                              value={`${Math.floor(logDurationSplit.standard / 60)}h ${logDurationSplit.standard % 60}m`}
+                              value={includeExtraInLog 
+                                ? `${Math.floor(logDurationSplit.standard / 60)}h ${logDurationSplit.standard % 60}m`
+                                : `${Math.floor((logDurationSplit.standard + logDurationSplit.extra) / 60)}h ${(logDurationSplit.standard + logDurationSplit.extra) % 60}m`
+                              }
                               readOnly 
                           /> 
                       </div>
-                      {isOvertimeSession && (
+                      {includeExtraInLog && (
                         <div>
                              <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1">Extra Hours</label>
                              <div className="flex gap-2">
                                 <input 
                                     type="number"
                                     min="0"
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none"
                                     value={Math.floor(logDurationSplit.extra / 60)}
                                     onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (parseInt(e.target.value) || 0) * 60 + (prev.extra % 60) }))}
                                 />
@@ -625,7 +584,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                                     type="number"
                                     min="0"
                                     max="59"
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none"
                                     value={logDurationSplit.extra % 60}
                                     onChange={(e) => setLogDurationSplit(prev => ({ ...prev, extra: (Math.floor(prev.extra / 60) * 60) + (parseInt(e.target.value) || 0) }))}
                                 />
@@ -638,7 +597,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Project / Client</label>
-                      <select required value={logFormData.projectId} onChange={e => setLogFormData({...logFormData, projectId: e.target.value, task: ''})} className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+                      <select required value={logFormData.projectId} onChange={e => setLogFormData({...logFormData, projectId: e.target.value, task: ''})} className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm">
                           <option value="" disabled>Select Project...</option>
                           {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                           <option value={NO_PROJECT_ID}>General / Administrative</option>
@@ -646,13 +605,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   </div>
                   <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Current Task</label>
-                      <select 
-                        required 
-                        disabled={!logFormData.projectId}
-                        value={logFormData.task} 
-                        onChange={e => setLogFormData({...logFormData, task: e.target.value})} 
-                        className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm disabled:opacity-50"
-                      >
+                      <select required disabled={!logFormData.projectId} value={logFormData.task} onChange={e => setLogFormData({...logFormData, task: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm disabled:opacity-50">
                           <option value="" disabled>{logFormData.projectId ? "Select subtask..." : "Select project first"}</option>
                           {availableTasks.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -661,19 +614,18 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
               <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Work Description</label>
-                  <textarea required rows={3} value={logFormData.description} onChange={e => setLogFormData({...logFormData, description: e.target.value})} placeholder="What did you achieve today?" className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" />
+                  <textarea required rows={3} value={logFormData.description} onChange={e => setLogFormData({...logFormData, description: e.target.value})} placeholder="What did you achieve today?" className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t dark:border-slate-700">
-                  <button type="button" onClick={() => setShowTimeLogModal(false)} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Abort Checkout</button>
-                  <button type="submit" disabled={isSubmittingLog} className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/30 hover:bg-teal-700 transition flex items-center gap-2 active:scale-95">
+                  <button type="button" onClick={() => setShowTimeLogModal(false)} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-800 transition-colors">Abort Checkout</button>
+                  <button type="submit" disabled={isSubmittingLog} className="px-10 py-3.5 bg-primary-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition flex items-center gap-2 active:scale-95">
                       {isSubmittingLog ? <Loader2 size={16} className="animate-spin" /> : 'SAVE & CONTINUE'}
                   </button>
               </div>
           </form>
       </DraggableModal>
 
-      {/* Early Checkout Modal */}
       <DraggableModal isOpen={showEarlyReasonModal} onClose={() => setShowEarlyReasonModal(false)} title="Early Shift Conclusion" width="max-w-md">
           <form onSubmit={handleEarlyCheckoutSubmit} className="space-y-5">
               <div className="bg-rose-50 dark:bg-rose-900/10 p-5 rounded-2xl border border-rose-100 dark:border-rose-800/50 flex items-start gap-4">
@@ -691,7 +643,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           </form>
       </DraggableModal>
 
-      {/* Retroactive Checkout Modal */}
       <DraggableModal isOpen={showRetroModal} onClose={() => setShowRetroModal(false)} title="Close Unfinished Session" width="max-w-md">
           <form onSubmit={handleRetroSubmit} className="space-y-6">
               <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/50 flex items-start gap-4">
@@ -699,14 +650,13 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                   <div><p className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase mb-1">Previous Session Open</p><p className="text-[10px] text-amber-700 leading-relaxed font-medium">You checked in on <span className="font-black underline">{pendingRecord?.date}</span> at <span className="font-black underline">{pendingRecord?.checkIn}</span> but forgot to check out. Please provide the details below.</p></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Checkout Date</label><input required type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={retroForm.date} onChange={e => setRetroForm({...retroForm, date: e.target.value})} /></div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Checkout Time</label><input required type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={retroForm.time} onChange={e => setRetroForm({...retroForm, time: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Checkout Date</label><input required type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={retroForm.date} onChange={e => setRetroForm({...retroForm, date: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Checkout Time</label><input required type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={retroForm.time} onChange={e => setRetroForm({...retroForm, time: e.target.value})} /></div>
               </div>
-              <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black shadow-lg text-[10px] uppercase tracking-widest hover:bg-teal-700 transition active:scale-95">Close Session & Check Out</button>
+              <button type="submit" className="w-full py-4 bg-primary-600 text-white rounded-2xl font-black shadow-lg text-[10px] uppercase tracking-widest hover:bg-primary-700 transition active:scale-95 shadow-primary-500/20">Close Session & Check Out</button>
           </form>
       </DraggableModal>
 
-      {/* Shared Delete Confirmation */}
       <DraggableModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Record?" width="max-w-sm">
           <div className="text-center">
               <AlertCircle size={48} className="text-rose-600 mx-auto mb-4" />
@@ -718,16 +668,15 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           </div>
       </DraggableModal>
 
-      {/* Edit Record Modal */}
       <DraggableModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modify Entry Records" width="max-w-md">
           <form onSubmit={handleEditSubmit} className="space-y-6">
               <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check In Date</label><input required type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkInDate} onChange={e => setEditForm({...editForm, checkInDate: e.target.value})} /></div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check In Time</label><input required type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkInTime} onChange={e => setEditForm({...editForm, checkInTime: e.target.value})} /></div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check Out Date (Optional)</label><input type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkOutDate} onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})} /></div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check Out Time (Optional)</label><input type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-sm" value={editForm.checkOutTime} onChange={e => setEditForm({...editForm, checkOutTime: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check In Date</label><input required type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={editForm.checkInDate} onChange={e => setEditForm({...editForm, checkInDate: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check In Time</label><input required type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={editForm.checkInTime} onChange={e => setEditForm({...editForm, checkInTime: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check Out Date (Optional)</label><input type="date" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={editForm.checkOutDate} onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})} /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase ml-1">Check Out Time (Optional)</label><input type="time" className="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm" value={editForm.checkOutTime} onChange={e => setEditForm({...editForm, checkOutTime: e.target.value})} /></div>
               </div>
-              <button type="submit" className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black shadow-lg text-[10px] uppercase tracking-widest hover:bg-teal-700 transition active:scale-95">Commit Overwrites</button>
+              <button type="submit" className="w-full py-4 bg-primary-600 text-white rounded-2xl font-black shadow-lg text-[10px] uppercase tracking-widest hover:bg-primary-700 transition active:scale-95 shadow-primary-500/20">Commit Overwrites</button>
           </form>
       </DraggableModal>
     </div>
