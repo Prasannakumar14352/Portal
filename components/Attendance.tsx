@@ -40,11 +40,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
   const [startDate, setStartDate] = useState(formatDateISO(firstDayOfMonth));
   const [endDate, setEndDate] = useState(formatDateISO(today));
 
-  // New Filters
+  // Filters
   const [filterLocation, setFilterLocation] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
 
-  // Sorting State
+  // Sorting
   const [sortConfig, setSortConfig] = useState<{ key: 'checkIn' | 'duration'; direction: 'asc' | 'desc' } | null>(null);
 
   const [showEarlyReasonModal, setShowEarlyReasonModal] = useState(false);
@@ -75,7 +75,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   const NO_PROJECT_ID = "NO_PROJECT";
 
-  // Dynamic Subtasks logic shared with TimeLogs
   const availableTasks = useMemo(() => {
     if (!logFormData.projectId || logFormData.projectId === NO_PROJECT_ID) {
       return ['General Administration', 'Internal Meeting', 'Documentation', 'Support', 'Training'].sort();
@@ -178,11 +177,12 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
           
           const totalMins = getDurationInMinutes(pendingRecord);
-          const standard = Math.min(totalMins, 480); // Cap standard at 8h
-          const extra = Math.max(0, totalMins - 480); // All time after 8h is potentially extra
+          // Requirement: Standard is capped at 8h (480 mins)
+          const standard = Math.min(totalMins, 480); 
+          const extra = Math.max(0, totalMins - 480);
           
           setLogDurationSplit({ standard, extra });
-          setIncludeExtraInLog(totalMins > 480); // Default to true if over 8h
+          setIncludeExtraInLog(false); // Extra is disabled by default
           
           setShowTimeLogModal(true);
           return;
@@ -197,8 +197,8 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       
       setIsSubmittingLog(true);
       try {
-          // If checkbox unchecked, merge all time into durationMinutes
-          const finalDuration = includeExtraInLog ? logDurationSplit.standard : (logDurationSplit.standard + logDurationSplit.extra);
+          // Logic: Only add 8 hours if unchecked. Only if checked, add remaining.
+          const finalDuration = logDurationSplit.standard;
           const finalExtra = includeExtraInLog ? logDurationSplit.extra : 0;
 
           await addTimeEntry({
@@ -213,7 +213,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
               isBillable: logFormData.isBillable
           });
 
-          showToast("Timesheet synced.", "success");
+          showToast(includeExtraInLog ? "Timesheet synced with overtime." : "Timesheet synced (Capped at 8h).", "success");
           setShowTimeLogModal(false);
           proceedToRetroCheck();
       } catch (err) {
@@ -561,10 +561,7 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                           <input 
                               type="text" 
                               className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm font-bold text-slate-500"
-                              value={includeExtraInLog 
-                                ? `${Math.floor(logDurationSplit.standard / 60)}h ${logDurationSplit.standard % 60}m`
-                                : `${Math.floor((logDurationSplit.standard + logDurationSplit.extra) / 60)}h ${(logDurationSplit.standard + logDurationSplit.extra) % 60}m`
-                              }
+                              value={`${Math.floor(logDurationSplit.standard / 60)}h ${logDurationSplit.standard % 60}m`}
                               readOnly 
                           /> 
                       </div>
