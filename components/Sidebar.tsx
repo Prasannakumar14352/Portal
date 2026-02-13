@@ -16,39 +16,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
   const { installApp, isInstallable } = useAppContext();
 
   const getMenuItems = () => {
-    // Items visible to EVERYONE
-    const commonItems = [
+    // List from the user's latest zoom-in screenshot
+    return [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'organization', label: 'Organization', icon: Building2 },
+      { id: 'time-logs', label: 'Time Logs', icon: Timer },
+      { id: 'attendance', label: 'My Attendance', icon: Clock },
+      { id: 'leaves', label: 'Leaves', icon: Calendar },
+      { id: 'payslips', label: 'Payslips', icon: FileText },
       { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'holidays', label: 'Holidays', icon: Coffee },
       { id: 'ai-assistant', label: 'HR Assistant', icon: MessageSquareText },
-    ];
-
-    if (userRole === UserRole.EMPLOYEE) {
-      return [
-        commonItems[0], // Dashboard
-        { id: 'organization', label: 'Organization', icon: Building2 },
-        { id: 'time-logs', label: 'Time Logs', icon: Timer },
-        { id: 'attendance', label: 'My Attendance', icon: Clock },
-        { id: 'leaves', label: 'Leaves', icon: Calendar },
-        { id: 'payslips', label: 'Payslips', icon: FileText },
-        commonItems[1], // Reports
-        commonItems[2], // Holidays
-        commonItems[3], // AI
-      ];
-    }
-
-    // Admin, HR and Manager
-    return [
-      commonItems[0], // Dashboard
-      { id: 'organization', label: 'Organization', icon: Building2 },
-      { id: 'time-logs', label: 'Time Logs', icon: Timer },
-      commonItems[1], // Reports
-      { id: 'attendance', label: 'Attendance', icon: Clock },
-      { id: 'leaves', label: 'Leave Management', icon: Calendar },
-      { id: 'payslips', label: 'Payslips', icon: FileText },
-      commonItems[2], // Holidays
-      commonItems[3], // AI
     ];
   };
 
@@ -56,51 +34,62 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole, 
 
   return (
     <>
-        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl flex flex-col h-full`}>
-            {/* Header - Fixed at Top */}
-            <div className="flex items-center justify-between h-20 px-6 border-b border-slate-100 dark:border-slate-800/50 flex-shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-800 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary-600/30">
-                        <span className="font-black text-lg tracking-tighter">EC</span>
+        <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-xl flex flex-col h-full`}>
+            {/* Header with Logo Area */}
+            <div className="flex items-center gap-4 h-20 px-6 border-b border-slate-50 dark:border-slate-800 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 bg-[#00adef] rounded-full flex items-center justify-center text-white font-black shadow-sm">
+                      IST
                     </div>
-                    <div>
-                        <h1 className="text-lg font-bold text-slate-800 dark:text-white leading-none tracking-tight">EmpowerCorp</h1>
-                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-1">HR Portal</p>
+                    <div className="text-slate-800 dark:text-white">
+                        <h1 className="text-xs font-black leading-none tracking-tight">SMART SOLUTIONS</h1>
                     </div>
                 </div>
-                <button onClick={onClose} className="md:hidden p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                <button onClick={onClose} className="md:hidden p-2 text-slate-400 hover:text-slate-600 ml-auto">
                     <X size={20} />
                 </button>
             </div>
 
-            {/* Scrollable Navigation Area */}
-            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
-                <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Main Menu</p>
+            {/* Section Header: MAIN MENU */}
+            <div className="px-8 pt-8 pb-4">
+                <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Main Menu</p>
+            </div>
+
+            {/* Navigation List */}
+            <nav className="flex-1 overflow-y-auto pb-4 space-y-1.5 px-4 custom-scrollbar">
                 {menuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = currentView === item.id;
+                    
                     return (
                         <button
                             key={item.id}
                             onClick={() => onChangeView(item.id)}
-                            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group relative overflow-hidden ${
+                            className={`w-full flex items-center gap-4 px-4 py-3.5 text-sm font-semibold transition-all duration-200 rounded-xl relative group ${
                                 isActive
-                                ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 shadow-sm'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
+                                ? 'bg-indigo-50/50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                             }`}
                         >
-                            {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary-600 rounded-r-full"></div>}
-                            <Icon size={20} className={`transition-colors ${isActive ? 'text-primary-600 dark:text-primary-400' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
-                            <span>{item.label}</span>
+                            {/* Selected Indicator Vertical Line */}
+                            {isActive && (
+                                <div className="absolute left-0 top-3 bottom-3 w-1.5 bg-indigo-500 rounded-full"></div>
+                            )}
+                            
+                            <Icon 
+                                size={20} 
+                                className={`transition-colors duration-200 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} 
+                            />
+                            <span className="tracking-tight">{item.label}</span>
                         </button>
                     );
                 })}
             </nav>
 
-            {/* Footer Section - Pinned to Bottom */}
-            <div className="flex-shrink-0 p-4">
-                <div className="px-2 pt-2 pb-2 text-center">
-                   <p className="text-[10px] text-slate-400 font-medium">© 2025 EmpowerCorp</p>
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-50 dark:border-slate-800">
+                <div className="text-center">
+                   <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold tracking-widest">© 2025 EmpowerCorp</p>
                 </div>
             </div>
         </div>

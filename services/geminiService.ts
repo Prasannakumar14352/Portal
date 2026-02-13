@@ -14,15 +14,15 @@ export interface HRContext {
 }
 
 export const getHRChatResponse = async (message: string, context: HRContext): Promise<string> => {
-  // Check multiple common environment variable names for the key
-  const apiKey = process.env.API_KEY || process.env.VITE_API_KEY || process.env.GOOGLE_API_KEY;
+  // Fix: Exclusively use process.env.API_KEY as per guidelines.
+  const apiKey = process.env.API_KEY;
 
   if (!apiKey) {
     throw new Error("MISSING_API_KEY");
   }
 
-  // Initialize the Google GenAI client inside the function
-  const ai = new GoogleGenAI({ apiKey });
+  // Fix: Always use new GoogleGenAI({apiKey: process.env.API_KEY}); strictly as a named parameter.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   // Construct a concise summary of the organization state for the AI
   const contextSummary = `
@@ -60,7 +60,7 @@ ORGANIZATION DATA:
         }
       });
       
-      // Directly accessing .text property as per guidelines
+      // Fix: Access .text property directly instead of calling a method text()
       return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
   } catch (error: any) {
       // Re-throw to be handled by the component
