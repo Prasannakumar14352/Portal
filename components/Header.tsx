@@ -60,7 +60,9 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
         </button>
         
         <div className="hidden sm:block">
-            {/* Title removed as per user request */}
+            <h1 className="text-sm font-black tracking-[0.2em] text-slate-800 dark:text-white uppercase opacity-90">
+                Empower HR Portal
+            </h1>
         </div>
       </div>
 
