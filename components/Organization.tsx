@@ -251,18 +251,31 @@ const Organization = () => {
     return () => { if (viewInstanceRef.current) { viewInstanceRef.current.destroy(); viewInstanceRef.current = null; setIsMapReady(false); } };
   }, [activeTab, directoryView, isImagery]);
 
-  // Handle markers update on map
+  // Handle markers update on map - Updated to use avatars
   useEffect(() => {
       if (isMapReady && graphicsLayerRef.current && GraphicClassRef.current) {
           graphicsLayerRef.current.removeAll();
           filteredDirectoryEmployees.forEach(emp => {
               const loc = parseLocation(emp.location);
               if (loc.latitude && loc.longitude) {
-                  // Use brand blue (#00adef) for map markers
+                  // Replaced generic blue dots with employee avatars
                   const graphic = new GraphicClassRef.current({
                       geometry: { type: "point", longitude: loc.longitude, latitude: loc.latitude },
-                      symbol: { type: "simple-marker", color: [0, 173, 239], outline: { color: [255, 255, 255], width: 1.5 } }, 
-                      popupTemplate: { title: `${emp.firstName} ${emp.lastName}`, content: emp.position || 'Team Member' },
+                      symbol: { 
+                          type: "picture-marker", 
+                          url: emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}`,
+                          width: "40px",
+                          height: "40px",
+                      }, 
+                      popupTemplate: { 
+                          title: `${emp.firstName} ${emp.lastName}`, 
+                          content: `
+                            <div style="font-family: sans-serif; padding-top: 8px;">
+                                <p><strong>Position:</strong> ${emp.position || emp.jobTitle || 'Team Member'}</p>
+                                <p><strong>Email:</strong> ${emp.email}</p>
+                            </div>
+                          ` 
+                      },
                       attributes: emp
                   });
                   graphicsLayerRef.current.add(graphic);

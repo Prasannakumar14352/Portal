@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AttendanceRecord, UserRole, Project, TimeEntry } from '../types';
-import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown, Zap } from 'lucide-react';
+import { PlayCircle, StopCircle, CheckCircle2, Edit2, Trash2, Lock, Info, Clock, Calendar, Filter, RotateCcw, ChevronLeft, ChevronRight, Search, Fingerprint, AlertCircle, FileText, Plus, Loader2, MapPin, ArrowUpDown, Zap, History } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import DraggableModal from './DraggableModal';
 
@@ -25,7 +25,7 @@ interface AttendanceProps {
 }
 
 const Attendance: React.FC<AttendanceProps> = ({ records }) => {
-  const { checkIn, checkOut, timeEntries, currentUser, updateAttendanceRecord, deleteAttendanceRecord, showToast, projects, addTimeEntry } = useAppContext();
+  const { checkIn, checkOut, timeEntries, currentUser, updateAttendanceRecord, deleteAttendanceRecord, showToast, projects, addTimeEntry, refreshData, notify } = useAppContext();
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -61,6 +61,15 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
+
+  // Manual Past Entry Modal
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualForm, setManualForm] = useState({
+      date: formatDateISO(new Date(new Date().setDate(new Date().getDate() - 1))),
+      checkInTime: '09:00',
+      checkOutTime: '18:00',
+      location: 'Office HQ India'
+  });
 
   // Time Log Form State for Mandatory Checkout Popup
   const [logFormData, setLogFormData] = useState({
@@ -177,12 +186,11 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
           setLogFormData({ projectId: '', task: '', description: '', isBillable: true });
           
           const totalMins = getDurationInMinutes(pendingRecord);
-          // Requirement: Standard is capped at 8h (480 mins)
           const standard = Math.min(totalMins, 480); 
           const extra = Math.max(0, totalMins - 480);
           
           setLogDurationSplit({ standard, extra });
-          setIncludeExtraInLog(false); // Extra is disabled by default
+          setIncludeExtraInLog(false); 
           
           setShowTimeLogModal(true);
           return;
@@ -197,7 +205,6 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
       
       setIsSubmittingLog(true);
       try {
-          // Logic: Only add 8 hours if unchecked. Only if checked, add remaining.
           const finalDuration = logDurationSplit.standard;
           const finalExtra = includeExtraInLog ? logDurationSplit.extra : 0;
 
@@ -302,6 +309,42 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
         checkOutTime: coutISO 
       });
       setShowEditModal(false);
+      showToast("Attendance record updated", "success");
+  };
+
+  const handleManualEntrySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    const cinISO = new Date(`${manualForm.date}T${manualForm.checkInTime}:00`).toISOString();
+    const coutISO = new Date(`${manualForm.date}T${manualForm.checkOutTime}:00`).toISOString();
+
+    if (new Date(coutISO) <= new Date(cinISO)) {
+        showToast("Check-out must be after check-in.", "error");
+        return;
+    }
+
+    const record: AttendanceRecord = {
+        id: Math.random().toString(36).substr(2, 9),
+        employeeId: currentUser.id,
+        employeeName: currentUser.name,
+        date: manualForm.date,
+        checkIn: formatTime12(new Date(cinISO)),
+        checkInTime: cinISO,
+        checkOut: formatTime12(new Date(coutISO)),
+        checkOutTime: coutISO,
+        status: 'Present',
+        workLocation: manualForm.location,
+        notes: 'Manual historical entry'
+    };
+
+    // Use updateAttendanceRecord as it usually handles adding if id is new or call context equivalent
+    // Given the context exports checkIn, we'll simulate the db call or use update if available
+    await updateAttendanceRecord(record);
+    await refreshData();
+    setShowManualModal(false);
+    showToast("Past shift logged successfully.", "success");
+    notify(`Manual attendance logged for ${manualForm.date}`, currentUser.id, 'info');
   };
 
   const handleSort = (key: 'checkIn' | 'duration') => {
@@ -402,10 +445,19 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
 
          <div className="flex flex-col items-center gap-3">
              {!pendingRecord ? (
-                <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-36 h-36 bg-emerald-50 dark:bg-emerald-900/10 rounded-full border-4 border-emerald-100 dark:border-emerald-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-emerald-500/5">
-                   <PlayCircle size={44} className="text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform" />
-                   <span className="font-black text-[10px] text-emerald-700 dark:text-emerald-500 uppercase tracking-widest">Check In</span>
-                </button>
+                <div className="flex gap-4 items-center">
+                    <button onClick={() => checkIn()} className="flex flex-col items-center justify-center w-36 h-36 bg-emerald-50 dark:bg-emerald-900/10 rounded-full border-4 border-emerald-100 dark:border-emerald-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-emerald-500/5">
+                        <PlayCircle size={44} className="text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform" />
+                        <span className="font-black text-[10px] text-emerald-700 dark:text-emerald-500 uppercase tracking-widest">Check In</span>
+                    </button>
+                    <button 
+                        onClick={() => setShowManualModal(true)} 
+                        className="flex flex-col items-center justify-center w-28 h-28 bg-slate-50 dark:bg-slate-800 rounded-full border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all cursor-pointer group opacity-60 hover:opacity-100"
+                    >
+                        <History size={24} className="text-slate-400 group-hover:text-primary-600 mb-1.5" />
+                        <span className="font-bold text-[9px] text-slate-500 dark:text-slate-400 group-hover:text-primary-600 uppercase text-center px-2">Log Past Shift</span>
+                    </button>
+                </div>
              ) : (
                 <button onClick={handleCheckOutClick} className="flex flex-col items-center justify-center w-36 h-36 bg-rose-50 dark:bg-rose-900/10 rounded-full border-4 border-rose-100 dark:border-rose-800/50 hover:scale-105 transition-all cursor-pointer group shadow-xl shadow-rose-500/5">
                    <StopCircle size={44} className="text-rose-600 mb-1.5 group-hover:scale-110 transition-transform" />
@@ -481,40 +533,124 @@ const Attendance: React.FC<AttendanceProps> = ({ records }) => {
                         Duration <ArrowUpDown size={12} className={sortConfig?.key === 'duration' ? 'text-primary-600' : 'text-slate-300'} />
                     </button>
                 </th>
-                {isHR && <th className="px-8 py-5 text-center">Actions</th>}
+                <th className="px-8 py-5 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {paginatedRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
-                  <td className="px-8 py-5">
-                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5">{record.employeeName}</div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-1.5">ID: <span className="text-primary-600/70">{record.employeeId}</span></div>
-                  </td>
-                  <td className="px-6 py-5">
-                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-black text-[11px] font-mono bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 w-fit shadow-sm">
-                          <Calendar size={13} className="text-slate-400" /> {record.date}
-                      </div>
-                  </td>
-                  <td className="px-6 py-5">{formatSessionString(record)}</td>
-                  <td className="px-6 py-5"><div className="font-mono text-sm font-black text-slate-800 dark:text-primary-400 flex items-center gap-2"><Clock size={14} className="text-slate-300" /> {calculateDuration(record)}</div></td>
-                  {isHR && (
+              {paginatedRecords.map((record) => {
+                const isOwner = String(record.employeeId) === String(currentUser?.id);
+                return (
+                  <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
                     <td className="px-8 py-5">
-                        <div className="flex justify-center gap-2">
-                           <button onClick={() => openEditModal(record)} className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Edit Session"><Edit2 size={16} /></button>
-                           <button onClick={() => { setRecordToDelete(record); setShowDeleteConfirm(true); }} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Delete Session"><Trash2 size={16} /></button>
+                        <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5">{record.employeeName}</div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-1.5">ID: <span className="text-primary-600/70">{record.employeeId}</span></div>
+                    </td>
+                    <td className="px-6 py-5">
+                        <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-black text-[11px] font-mono bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 w-fit shadow-sm">
+                                <Calendar size={13} className="text-slate-400" /> {record.date}
+                            </div>
+                            {record.notes?.includes('Manual') && (
+                                <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter ml-1">Manual Entry</span>
+                            )}
                         </div>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-6 py-5">{formatSessionString(record)}</td>
+                    <td className="px-6 py-5"><div className="font-mono text-sm font-black text-slate-800 dark:text-primary-400 flex items-center gap-2"><Clock size={14} className="text-slate-300" /> {calculateDuration(record)}</div></td>
+                    <td className="px-8 py-5">
+                        <div className="flex justify-center gap-2">
+                           {(isHR || isOwner) && (
+                               <button onClick={() => openEditModal(record)} className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Edit Session">
+                                   <Edit2 size={16} />
+                               </button>
+                           )}
+                           {isHR && (
+                               <button onClick={() => { setRecordToDelete(record); setShowDeleteConfirm(true); }} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white dark:bg-slate-700 border border-slate-100" title="Delete Session">
+                                   <Trash2 size={16} />
+                               </button>
+                           )}
+                           {!isHR && !isOwner && <Lock size={16} className="text-slate-200" />}
+                        </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {paginatedRecords.length === 0 && (
-                <tr><td colSpan={isHR ? 5 : 4} className="px-8 py-24 text-center text-slate-300 dark:text-slate-600 italic font-medium">No records matching your search.</td></tr>
+                <tr><td colSpan={5} className="px-8 py-24 text-center text-slate-300 dark:text-slate-600 italic font-medium">No records matching your search.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Manual Entry Modal */}
+      <DraggableModal isOpen={showManualModal} onClose={() => setShowManualModal(false)} title="Log Historical Shift" width="max-w-md">
+          <form onSubmit={handleManualEntrySubmit} className="space-y-6">
+              <div className="bg-primary-50 dark:bg-primary-900/10 p-5 rounded-2xl border border-primary-100 dark:border-primary-800/50 flex items-start gap-4">
+                  <Info className="text-primary-600 shrink-0" size={24} />
+                  <div>
+                      <p className="text-xs font-bold text-primary-800 dark:text-primary-400 uppercase tracking-wide mb-1">Manual Attendance Recovery</p>
+                      <p className="text-[10px] text-primary-700 dark:text-primary-500 leading-relaxed font-medium">Use this form to log shifts for dates you missed. Entries will be flagged as manual for review.</p>
+                  </div>
+              </div>
+
+              <div className="space-y-4">
+                  <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1.5">Shift Date</label>
+                      <input 
+                        type="date" 
+                        max={formatDateISO(new Date())}
+                        required
+                        value={manualForm.date}
+                        onChange={e => setManualForm({...manualForm, date: e.target.value})}
+                        className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1.5">Check In</label>
+                          <input 
+                            type="time" 
+                            required
+                            value={manualForm.checkInTime}
+                            onChange={e => setManualForm({...manualForm, checkInTime: e.target.value})}
+                            className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1.5">Check Out</label>
+                          <input 
+                            type="time" 
+                            required
+                            value={manualForm.checkOutTime}
+                            onChange={e => setManualForm({...manualForm, checkOutTime: e.target.value})}
+                            className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                          />
+                      </div>
+                  </div>
+                  <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase ml-1 mb-1.5">Working Location</label>
+                      <select 
+                        required
+                        value={manualForm.location}
+                        onChange={e => setManualForm({...manualForm, location: e.target.value})}
+                        className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      >
+                         <option>Office HQ India</option>
+                         <option>WFH India</option>
+                         <option>UAE Office</option>
+                         <option>USA Office</option>
+                         <option>Client Location</option>
+                      </select>
+                  </div>
+              </div>
+
+              <div className="flex gap-3 pt-6 border-t dark:border-slate-700">
+                  <button type="button" onClick={() => setShowManualModal(false)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 text-slate-500 font-bold rounded-xl text-xs uppercase">Discard</button>
+                  <button type="submit" className="flex-1 py-3 bg-primary-600 text-white font-bold rounded-xl text-xs uppercase shadow-lg shadow-primary-500/20 hover:bg-primary-700 transition">Save Past Shift</button>
+              </div>
+          </form>
+      </DraggableModal>
 
       <DraggableModal isOpen={showTimeLogModal} onClose={() => setShowTimeLogModal(false)} title="Log Your Daily Activity" width="max-w-xl">
           <form onSubmit={handleMandatoryLogSubmit} className="space-y-6">
