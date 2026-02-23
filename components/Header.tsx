@@ -144,8 +144,12 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
                     <img src={user.avatar} className="w-full h-full object-cover" alt="" />
                 </div>
                 <div className="hidden lg:block text-left">
-                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{user.name.split(' ')[0]}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">{user.role}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-none truncate max-w-[150px]">{user.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{user.role}</p>
+                        <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                        <p className="text-[10px] text-primary-600 font-black tracking-tighter">{user.employeeId}</p>
+                    </div>
                 </div>
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showProfile ? 'rotate-180' : ''}`} />
             </button>
