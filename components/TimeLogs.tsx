@@ -337,15 +337,81 @@ const TimeLogs = () => {
   };
 
   const exportExcel = () => {
-      const data = prepareExportData();
-      if (data.length === 0) {
+      if (visibleEntries.length === 0) {
           showToast("No data to export", "warning");
           return;
       }
-      const worksheet = XLSX.utils.json_to_sheet(data);
+
+      // Prepare data rows
+      const dataRows = visibleEntries.map(e => {
+          const user = employees.find(u => String(u.id) === String(e.userId));
+          const totalMinutes = e.durationMinutes + (e.extraMinutes || 0);
+          const decimalHours = (totalMinutes / 60).toFixed(2);
+          
+          return [
+              e.date,
+              user ? `${user.firstName}${user.lastName.charAt(0)}` : 'Unknown',
+              'Projects Delivery', // Category from image
+              getProjectName(e.projectId),
+              e.task,
+              parseFloat(decimalHours), // Use number for Excel
+              e.description,
+              e.status.toLowerCase(),
+              e.isBillable ? 'Yes' : 'No'
+          ];
+      });
+
+      // Headers
+      const headers = ["Date", "Resource", "Category", "Project", "Task", "Time", "Description", "Status", "Billable"];
+      
+      // Metadata
+      const title = "Time Entries";
+      const dateRangeStr = timePeriod === 'Month' 
+        ? `${new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+        : `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${weekDays[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      
+      const generatedOnStr = `Generated on ${new Date().toISOString().replace('T', ' ').slice(0, 16)}`;
+
+      // Create worksheet starting from Row 4 (index 3) for headers
+      const ws = XLSX.utils.aoa_to_sheet([
+        [title], // Row 1: Title
+        [dateRangeStr], // Row 2: Date Range
+        [], // Row 3: Empty for Generated On
+        headers, // Row 4: Headers
+        ...dataRows // Row 5+: Data
+      ]);
+
+      // Add Generated On to I3 (Row 3, Column 9)
+      XLSX.utils.sheet_add_aoa(ws, [[generatedOnStr]], { origin: "I3" });
+
+      // Apply number format to Time column (Column F, index 5)
+      for (let i = 0; i < dataRows.length; i++) {
+          const cellRef = XLSX.utils.encode_cell({ r: 4 + i, c: 5 });
+          if (ws[cellRef]) ws[cellRef].z = '0.00';
+      }
+
+      // Merges
+      ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }, // Title A1:I1
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }, // Date Range A2:I2
+      ];
+
+      // Column widths
+      ws['!cols'] = [
+        { wch: 12 }, // Date
+        { wch: 15 }, // Resource
+        { wch: 20 }, // Category
+        { wch: 25 }, // Project
+        { wch: 20 }, // Task
+        { wch: 10 }, // Time
+        { wch: 50 }, // Description
+        { wch: 12 }, // Status
+        { wch: 10 }, // Billable
+      ];
+
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "TimeLogs");
-      XLSX.writeFile(workbook, `timelogs_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.utils.book_append_sheet(workbook, ws, "Time Entries");
+      XLSX.writeFile(workbook, `TimeEntries_${new Date().toISOString().split('T')[0]}.xlsx`);
       showToast("Excel Exported successfully", "success");
   };
 
