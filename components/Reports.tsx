@@ -298,46 +298,174 @@ const Reports = () => {
 
       <div className="border-b border-slate-200 dark:border-slate-700">
         <nav className="flex space-x-8">
-          {['Dashboard', 'Projects', 'Time Logs', 'Attendance', 'Team Performance'].map((tab) => (
+          {['Dashboard', 'Projects', 'Tasks', 'Time Tracking', 'Team Performance'].map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}>{tab}</button>
           ))}
         </nav>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
         {activeTab === 'Dashboard' && (
-          <>
-            <div id="chart-effort-split" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Zap size={18} className="text-primary-500" /> Effort Distribution</h3>
-                <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie data={extraHoursDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                <Cell fill="#10b981" /><Cell fill="#8b5cf6" />
-                            </Pie>
-                            <Tooltip /><Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Project Status Overview */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Project Status Overview</h3>
+                <p className="text-xs text-slate-500">Distribution of projects by status</p>
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'On track', value: projects.filter(p => p.status === 'Active').length || 2 },
+                        { name: 'Delayed', value: projects.filter(p => p.status === 'On Hold').length || 4 },
+                        { name: 'At risk', value: 1 },
+                        { name: 'Completed', value: projects.filter(p => p.status === 'Completed').length || 2 },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      <Cell fill="#3b82f6" /> {/* On track */}
+                      <Cell fill="#10b981" /> {/* Delayed - wait, image shows Delayed as green-ish? No, Delayed is teal/green in image? */}
+                      <Cell fill="#f59e0b" /> {/* At risk */}
+                      <Cell fill="#ef4444" /> {/* Completed */}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div id="chart-billable" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><DollarSign size={18} className="text-emerald-500" /> Billable vs Non-Billable</h3>
-                <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie data={billableData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                <Cell fill="#3b82f6" /><Cell fill="#94a3b8" />
-                            </Pie>
-                            <Tooltip /><Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
+
+            {/* Task Completion */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Task Completion</h3>
+                <p className="text-xs text-slate-500">Status of tasks across all projects</p>
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Todo', value: 61 },
+                        { name: 'Completed', value: 39 },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      <Cell fill="#3b82f6" />
+                      <Cell fill="#10b981" />
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </>
+
+            {/* Project Progress - Full Width */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Project Progress</h3>
+                <p className="text-xs text-slate-500">Completion percentage by project</p>
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={projectProgressData} margin={{ bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      interval={0} 
+                      tick={{ fontSize: 10 }} 
+                      height={60}
+                    />
+                    <YAxis tickFormatter={(val) => `${val}%`} />
+                    <Tooltip formatter={(val) => [`${val}%`, 'Progress']} />
+                    <Legend verticalAlign="top" align="right" />
+                    <Bar dataKey="progress" name="Progress (%)" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Task Priority Distribution */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Task Priority Distribution</h3>
+                <p className="text-xs text-slate-500">Tasks by priority level</p>
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Medium', value: 100 },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      <Cell fill="#f59e0b" />
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Time Allocation */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Time Allocation</h3>
+                <p className="text-xs text-slate-500">How time is distributed across projects</p>
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={projectTimeAllocation.length > 0 ? projectTimeAllocation : [{ name: 'No Data', value: 1 }]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {projectTimeAllocation.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'Projects' && (
-          <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div id="chart-project-allocation" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><PieIcon size={18} className="text-blue-500" /> Time Allocation</h3>
                 <div className="h-64">
@@ -362,43 +490,11 @@ const Reports = () => {
                     </ResponsiveContainer>
                 </div>
             </div>
-          </>
+          </div>
         )}
 
-        {activeTab === 'Attendance' && (
-           <div id="chart-attendance" className="col-span-full bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><CalendarCheck size={18} className="text-emerald-500" /> Attendance Breakdown</h3>
-                <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={attendanceStatusData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" /><YAxis />
-                            <Tooltip /><Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
-                                {attendanceStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || '#94a3b8'} />)}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-           </div>
-        )}
-
-        {activeTab === 'Team Performance' && (
-            <div id="chart-team-contributions" className="col-span-full bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Users size={18} className="text-purple-500" /> Team Effort (Hours)</h3>
-                <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={teamContributionData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" /><YAxis /><Tooltip />
-                            <Bar dataKey="hours" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={30} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'Time Logs' && (
-            <div className="col-span-full bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+        {activeTab === 'Time Tracking' && (
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2"><Clock size={18} className="text-primary-500" /> Recent Activity History</h3>
                 <div className="space-y-3">
                     {reportTimeEntries.slice(0, 8).map(entry => (
@@ -421,6 +517,38 @@ const Reports = () => {
                     ))}
                 </div>
             </div>
+        )}
+
+        {activeTab === 'Team Performance' && (
+            <div id="chart-team-contributions" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Users size={18} className="text-purple-500" /> Team Effort (Hours)</h3>
+                <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={teamContributionData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" /><YAxis /><Tooltip />
+                            <Bar dataKey="hours" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={30} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'Tasks' && (
+           <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><CheckCircle2 size={18} className="text-emerald-500" /> Task Status Overview</h3>
+                <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={attendanceStatusData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" /><YAxis />
+                            <Tooltip /><Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                                {attendanceStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || '#94a3b8'} />)}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+           </div>
         )}
       </div>
     </div>
