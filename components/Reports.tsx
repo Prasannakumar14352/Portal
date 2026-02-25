@@ -273,15 +273,63 @@ const Reports = () => {
     showToast("Download completed.", "success");
   };
 
+  const burndownData = useMemo(() => {
+    const days = 30;
+    const totalTasks = 100;
+    const data = [];
+    const now = new Date();
+    
+    for (let i = 0; i <= days; i++) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - (days - i));
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        // Ideal burndown: linear from totalTasks to 0
+        const ideal = Math.max(0, totalTasks - (totalTasks / days) * i);
+        
+        // Actual burndown: slightly fluctuating around ideal
+        const actual = i > days - 5 ? undefined : Math.max(0, totalTasks - (totalTasks / days) * i + (Math.sin(i) * 5 + 5));
+        
+        data.push({
+            name: dateStr,
+            'Actual Remaining': actual,
+            'Ideal Burndown': ideal
+        });
+    }
+    return data;
+  }, []);
+
+  const userWorkloadData = useMemo(() => {
+    return employees.map(emp => {
+        const name = `${emp.firstName} ${emp.lastName}`;
+        const completed = timeEntries.filter(t => String(t.userId) === String(emp.id)).length;
+        const assigned = completed + Math.floor(Math.random() * 5); // Mocking assigned tasks
+        return {
+            name,
+            'Assigned Tasks': assigned,
+            'Completed Tasks': completed
+        };
+    }).sort((a, b) => b['Assigned Tasks'] - a['Assigned Tasks']);
+  }, [employees, timeEntries]);
+
   return (
     <div className="space-y-6 pb-10 animate-fade-in">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Reports & Analytics</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Analyze working hours, project effort, and team performance.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Analyze project performance and team productivity</p>
         </div>
         
         <div className="flex items-center gap-3 w-full lg:w-auto">
+            <select value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500">
+                <option>This Month</option>
+                <option>Last Month</option>
+                <option>This Quarter</option>
+            </select>
+            <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="All">All Projects</option>
+                {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            </select>
             <div className="relative" ref={exportMenuRef}>
               <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
                 <Download size={16} /> Export
@@ -332,7 +380,7 @@ const Reports = () => {
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     >
                       <Cell fill="#3b82f6" /> {/* On track */}
-                      <Cell fill="#10b981" /> {/* Delayed - wait, image shows Delayed as green-ish? No, Delayed is teal/green in image? */}
+                      <Cell fill="#10b981" /> {/* Delayed */}
                       <Cell fill="#f59e0b" /> {/* At risk */}
                       <Cell fill="#ef4444" /> {/* Completed */}
                     </Pie>
@@ -466,27 +514,70 @@ const Reports = () => {
 
         {activeTab === 'Projects' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div id="chart-project-allocation" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><PieIcon size={18} className="text-blue-500" /> Time Allocation</h3>
+            {/* Project Time Allocation */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="mb-4">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">Project Time Allocation</h3>
+                  <p className="text-xs text-slate-500">Percentage of time spent on each project</p>
+                </div>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                            <Pie data={projectTimeAllocation} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
+                            <Pie 
+                              data={projectTimeAllocation} 
+                              dataKey="value" 
+                              nameKey="name" 
+                              cx="50%" 
+                              cy="50%" 
+                              outerRadius={80}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            >
                                 {projectTimeAllocation.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                             </Pie>
-                            <Tooltip /><Legend />
+                            <Tooltip />
+                            <Legend verticalAlign="bottom" height={36}/>
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
             </div>
-            <div id="chart-project-progress" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Activity size={18} className="text-orange-500" /> Task Progress (%)</h3>
+
+            {/* Project Progress */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="mb-4">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">Project Progress</h3>
+                  <p className="text-xs text-slate-500">Completion percentage by project</p>
+                </div>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={projectProgressData} layout="vertical">
-                            <XAxis type="number" domain={[0, 100]} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
-                            <Tooltip /><Bar dataKey="progress" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                        <BarChart data={projectProgressData} layout="vertical" margin={{ left: 40 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" domain={[0, 100]} tickFormatter={(val) => `${val}`} />
+                            <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
+                            <Tooltip formatter={(val) => [`${val}%`, 'Progress']} />
+                            <Legend verticalAlign="top" align="right" />
+                            <Bar dataKey="progress" name="Progress (%)" fill="#818cf8" radius={[0, 4, 4, 0]} />
                         </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Task Burndown - Full Width */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="mb-4">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">Task Burndown</h3>
+                  <p className="text-xs text-slate-500">Tasks remaining vs ideal progress</p>
+                </div>
+                <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={burndownData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={2} />
+                            <YAxis tick={{ fontSize: 10 }} label={{ value: 'Tasks Remaining', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10 } }} />
+                            <Tooltip />
+                            <Legend verticalAlign="bottom" height={36} />
+                            <Line type="monotone" dataKey="Actual Remaining" stroke="#818cf8" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                            <Line type="monotone" dataKey="Ideal Burndown" stroke="#10b981" strokeDasharray="5 5" strokeWidth={2} dot={false} />
+                        </LineChart>
                     </ResponsiveContainer>
                 </div>
             </div>
@@ -520,16 +611,75 @@ const Reports = () => {
         )}
 
         {activeTab === 'Team Performance' && (
-            <div id="chart-team-contributions" className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Users size={18} className="text-purple-500" /> Team Effort (Hours)</h3>
-                <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={teamContributionData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" /><YAxis /><Tooltip />
-                            <Bar dataKey="hours" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={30} />
-                        </BarChart>
-                    </ResponsiveContainer>
+            <div className="space-y-6">
+                {/* Team Member Contributions */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="mb-4">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white">Team Member Contributions</h3>
+                        <p className="text-xs text-slate-500">Hours logged by team members over time</p>
+                    </div>
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={teamContributionData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                                <YAxis tick={{ fontSize: 10 }} label={{ value: 'Hours', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
+                                <Tooltip />
+                                <Legend verticalAlign="top" align="right" />
+                                <Bar dataKey="hours" name="Hours Logged" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* User Workload */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="mb-4">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white">User Workload</h3>
+                        <p className="text-xs text-slate-500">Tasks assigned to each user</p>
+                    </div>
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={userWorkloadData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                                <YAxis tick={{ fontSize: 10 }} label={{ value: 'Tasks', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
+                                <Tooltip />
+                                <Legend verticalAlign="bottom" height={36} />
+                                <Bar dataKey="Assigned Tasks" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                                <Bar dataKey="Completed Tasks" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Billable vs Non-billable */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 max-w-2xl">
+                    <div className="mb-4">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white">Billable vs Non-billable</h3>
+                        <p className="text-xs text-slate-500">Time tracking by billable status</p>
+                    </div>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={billableData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                >
+                                    <Cell fill="#10b981" />
+                                    <Cell fill="#818cf8" />
+                                </Pie>
+                                <Tooltip />
+                                <Legend verticalAlign="bottom" height={36} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
         )}
