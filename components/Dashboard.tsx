@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { Users, UserCheck, CalendarOff, TrendingUp, ArrowUpRight } from 'lucide-react';
 import { Employee, EmployeeStatus, LeaveRequest, LeaveStatus, Department } from '../types';
+import ChartCard from './ChartCard';
 
 interface DashboardProps {
   employees: Employee[];
@@ -130,12 +131,13 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="text-lg font-bold text-slate-800 dark:text-white">Workforce Distribution</h3>
-             <button className="text-xs font-bold text-primary-600 bg-primary-50 dark:bg-primary-900/30 px-3 py-1.5 rounded-lg">View Details</button>
-          </div>
-          <div className="h-72">
+        <ChartCard 
+          title="Workforce Distribution" 
+          subtext="Employee status breakdown"
+          height="h-72"
+          className="rounded-3xl shadow-sm"
+          data={statusData}
+        >
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
@@ -159,33 +161,32 @@ const Dashboard: React.FC<DashboardProps> = ({ employees, leaves }) => {
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-        </div>
+        </ChartCard>
 
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">Department Structure</h3>
-                <button className="text-xs font-bold text-primary-600 bg-primary-50 dark:bg-primary-900/30 px-3 py-1.5 rounded-lg">View Org Chart</button>
-            </div>
-            <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <BarChart data={departmentData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                        <XAxis type="number" hide />
-                        <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fontWeight: 600, fill: '#64748b'}} interval={0} />
-                        <Tooltip 
-                            cursor={{fill: 'transparent'}} 
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Bar dataKey="value" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={24} name="Staff Count">
-                            {departmentData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+        <ChartCard 
+          title="Department Structure" 
+          subtext="Staff count by department"
+          height="h-72"
+          className="rounded-3xl shadow-sm"
+          data={departmentData}
+        >
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <BarChart data={departmentData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fontWeight: 600, fill: '#64748b'}} interval={0} />
+                    <Tooltip 
+                        cursor={{fill: 'transparent'}} 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={24} name="Staff Count">
+                        {departmentData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Bar>
+                </BarChart>
+            </ResponsiveContainer>
+        </ChartCard>
       </div>
     </div>
   );
