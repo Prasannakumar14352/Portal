@@ -85,7 +85,7 @@ const MultiSelectUser = ({
                   {selectedIds.map(String).includes(String(user.id)) && <CheckCircle size={10} className="text-white" />}
                 </div>
                 <div className="flex items-center gap-2">
-                    <img src={user.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />
+                    <img src={user.avatar || undefined} className="w-6 h-6 rounded-full object-cover" alt="" />
                     <span className="text-sm font-bold text-slate-700 dark:text-white">{user.name}</span>
                 </div>
               </div>
@@ -798,7 +798,7 @@ const LeaveManagement: React.FC<LeaveManagementProps> = ({
                           <div key={member.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col">
                               <div className="flex items-center gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-slate-700">
                                   <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-100 dark:border-slate-700">
-                                      <img src={member.avatar} className="w-full h-full object-cover" alt="" />
+                                      <img src={member.avatar || undefined} className="w-full h-full object-cover" alt="" />
                                   </div>
                                   <div>
                                       <h4 className="font-bold text-slate-800 dark:text-white">{member.name}</h4>

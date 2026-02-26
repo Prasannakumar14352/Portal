@@ -266,7 +266,7 @@ const Profile = () => {
             <div className="absolute top-0 left-0 w-full h-1.5 bg-primary-600"></div>
             <div className="relative mb-6">
                 <div className={`w-32 h-32 rounded-full border-4 ${isEditMode ? 'border-primary-500/50 scale-105' : 'border-white dark:border-slate-900'} shadow-2xl overflow-hidden bg-slate-100 dark:bg-slate-700 transition-all`}>
-                    <img src={formData.avatar} alt="" className="w-full h-full object-cover" />
+                    <img src={formData.avatar || undefined} alt="" className="w-full h-full object-cover" />
                 </div>
                 {/* Employee only allowed to change location and phone number. Avatar restriction enforced. */}
                 {isEditMode && isPowerUser && (

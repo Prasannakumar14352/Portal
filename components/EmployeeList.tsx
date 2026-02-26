@@ -220,7 +220,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                             <td className="px-6 py-4">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 overflow-hidden border-2 border-white dark:border-slate-700 shadow-sm">
-                                        <img src={emp.avatar} alt="" className="w-full h-full object-cover" />
+                                        <img src={emp.avatar || undefined} alt="" className="w-full h-full object-cover" />
                                     </div>
                                     <div>
                                         <p className="font-bold text-slate-800 dark:text-white text-sm">{emp.firstName} {emp.lastName}</p>

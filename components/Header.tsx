@@ -141,13 +141,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onChangeView, onMenuCli
                 className="flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-700"
             >
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm bg-slate-200">
-                    <img src={user.avatar} className="w-full h-full object-cover" alt="" />
+                    <img src={user.avatar || undefined} className="w-full h-full object-cover" alt="" />
                 </div>
                 <div className="hidden lg:block text-left">
-                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-none truncate max-w-[150px]">{user.name}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-none truncate max-w-[200px]">{user.name}</p>
                     <div className="flex items-center gap-2 mt-1">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{user.role}</p>
-                        <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{user.position || user.jobTitle || user.role}</p>
+                        <span className="text-slate-300 dark:text-slate-600 font-bold">•</span>
                         <p className="text-[10px] text-primary-600 font-black tracking-tighter">{user.employeeId}</p>
                     </div>
                 </div>
