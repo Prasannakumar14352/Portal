@@ -43,14 +43,34 @@ const getSafeProjectIds = (emp: any): (string | number)[] => {
 };
 
 const parseLocation = (loc: any) => {
-    const defaultLoc = { latitude: 20.5937, longitude: 78.9629, address: '' };
+    const defaultLoc = { latitude: 20.5937, longitude: 78.9629, address: '', isDefault: true };
     if (!loc) return defaultLoc;
+    
     let parsed = loc;
-    if (typeof loc === 'string') { try { parsed = JSON.parse(loc); } catch (e) { return defaultLoc; } }
+    if (typeof loc === 'string') {
+        try {
+            parsed = JSON.parse(loc);
+        } catch (e) {
+            // If it's not JSON, it might be a simple address string or invalid
+            return { ...defaultLoc, address: loc, isDefault: true };
+        }
+    }
+
+    // Support various coordinate field names (case-insensitive-ish)
+    const lat = parsed.latitude ?? parsed.lat ?? parsed.Latitude ?? parsed.Lat ?? parsed.y ?? parsed.Y;
+    const lng = parsed.longitude ?? parsed.lng ?? parsed.Longitude ?? parsed.Lng ?? parsed.x ?? parsed.X;
+
+    const latitude = typeof lat === 'number' ? lat : parseFloat(String(lat));
+    const longitude = typeof lng === 'number' ? lng : parseFloat(String(lng));
+
+    // Check if coordinates are valid and not exactly 0,0 (unless intended, but usually means missing)
+    const isValid = !isNaN(latitude) && !isNaN(longitude) && (latitude !== 0 || longitude !== 0);
+
     return {
-        latitude: parseFloat(parsed.latitude) || defaultLoc.latitude,
-        longitude: parseFloat(parsed.longitude) || defaultLoc.longitude,
-        address: parsed.address || ''
+        latitude: isValid ? latitude : defaultLoc.latitude,
+        longitude: isValid ? longitude : defaultLoc.longitude,
+        address: parsed.address || '',
+        isDefault: !isValid
     };
 };
 
@@ -170,6 +190,8 @@ const Organization = () => {
   const [activeTab, setActiveTab] = useState<'projects' | 'directory' | 'positions' | 'chart'>('projects');
   const [directorySearch, setDirectorySearch] = useState('');
   const [directoryView, setDirectoryView] = useState<'map' | 'list'>('list');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
   const [projectSearch, setProjectSearch] = useState('');
   const [projectStatusFilter, setProjectStatusFilter] = useState('All');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -178,7 +200,14 @@ const Organization = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const viewInstanceRef = useRef<any>(null);
   const graphicsLayerRef = useRef<any>(null);
-  const GraphicClassRef = useRef<any>(null);
+  const esriRefs = useRef<{
+    Map: any;
+    MapView: any;
+    Graphic: any;
+    GraphicsLayer: any;
+    Home: any;
+    Point: any;
+  } | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isImagery, setIsImagery] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -210,6 +239,16 @@ const Organization = () => {
       return employees.filter(e => `${e.firstName} ${e.lastName}`.toLowerCase().includes(term) || (e.position || '').toLowerCase().includes(term) || (e.jobTitle || '').toLowerCase().includes(term) || (e.department || '').toLowerCase().includes(term) || (e.email || '').toLowerCase().includes(term));
   }, [employees, directorySearch]);
 
+  const totalPages = Math.ceil(filteredDirectoryEmployees.length / itemsPerPage);
+  const paginatedEmployees = useMemo(() => {
+      const start = (currentPage - 1) * itemsPerPage;
+      return filteredDirectoryEmployees.slice(start, start + itemsPerPage);
+  }, [filteredDirectoryEmployees, currentPage]);
+
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [directorySearch]);
+
   const filteredProjects = useMemo(() => {
       return projects.filter(p => {
           const matchSearch = p.name.toLowerCase().includes(projectSearch.toLowerCase()) || (p.description || '').toLowerCase().includes(projectSearch.toLowerCase());
@@ -234,55 +273,120 @@ const Organization = () => {
 
   useEffect(() => {
     if (activeTab !== 'directory' || directoryView !== 'map' || !mapContainerRef.current) return;
+    
+    let isMounted = true;
     setIsMapReady(false);
-    loadModules(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/layers/GraphicsLayer", "esri/widgets/Home"], { css: true })
-      .then(([EsriMap, MapView, Graphic, GraphicsLayer, Home]) => {
-        if (!mapContainerRef.current) return;
-        GraphicClassRef.current = Graphic;
-        const map = new EsriMap({ basemap: isImagery ? "satellite" : "topo-vector" });
-        const view = new MapView({ container: mapContainerRef.current, map: map, zoom: 3, center: [78.9629, 20.5937], ui: { components: ["zoom"] } });
+
+    loadModules([
+      "esri/Map", 
+      "esri/views/MapView", 
+      "esri/Graphic", 
+      "esri/layers/GraphicsLayer", 
+      "esri/widgets/Home", 
+      "esri/geometry/Point"
+    ], { css: true })
+      .then(([EsriMap, MapView, Graphic, GraphicsLayer, Home, Point]) => {
+        if (!isMounted || !mapContainerRef.current) return;
+
+        esriRefs.current = { Map: EsriMap, MapView, Graphic, GraphicsLayer, Home, Point };
+
+        const map = new EsriMap({ 
+          basemap: isImagery ? "satellite" : "topo-vector" 
+        });
+
+        const view = new MapView({ 
+          container: mapContainerRef.current, 
+          map: map, 
+          zoom: 3, 
+          center: [0, 20], 
+          ui: { components: ["zoom"] } 
+        });
+
         view.ui.add(new Home({ view }), "top-left");
+        
         const layer = new GraphicsLayer();
         map.add(layer);
+        
         viewInstanceRef.current = view;
         graphicsLayerRef.current = layer;
-        view.when(() => { setIsMapReady(true); });
+
+        view.when(() => { 
+          if (isMounted) setIsMapReady(true); 
+        });
+      })
+      .catch(err => {
+        console.error("ArcGIS Load Error:", err);
       });
-    return () => { if (viewInstanceRef.current) { viewInstanceRef.current.destroy(); viewInstanceRef.current = null; setIsMapReady(false); } };
+
+    return () => { 
+      isMounted = false;
+      if (viewInstanceRef.current) { 
+        viewInstanceRef.current.destroy(); 
+        viewInstanceRef.current = null; 
+      } 
+      setIsMapReady(false); 
+    };
   }, [activeTab, directoryView, isImagery]);
 
-  // Handle markers update on map - Updated to use avatars
+  // Handle markers update on map
   useEffect(() => {
-      if (isMapReady && graphicsLayerRef.current && GraphicClassRef.current) {
-          graphicsLayerRef.current.removeAll();
-          filteredDirectoryEmployees.forEach(emp => {
+      if (isMapReady && viewInstanceRef.current && esriRefs.current) {
+          const { Graphic } = esriRefs.current;
+          viewInstanceRef.current.graphics.removeAll();
+          const graphics: any[] = [];
+
+          const employeesToDisplay = filteredDirectoryEmployees.length > 0 ? filteredDirectoryEmployees : employees;
+
+          employeesToDisplay.forEach(emp => {
               const loc = parseLocation(emp.location);
-              if (loc.latitude && loc.longitude) {
-                  // Replaced generic blue dots with employee avatars
-                  const graphic = new GraphicClassRef.current({
-                      geometry: { type: "point", longitude: loc.longitude, latitude: loc.latitude },
+              if (!loc.isDefault) {
+                  const graphic = new Graphic({
+                      geometry: {
+                          type: "point",
+                          longitude: loc.longitude,
+                          latitude: loc.latitude
+                      },
                       symbol: { 
-                          type: "picture-marker", 
-                          url: emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}`,
-                          width: "40px",
-                          height: "40px",
+                          type: "simple-marker",
+                          color: [37, 99, 235], // primary-600
+                          size: "12px",
+                          outline: {
+                              color: [255, 255, 255],
+                              width: 2
+                          }
                       }, 
                       popupTemplate: { 
                           title: `${emp.firstName} ${emp.lastName}`, 
                           content: `
                             <div style="font-family: sans-serif; padding-top: 8px;">
-                                <p><strong>Position:</strong> ${emp.position || emp.jobTitle || 'Team Member'}</p>
-                                <p><strong>Email:</strong> ${emp.email}</p>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <img src="${emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.firstName)}+${encodeURIComponent(emp.lastName)}`}" style="width: 40px; height: 40px; border-radius: 50%;" />
+                                    <div>
+                                        <p style="margin: 0; font-weight: bold;">${emp.firstName} ${emp.lastName}</p>
+                                        <p style="margin: 0; font-size: 11px; color: #666;">${emp.position || emp.jobTitle || 'Team Member'}</p>
+                                    </div>
+                                </div>
+                                <p style="margin: 4px 0;"><strong>Email:</strong> ${emp.email}</p>
+                                ${loc.address ? `<p style="margin: 4px 0;"><strong>Location:</strong> ${loc.address}</p>` : ''}
                             </div>
                           ` 
                       },
                       attributes: emp
                   });
-                  graphicsLayerRef.current.add(graphic);
+                  graphics.push(graphic);
               }
           });
+
+          if (graphics.length > 0) {
+              viewInstanceRef.current.graphics.addMany(graphics);
+              if (graphics.length > 1) {
+                  viewInstanceRef.current.goTo(graphics, { duration: 1000 }).catch(() => {});
+              } else {
+                  viewInstanceRef.current.goTo({ target: graphics[0], zoom: 12 }, { duration: 1000 }).catch(() => {});
+              }
+          }
       }
-  }, [isMapReady, filteredDirectoryEmployees]);
+  }, [isMapReady, filteredDirectoryEmployees, employees]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
       e.preventDefault(); setIsProcessing(true);
@@ -413,9 +517,125 @@ const Organization = () => {
                    </div>
                 </div>
                 {directoryView === 'map' ? (
-                   <div className="h-[60vh] bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden relative border border-slate-200 dark:border-slate-700 shadow-inner"><div ref={mapContainerRef} className="w-full h-full" /><div className="absolute top-4 right-4 z-10 bg-white dark:bg-slate-800 p-2 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 flex flex-col gap-2"><button onClick={() => setIsImagery(!isImagery)} className={`p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${isImagery ? 'text-primary-600' : 'text-slate-500'}`} title="Toggle Imagery"><Layers size={20}/></button></div></div>
+                   <div className="h-[60vh] bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden relative border border-slate-200 dark:border-slate-700 shadow-inner">
+                       <div ref={mapContainerRef} className="w-full h-full" />
+                       <div className="absolute top-4 right-4 z-10 bg-white dark:bg-slate-800 p-2 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
+                           <button 
+                               onClick={() => {
+                                   if (viewInstanceRef.current && viewInstanceRef.current.graphics.length > 0) {
+                                       viewInstanceRef.current.goTo(viewInstanceRef.current.graphics.toArray()).catch(() => {});
+                                   }
+                               }}
+                               className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-500"
+                               title="Center on Employees"
+                           >
+                               <LocateFixed size={20}/>
+                           </button>
+                           <button onClick={() => setIsImagery(!isImagery)} className={`p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${isImagery ? 'text-primary-600' : 'text-slate-500'}`} title="Toggle Imagery"><Layers size={20}/></button>
+                       </div>
+                   </div>
                 ) : (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filteredDirectoryEmployees.map(emp => ( <div key={emp.id} className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group flex flex-col"><div className="flex items-center gap-4 mb-4"><img src={emp.avatar || undefined} className="w-14 h-14 rounded-full" alt=""/><div className="flex-1 overflow-hidden"><h4 className="font-bold text-slate-800 dark:text-white truncate">{emp.firstName} {emp.lastName}</h4><p className="text-xs text-primary-600 dark:text-primary-400 font-bold uppercase truncate">{emp.position}</p></div></div><div className="space-y-2 mb-6"><div className="flex items-center gap-3 text-xs text-slate-500"><Mail size={14}/> {emp.email}</div><div className="flex items-center gap-3 text-xs text-slate-500"><Building2 size={14}/> {emp.department}</div></div>{isPowerUser && <button onClick={() => { setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: getSafeProjectIds(emp)}); setShowEmployeeModal(true); }} className="mt-auto w-full py-2 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-colors uppercase tracking-widest border border-transparent hover:border-primary-100">Edit Profile</button>}</div> ))}</div>
+                    <div className="space-y-4">
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Employee</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Position</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Department</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Email</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                        {paginatedEmployees.map(emp => (
+                                            <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <img src={emp.avatar || undefined} className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-700 shadow-sm" alt=""/>
+                                                        <div>
+                                                            <p className="font-bold text-slate-800 dark:text-white text-sm">{emp.firstName} {emp.lastName}</p>
+                                                            <p className="text-[10px] text-slate-400 font-bold">#{emp.employeeId}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded-md">
+                                                        {emp.position || emp.jobTitle}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                                        <Building2 size={14} className="text-slate-400" />
+                                                        {emp.department}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                                        <Mail size={14} className="text-slate-400" />
+                                                        {emp.email}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {isPowerUser && (
+                                                        <button 
+                                                            onClick={() => { setEditingEmployee(emp); setEmployeeFormData({...emp, projectIds: getSafeProjectIds(emp)}); setShowEmployeeModal(true); }} 
+                                                            className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-all"
+                                                            title="Edit Profile"
+                                                        >
+                                                            <Edit2 size={16}/>
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {filteredDirectoryEmployees.length === 0 && (
+                                <div className="p-12 text-center">
+                                    <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Search size={24} className="text-slate-300" />
+                                    </div>
+                                    <p className="text-slate-500 font-medium">No employees found matching your search.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex justify-between items-center px-2">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredDirectoryEmployees.length)} of {filteredDirectoryEmployees.length}
+                                </p>
+                                <div className="flex gap-1">
+                                    <button 
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(prev => prev - 1)}
+                                        className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <ChevronLeft size={18} />
+                                    </button>
+                                    {[...Array(totalPages)].map((_, i) => (
+                                        <button 
+                                            key={i}
+                                            onClick={() => setCurrentPage(i + 1)}
+                                            className={`w-10 h-10 rounded-lg border font-bold text-sm transition-all ${currentPage === i + 1 ? 'bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-500/30' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    ))}
+                                    <button 
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage(prev => prev + 1)}
+                                        className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <ChevronRight size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         )}
